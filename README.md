@@ -1,8 +1,6 @@
 # cowCode
 
-WhatsApp + configurable LLM. Receives messages, gets a reply from your chosen backend, sends it back. No tools, no extra features.
-
-This works seamlessly with a **local LLM** (e.g. LM Studio, Ollama): each message is sent to your model and the reply is posted back to WhatsApp with minimal context—no long history or heavy prompting, so it stays simple and fast.
+**Connect chat apps to your local LLM.** You send a message; the bot gets a reply from your chosen model (LM Studio, Ollama, or cloud fallbacks) and sends it back. Minimal setup, no extra features—minimal context per message, so it stays simple and fast. Right now **WhatsApp** is supported (more channels planned).
 
 **Note:** The connected linked device in WhatsApp may show as **Google Chrome (Ubuntu)**. This is due to the library used (Baileys) and is expected; you can ignore it.
 
@@ -35,12 +33,14 @@ First entry is local (literal values in config). You can set **`baseUrl`** in co
     "maxTokens": 2048,
     "models": [
       { "provider": "lmstudio", "baseUrl": "http://127.0.0.1:1234/v1", "model": "local", "apiKey": "not-needed" },
-      { "provider": "openai", "apiKey": "LLM_1_API_KEY", "model": "gpt-4o" },
+      { "provider": "openai", "apiKey": "LLM_1_API_KEY", "model": "gpt-4o", "priority": true },
       { "provider": "grok", "apiKey": "LLM_2_API_KEY", "model": "grok-2" }
     ]
   }
 }
 ```
+
+**Priority:** You can set **`"priority": true`** on exactly one model. That model is always tried first, no matter where it appears in the list. If no model has `priority`, the order in the config array is used (first entry first, then fallbacks).
 
 For **cloud** providers set `provider` and `apiKey`; you can set **`model`** in config (e.g. `"model": "gpt-4o"`) or leave it out to use the env var `OPENAI_MODEL` / `GROK_MODEL` / etc., or the built-in default for that provider.
 
