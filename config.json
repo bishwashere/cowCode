@@ -1,0 +1,8 @@
+{
+  "llm": {
+    "baseUrl": "http://127.0.0.1:1234/v1",
+    "apiKey": "not-needed",
+    "model": "local",
+    "maxTokens": 2048
+  }
+}

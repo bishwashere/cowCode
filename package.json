@@ -1,0 +1,17 @@
+{
+  "name": "wa-llm",
+  "version": "1.0.0",
+  "description": "WhatsApp + configurable local/cloud LLM. No tools, just reply.",
+  "type": "module",
+  "main": "index.js",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "start": "node index.js",
+    "auth": "node index.js --auth-only"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "pino": "^9.5.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
