@@ -1,22 +1,38 @@
 # cowCode
 
-**Connect chat apps to your local LLM.** You send a message; the bot gets a reply from your chosen model (LM Studio, Ollama, or cloud fallbacks) and sends it back. Minimal setup, no extra features—minimal context per message, so it stays simple and fast. Right now **WhatsApp** is supported (more channels planned).
+**Connect chat apps to your local LLM.** You send a message; the bot gets a reply from your chosen model (LM Studio, Ollama, or cloud fallbacks) and sends it back. Minimal setup, no extra features, minimal context per message, so it stays simple and fast. Right now **WhatsApp** is supported (more channels planned).
+
+**Why so little context?** We built this after repeatedly hitting a wall: context windows were never small enough. Long histories and heavy system prompts kept blowing the limit. So this project is deliberately minimal: each turn gets only what’s needed to reply. No conversation buffer, no fancy prompting. That’s the only way it reliably works with smaller or local models.
 
 **Note:** The connected linked device in WhatsApp may show as **Google Chrome (Ubuntu)**. This is due to the library used (Baileys) and is expected; you can ignore it.
 
 ## Setup
 
-1. **Install**  
-   `pnpm install`
+1. **Install**
+
+   ```bash
+   pnpm install
+   ```
 
 2. **Link WhatsApp (first time only)**  
-   `pnpm run auth` — scan the QR in the terminal with WhatsApp (Linked devices), then Ctrl+C.
+   Run the command below, then scan the QR in the terminal with WhatsApp (Linked devices), then Ctrl+C.
+
+   ```bash
+   pnpm run auth
+   ```
 
 3. **Env (only for cloud models)**  
    If you add OpenAI/Grok/etc. as fallbacks, copy `.env.example` to `.env` and set the API keys there. The first (local) model needs no env.
 
-4. **Run**  
-   `pnpm start`
+   ```bash
+   cp .env.example .env
+   ```
+
+4. **Run**
+
+   ```bash
+   pnpm start
+   ```
 
 Ensure your LLM server is running (e.g. LM Studio or Ollama with a model loaded) before or when you start.
 
