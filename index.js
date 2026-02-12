@@ -205,14 +205,14 @@ async function main() {
         ]);
         const reply = stripThinking(rawReply);
         if (reply) {
-          const textToSend = '[OpenCow] ' + reply;
+          const textToSend = '[CowCode] ' + reply;
           await sock.sendMessage(jid, { text: textToSend });
           lastSentByJid.set(jid, textToSend);
           console.log('[replied]');
         }
       } catch (err) {
         console.error('LLM error:', err.message);
-        await sock.sendMessage(jid, { text: `[OpenCow] Error: ${err.message}` });
+        await sock.sendMessage(jid, { text: `[CowCode] Error: ${err.message}` });
       }
     }
   });
