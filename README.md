@@ -1,4 +1,4 @@
-# wa-llm
+# cowCode
 
 WhatsApp + configurable LLM. Receives messages, gets a reply from your chosen backend, sends it back. No tools, no extra features.
 

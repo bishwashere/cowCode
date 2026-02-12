@@ -1,5 +1,5 @@
 {
-  "name": "wa-llm",
+  "name": "cowcode",
   "version": "1.0.0",
   "description": "WhatsApp + configurable local/cloud LLM. No tools, just reply.",
   "type": "module",
