@@ -205,14 +205,14 @@ async function main() {
         ]);
         const reply = stripThinking(rawReply);
         if (reply) {
-          const textToSend = '[OpenClay] ' + reply;
+          const textToSend = '[OpenCow] ' + reply;
           await sock.sendMessage(jid, { text: textToSend });
           lastSentByJid.set(jid, textToSend);
           console.log('[replied]');
         }
       } catch (err) {
         console.error('LLM error:', err.message);
-        await sock.sendMessage(jid, { text: `[OpenClay] Error: ${err.message}` });
+        await sock.sendMessage(jid, { text: `[OpenCow] Error: ${err.message}` });
       }
     }
   });
