@@ -206,7 +206,9 @@ async function main() {
   function getBrowserSystemPrompt() {
     return `You are a helpful assistant with access to the browser tool to search the web or open a URL. Reply concisely in the same language the user uses. Do not use <think> or any thinking/reasoning blocks—output only your final reply.
 
-Use the browser tool to get current information: call action "search" with "query" set to the user's search (e.g. recent trends, latest news). Then answer based on the returned content. If the user gave a specific URL, use action "navigate" with "url". Summarize the results clearly for the user.`;
+Use the browser tool to get current information: call action "search" with "query" set to the user's search (e.g. current time, weather, recent trends, latest news). Then answer based on the returned content. If the user gave a specific URL, use action "navigate" with "url".
+
+CRITICAL - Give the exact data in your reply: When the user asks for things like current time, weather, today's date, or sunny/rainy conditions, state the actual value from the search results (e.g. "The time is 3:45 PM IST", "It's 28°C and sunny in Mumbai", "Today is 12 February 2025"). Do NOT tell them to "check the link", "see the results above", or "search for it"—answer with the concrete time, weather, or fact directly.`;
   }
   function getScheduleSystemPrompt() {
     const now = Date.now();
@@ -327,6 +329,16 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
           tool_call_id: tc.id,
           content: result,
         });
+      }
+    }
+    // For SEARCH: if we have search results but no LLM reply (e.g. model didn't synthesize), run one more call with no tools so the model answers with the exact data from the results.
+    if (isSearch && browserResult && !stripThinking(finalContent).trim()) {
+      try {
+        const synthesized = await chatWithTools(messages, []);
+        const reply = synthesized?.content && stripThinking(synthesized.content).trim();
+        if (reply) finalContent = reply;
+      } catch (err) {
+        console.error('[agent] search synthesis failed:', err.message);
       }
     }
     let textToSend;

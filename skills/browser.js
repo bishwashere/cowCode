@@ -213,11 +213,13 @@ async function runWithBrowser(fn) {
 export const browserSkill = {
   id: 'browser',
   name: 'browser',
-  description: `Search the web or fetch a page. Use when the user needs current, recent, or real-time information (news, trends, today's data, latest X).
+  description: `Search the web or fetch a page. Use when the user needs current, recent, or real-time information.
+
+Use search for: current time, what's the time, weather today, is it sunny/rainy, today's date, news, trends, latest X. Always call search with a clear query (e.g. "current time", "weather in Mumbai") so you get exact data to reply with.
 
 ACTIONS:
-- search: Run a web search for "query". Returns text snippets from search results. Use for "recent trends", "latest news", "what is X today", etc.
-- navigate: Open "url" and return the main text content of the page. Use when the user provides a specific URL to read.`,
+- search: Run a web search for "query". Returns text snippets. Use for time, weather, date, "recent trends", "latest news", etc.
+- navigate: Open "url" and return the main text content. Use when the user gives a specific URL to read.`,
   parameters: BROWSER_TOOL_SCHEMA,
   async execute(ctx, args) {
     const action = args?.action && String(args.action).trim().toLowerCase();

@@ -263,7 +263,7 @@ export async function classifyIntent(userMessage) {
       role: 'system',
       content: `You classify the user's intent. Reply with exactly one word: CHAT, SCHEDULE_LIST, SCHEDULE_CREATE, or SEARCH.
 
-SEARCH = the user wants CURRENT, RECENT, or REAL-TIME information from the web. Examples: "recent AI trends", "latest news about X", "what's trending today", "search for X", "find me information about X", "what is the weather today", "current price of Y", "what happened this week". If they need up-to-date or live data = SEARCH.
+SEARCH = the user wants CURRENT, RECENT, or REAL-TIME information from the web. Examples: "what's the time now", "current time", "what is the weather today", "is it sunny or rainy", "recent AI trends", "latest news about X", "what's trending today", "search for X", "current price of Y". If they need up-to-date or live data (time, weather, etc.) = SEARCH.
 
 SCHEDULE_LIST = the user ONLY wants to see, list, count, or ask about existing scheduled jobs/reminders/crons. Examples: "do we have any crons?", "which crons are set?", "list my reminders", "what's scheduled?".
 
