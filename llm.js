@@ -201,13 +201,15 @@ export async function classifyIntent(userMessage) {
   const messages = [
     {
       role: 'system',
-      content: `You classify the user's intent. Reply with exactly one word: CHAT, SCHEDULE_LIST, or SCHEDULE_CREATE.
+      content: `You classify the user's intent. Reply with exactly one word: CHAT, SCHEDULE_LIST, SCHEDULE_CREATE, or SEARCH.
 
-SCHEDULE_LIST = the user ONLY wants to see, list, count, or ask about existing scheduled jobs/reminders/crons. They are NOT asking to create or set up a new one. Examples: "do we have any crons?", "is there any crons set up?", "which crons are set?", "how many crons do I have?", "what's scheduled?", "list my reminders", "show my crons", "what is the next cron?", "do I have reminders?" — any phrasing that only asks about existing schedules = SCHEDULE_LIST.
+SEARCH = the user wants CURRENT, RECENT, or REAL-TIME information from the web. Examples: "recent AI trends", "latest news about X", "what's trending today", "search for X", "find me information about X", "what is the weather today", "current price of Y", "what happened this week". If they need up-to-date or live data = SEARCH.
 
-SCHEDULE_CREATE = the user wants to CREATE or SET a new reminder or schedule a message at a future time. Examples: "remind me in 5 minutes", "send me X tomorrow", "set a cron for 8am", "add a reminder", "send me hello in 1 minute".
+SCHEDULE_LIST = the user ONLY wants to see, list, count, or ask about existing scheduled jobs/reminders/crons. Examples: "do we have any crons?", "which crons are set?", "list my reminders", "what's scheduled?".
 
-CHAT = greetings, general questions, or anything that is neither listing existing schedules nor creating a new one.`,
+SCHEDULE_CREATE = the user wants to CREATE or SET a new reminder or schedule. Examples: "remind me in 5 minutes", "send me X tomorrow", "set a cron for 8am".
+
+CHAT = greetings, general knowledge questions (that don't need current data), or conversation. Examples: "Hi", "what is the capital of France", "explain quantum computing".`,
     },
     { role: 'user', content: (userMessage || '').trim() || 'Hi' },
   ];
@@ -229,6 +231,7 @@ CHAT = greetings, general questions, or anything that is neither listing existin
       if (content.includes('SCHEDULE_LIST')) return 'SCHEDULE_LIST';
       if (content.includes('SCHEDULE_CREATE')) return 'SCHEDULE_CREATE';
       if (content.includes('SCHEDULE')) return 'SCHEDULE_CREATE';
+      if (content.includes('SEARCH')) return 'SEARCH';
       return 'CHAT';
     } catch (err) {
       console.log('[LLM] intent try failed:', label, err.message);

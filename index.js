@@ -163,8 +163,22 @@ async function main() {
   const MAX_OUR_SENT_IDS = 200;
 
   // Agent logic (shared by real socket handler and --test mode)
-  const tools = getEnabledTools();
+  const allTools = getEnabledTools();
+  function getToolsForIntent(intent) {
+    if (intent === 'SCHEDULE_LIST' || intent === 'SCHEDULE_CREATE') {
+      return allTools.filter((t) => t.function?.name === 'cron');
+    }
+    if (intent === 'SEARCH') {
+      return allTools.filter((t) => t.function?.name === 'browser');
+    }
+    return [];
+  }
   const chatSystemPrompt = 'You are a helpful assistant. Reply concisely in the same language the user uses. Do not use <think> or any thinking/reasoning blocks—output only your final reply.';
+  function getBrowserSystemPrompt() {
+    return `You are a helpful assistant with access to the browser tool to search the web or open a URL. Reply concisely in the same language the user uses. Do not use <think> or any thinking/reasoning blocks—output only your final reply.
+
+Use the browser tool to get current information: call action "search" with "query" set to the user's search (e.g. recent trends, latest news). Then answer based on the returned content. If the user gave a specific URL, use action "navigate" with "url". Summarize the results clearly for the user.`;
+  }
   function getScheduleSystemPrompt() {
     const now = Date.now();
     const nowIso = new Date(now).toISOString();
@@ -197,9 +211,11 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
     } catch (err) {
       console.error('[agent] intent classification failed:', err.message);
     }
-    const useTools = (intent === 'SCHEDULE_LIST' || intent === 'SCHEDULE_CREATE') && tools.length > 0;
+    const toolsToUse = getToolsForIntent(intent);
+    const useTools = toolsToUse.length > 0;
     const isListOnly = intent === 'SCHEDULE_LIST';
-    if (useTools && !isListOnly) {
+    const isSearch = intent === 'SEARCH';
+    if (useTools && !isListOnly && !isSearch) {
       const immediateReply = "[CowCode] Got it, one moment.";
       const immediateSent = await sock.sendMessage(jid, { text: immediateReply });
       if (immediateSent?.key?.id && ourSentIdsRef?.current) {
@@ -212,7 +228,9 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
       lastSentByJidMap.set(jid, immediateReply);
       console.log('[replied] (immediate)');
     }
-    const systemPrompt = useTools ? getScheduleSystemPrompt() : chatSystemPrompt;
+    const systemPrompt = useTools
+      ? (intent === 'SEARCH' ? getBrowserSystemPrompt() : getScheduleSystemPrompt())
+      : chatSystemPrompt;
     const ctx = {
       storePath: CRON_STORE_PATH,
       jid,
@@ -225,6 +243,7 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
     ];
     let finalContent = '';
     let cronListResult = null;
+    let browserResult = null;
     const maxToolRounds = 1;
     for (let round = 0; round <= maxToolRounds; round++) {
       if (!useTools) {
@@ -232,7 +251,7 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
         finalContent = stripThinking(rawReply);
         break;
       }
-      const { content, toolCalls } = await chatWithTools(messages, tools);
+      const { content, toolCalls } = await chatWithTools(messages, toolsToUse);
       if (!toolCalls || toolCalls.length === 0) {
         finalContent = content || '';
         break;
@@ -271,6 +290,9 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
         if (skillId === 'cron' && action === 'list' && result && typeof result === 'string') {
           cronListResult = result;
         }
+        if (skillId === 'browser' && result && typeof result === 'string') {
+          browserResult = result;
+        }
         messages.push({
           role: 'tool',
           tool_call_id: tc.id,
@@ -283,6 +305,22 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
       textToSend = '[CowCode] ' + stripThinking(finalContent).trim();
     } else if (cronListResult && cronListResult.trim()) {
       textToSend = '[CowCode] ' + cronListResult.trim();
+    } else if (browserResult && browserResult.trim()) {
+      let browserReply = browserResult.trim();
+      try {
+        const parsed = JSON.parse(browserReply);
+        if (parsed && typeof parsed.error === 'string') {
+          const err = parsed.error;
+          if (/executable doesn't exist|doesn't exist at|playwright.*install/i.test(err)) {
+            browserReply = "I couldn't run the search because the browser isn't set up. Run: pnpm exec playwright install";
+          } else {
+            browserReply = 'Search failed: ' + err;
+          }
+        }
+      } catch (_) {
+        browserReply = browserReply.slice(0, 2000) + (browserReply.length > 2000 ? '…' : '');
+      }
+      textToSend = '[CowCode] ' + browserReply;
     } else {
       textToSend = "[CowCode] Done. Anything else?";
     }

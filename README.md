@@ -64,13 +64,13 @@ For **cloud** providers set `provider` and `apiKey`; you can set **`model`** in 
 `openai`, `grok` / `xai`, `together`, `deepseek`, `ollama`, `lmstudio`. For **local** (`lmstudio`, `ollama`) you can set `baseUrl` in config; for others the URL is preset and not configurable.
 
 **Skills (tools the assistant can use):**  
-Scheduling and other capabilities are implemented as **skills**. In `config.json`, `skills.enabled` is an array of skill ids. By default only **cron** is enabled. To add a future skill (e.g. search), add it to `skills.enabled` and any per-skill options under `skills.<id>` (e.g. `skills.search`). Skills not in `skills.enabled` are not loaded.
+Scheduling, web search, and other capabilities are implemented as **skills**. In `config.json`, `skills.enabled` is an array of skill ids. By default **cron** and **browser** are enabled. Skills not in `skills.enabled` are not loaded.
 
 ```json
 "skills": {
-  "enabled": ["cron"],
+  "enabled": ["cron", "browser"],
   "cron": {},
-  "search": {}
+  "browser": {}
 }
 ```
 
@@ -97,6 +97,24 @@ The **cron** skill is enabled by default. You can say things like “remind me t
 4. **Enable/disable:** `pnpm run cron enable <job-id>` or `pnpm run cron disable <job-id>`
 
 Jobs are stored in `cron/jobs.json`. **One-shot jobs** (e.g. "send me hi in 30 seconds") are **removed from the file after they run**, so `jobs.json` may be empty even though the cron sent the message—check the terminal for `[cron] One-shot completed and removed from store`. The runner starts when WhatsApp connects (`pnpm start`). By default the reply is sent to your "Message yourself" chat; use `--jid <number@s.whatsapp.net>` to send to a specific chat.
+
+### Browser skill: web search (no API key)
+
+The **browser** skill is enabled by default. It uses **Playwright** to search the web or open a URL when the user asks for current/recent information (e.g. "recent AI trends", "latest news about X", "search for Y"). No Brave or other search API key is required; it runs a headless browser locally. Install Chromium once:
+
+```bash
+npx playwright install chromium
+```
+
+If the browser binary is missing, search/navigate tool calls will return an error; the assistant will still reply with that. To disable the skill, remove `"browser"` from `skills.enabled` in `config.json`.
+
+### Tests
+
+- **Cron (unit):** `pnpm run test:schedule`
+- **Cron (E2E, needs LLM):** `pnpm run test:schedule-e2e`
+- **Browser (unit, needs network; skips if no Chromium):** `pnpm run test:browser`
+- **Browser (E2E, needs LLM):** `pnpm run test:browser-e2e`
+- **Intent classification (needs LLM):** `pnpm run test:intent`
 
 ### If linking fails ("can't link device")
 

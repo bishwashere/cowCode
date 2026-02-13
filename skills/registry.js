@@ -8,15 +8,18 @@ import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { cronSkill } from './cron.js';
+import { browserSkill } from './browser.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const CONFIG_PATH = join(__dirname, '..', 'config.json');
 
+const DEFAULT_ENABLED = ['cron', 'browser'];
+
 /** Built-in skills. Add new skills here and to config.json skills.enabled when ready. */
 const BUILTIN_SKILLS = {
   cron: cronSkill,
-  // search: searchSkill,  // future
+  browser: browserSkill,
 };
 
 /**
@@ -28,9 +31,9 @@ export function getSkillsConfig() {
     const config = JSON.parse(raw);
     const skills = config.skills;
     if (!skills || typeof skills !== 'object') {
-      return { enabled: ['cron'] };
+      return { enabled: DEFAULT_ENABLED };
     }
-    const enabled = Array.isArray(skills.enabled) ? skills.enabled : ['cron'];
+    const enabled = Array.isArray(skills.enabled) ? skills.enabled : DEFAULT_ENABLED;
     return { enabled, ...skills };
   } catch {
     return { enabled: ['cron'] };

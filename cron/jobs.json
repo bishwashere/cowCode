@@ -1,31 +1,4 @@
 {
   "version": 1,
-  "jobs": [
-    {
-      "id": "job-mlk6dat8-dc1nna",
-      "name": "Reminder",
-      "enabled": true,
-      "schedule": {
-        "kind": "at",
-        "at": "2026-02-13T00:55:16.168Z"
-      },
-      "message": "hi",
-      "jid": "16418198209@s.whatsapp.net",
-      "createdAtMs": 1770944060924,
-      "updatedAtMs": 1770944060924
-    },
-    {
-      "id": "job-mlk6dc2q-wh4gf4",
-      "name": "Reminder",
-      "enabled": true,
-      "schedule": {
-        "kind": "at",
-        "at": "2026-02-13T00:56:16.168Z"
-      },
-      "message": "hi",
-      "jid": "16418198209@s.whatsapp.net",
-      "createdAtMs": 1770944062562,
-      "updatedAtMs": 1770944062562
-    }
-  ]
+  "jobs": []
 }

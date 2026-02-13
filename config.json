@@ -2,14 +2,32 @@
   "llm": {
     "maxTokens": 2048,
     "models": [
-      {"provider": "lmstudio", "baseUrl": "http://127.0.0.1:1234/v1", "model": "local", "apiKey": "not-needed", "priority": true},
-      {"provider": "openai", "apiKey": "LLM_1_API_KEY", "model": "gpt-4o"},
-      {"provider": "grok", "apiKey": "LLM_2_API_KEY"}
+      {
+        "provider": "lmstudio",
+        "baseUrl": "http://127.0.0.1:1234/v1",
+        "model": "local",
+        "apiKey": "not-needed",
+        "priority": true
+      },
+      {
+        "provider": "openai",
+        "apiKey": "LLM_1_API_KEY",
+        "model": "gpt-4o"
+      },
+      {
+        "provider": "grok",
+        "apiKey": "LLM_2_API_KEY"
+      }
     ]
   },
   "skills": {
-    "enabled": ["cron"],
+    "enabled": ["cron", "browser"],
     "cron": {},
-    "search": {}
+    "browser": {
+      "search": {
+        "provider": "brave",
+        "count": 8
+      }
+    }
   }
 }
