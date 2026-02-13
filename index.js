@@ -77,33 +77,28 @@ async function runAuthOnly(opts = {}) {
 
   return new Promise((resolve, reject) => {
     sock.ev.on('connection.update', async (u) => {
-      if (u.connection) {
-        console.log('[connection]', u.connection);
-        if (u.connection === 'open') {
-          if (opts.continueToBot) {
-            console.log('Linked. Starting the bot…');
-          } else {
-            console.log('Linked. You can Ctrl+C and run pnpm start.');
-          }
-          resolve(sock);
+      if (u.connection === 'open') {
+        if (opts.continueToBot) {
+          console.log('[connection] connection successful');
+          console.log('Please send a message to your own number to get started.');
+        } else {
+          console.log('[connection] connection successful');
+          console.log('Linked. You can Ctrl+C and run pnpm start.');
+        }
+        resolve(sock);
+        return;
+      }
+      if (u.connection === 'close' && u.lastDisconnect) {
+        const err = u.lastDisconnect.error;
+        const code = err?.output?.statusCode ?? err?.statusCode;
+        const reason = DISCONNECT_REASONS[code] || `Code ${code}`;
+        if (code === RESTART_REQUIRED_CODE) {
+          try { sock.end(undefined); } catch (_) {}
+          resolve('restart');
           return;
         }
-        if (u.connection === 'close' && u.lastDisconnect) {
-          const err = u.lastDisconnect.error;
-          const code = err?.output?.statusCode ?? err?.statusCode;
-          const msg = err?.message || err?.output?.payload?.message;
-          const reason = DISCONNECT_REASONS[code] || `Code ${code}`;
-          console.error('[disconnect]', reason);
-          if (msg) console.error('[disconnect message]', msg);
-          if (code === RESTART_REQUIRED_CODE) {
-            console.log('Reconnecting so the link can finish…');
-            try { sock.end(undefined); } catch (_) {}
-            resolve('restart');
-            return;
-          }
-          reject(new Error(reason));
-          return;
-        }
+        reject(new Error(reason));
+        return;
       }
       if (u.qr) {
         qrcodeTerminal.generate(u.qr, { small: true });
@@ -398,10 +393,8 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
 
   console.log('Connecting to WhatsApp…');
   sock.ev.on('connection.update', (u) => {
-    if (u.connection != null) {
-      console.log('[connection]', u.connection);
-    }
     if (u.connection === 'open') {
+      console.log('[connection] connection successful');
       const sid = sock.user?.id ?? selfJid;
       if (sid) selfJid = sid;
       console.log('WhatsApp connected. Self JID:', sid ?? 'unknown');
