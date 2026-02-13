@@ -2,7 +2,7 @@
 /**
  * One-command setup: install deps, one-time onboarding (base URL, optional API keys), then run the app.
  * On first run the app will show QR to link WhatsApp, then start the bot.
- * Usage: pnpm run setup
+ * Usage: npm run setup | pnpm run setup | yarn setup | node setup.js
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'fs';
@@ -50,20 +50,23 @@ async function promptSecret(prompt, existingVal) {
   return answer || existingVal || '';
 }
 
-function hasPnpm() {
-  const r = spawnSync('pnpm', ['--version'], { encoding: 'utf8', shell: true });
-  return r.status === 0 && r.stdout && String(r.stdout).trim().length > 0;
+/** Returns first available package manager: pnpm, npm, or yarn. */
+function getPackageManager() {
+  for (const cmd of ['pnpm', 'npm', 'yarn']) {
+    const r = spawnSync(cmd, ['--version'], { encoding: 'utf8', shell: true });
+    if (r.status === 0 && r.stdout && String(r.stdout).trim().length > 0) return cmd;
+  }
+  return 'npm';
 }
 
 function ensureInstall() {
   const nodeModules = join(ROOT, 'node_modules');
   if (!existsSync(nodeModules) || !existsSync(join(nodeModules, '@whiskeysockets', 'baileys'))) {
-    const usePnpm = hasPnpm();
-    const cmd = usePnpm ? 'pnpm' : 'npm';
-    console.log(`Installing dependencies (${cmd} install)…`);
-    const res = spawnSync(cmd, ['install'], { cwd: ROOT, stdio: 'inherit', shell: true });
+    const pm = getPackageManager();
+    console.log(`Installing dependencies (${pm} install)…`);
+    const res = spawnSync(pm, ['install'], { cwd: ROOT, stdio: 'inherit', shell: true });
     if (res.status !== 0) {
-      console.error(`${cmd} install failed.`);
+      console.error(`${pm} install failed.`);
       process.exit(res.status ?? 1);
     }
     console.log('Dependencies installed.\n');

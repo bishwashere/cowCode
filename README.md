@@ -2,7 +2,7 @@
 
 WhatsApp bot that replies using your local or cloud LLM (LM Studio, Ollama, OpenAI, etc.). Chat in “Message yourself”; the bot answers there.
 
-**Requirements:** Node ≥18. Your LLM server (e.g. LM Studio) should be running when you start the bot. Setup works with npm or pnpm; if pnpm isn’t installed, it uses npm.
+**Requirements:** Node ≥18. Your LLM server (e.g. LM Studio) should be running when you start the bot. Use **npm**, **pnpm**, or **yarn** — whichever you have; setup auto-detects and uses it for install.
 
 ---
 
@@ -17,11 +17,17 @@ cd cowCode
 
 ## 2. Setup (first time only)
 
-```bash
-pnpm run setup
-```
+Use any of these (pick the package manager you use):
 
-*(No pnpm? Use `npm run setup` or `node setup.js`. Setup will install deps with npm.)*
+```bash
+npm run setup
+# or
+pnpm run setup
+# or
+yarn setup
+# or (no package manager needed)
+node setup.js
+```
 
 - Installs dependencies, asks for local LLM base URL and optional API keys (Brave, OpenAI), then starts the app.
 - If WhatsApp isn’t linked yet, scan the QR code with WhatsApp → Linked devices. The bot starts after that.
@@ -31,14 +37,15 @@ pnpm run setup
 ## 3. Everyday start
 
 ```bash
-pnpm start
+npm start
+# or  pnpm start   or  yarn start
 ```
 
 Use this whenever you want to run the bot again. No need to run setup unless you change config or re-link.
 
 ---
 
-**Tips:** Reply in “Message yourself”. You can say “remind me in 5 minutes” or “search for X”; cron and web search are on by default. If linking fails, run `pnpm run auth -- --pair 1234567890` and use “Link with phone number” in WhatsApp.
+**Tips:** Reply in “Message yourself”. You can say “remind me in 5 minutes” or “search for X”; cron and web search are on by default. If linking fails, run `npm run auth -- --pair 1234567890` (or `pnpm run auth -- --pair …` / `yarn auth -- --pair …`) and use “Link with phone number” in WhatsApp.
 
 ---
 
