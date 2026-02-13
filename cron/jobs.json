@@ -2,43 +2,30 @@
   "version": 1,
   "jobs": [
     {
-      "id": "job-mlk2lv5h-ob9rg6",
-      "name": "one minute hello",
-      "enabled": true,
-      "schedule": {
-        "kind": "at",
-        "at": "2026-02-12T23:10:55.090Z"
-      },
-      "message": "hello",
-      "jid": "16418198209@s.whatsapp.net",
-      "createdAtMs": 1770937742069,
-      "updatedAtMs": 1770937742069
-    },
-    {
-      "id": "job-mlk2mkpb-2mg9yw",
+      "id": "job-mlk6dat8-dc1nna",
       "name": "Reminder",
       "enabled": true,
       "schedule": {
         "kind": "at",
-        "at": "2026-02-12T23:10:25.116Z"
+        "at": "2026-02-13T00:55:16.168Z"
       },
-      "message": "Miss you for every next one minute for three times",
+      "message": "hi",
       "jid": "16418198209@s.whatsapp.net",
-      "createdAtMs": 1770937775183,
-      "updatedAtMs": 1770937775183
+      "createdAtMs": 1770944060924,
+      "updatedAtMs": 1770944060924
     },
     {
-      "id": "job-mlk2mmt0-xeg346",
+      "id": "job-mlk6dc2q-wh4gf4",
       "name": "Reminder",
       "enabled": true,
       "schedule": {
         "kind": "at",
-        "at": "2026-02-12T23:11:25.116Z"
+        "at": "2026-02-13T00:56:16.168Z"
       },
-      "message": "Miss you for every next one minute for three times",
+      "message": "hi",
       "jid": "16418198209@s.whatsapp.net",
-      "createdAtMs": 1770937777908,
-      "updatedAtMs": 1770937777908
+      "createdAtMs": 1770944062562,
+      "updatedAtMs": 1770944062562
     }
   ]
 }

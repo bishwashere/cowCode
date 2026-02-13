@@ -190,10 +190,10 @@ export async function chatWithTools(messages, tools) {
 }
 
 /**
- * Classify user intent for routing: CHAT (normal reply) or SCHEDULE (user wants to set/list/remove reminders).
- * Uses one short LLM call. Most messages should be CHAT.
+ * Classify user intent for routing. Identify first, then we decide reply behaviour.
+ * Uses one short LLM call.
  * @param {string} userMessage
- * @returns {Promise<'CHAT'|'SCHEDULE'>}
+ * @returns {Promise<'CHAT'|'SCHEDULE_LIST'|'SCHEDULE_CREATE'>}
  */
 const INTENT_TIMEOUT_MS = 15_000;
 
@@ -201,11 +201,13 @@ export async function classifyIntent(userMessage) {
   const messages = [
     {
       role: 'system',
-      content: `Reply with exactly one word: CHAT or SCHEDULE.
+      content: `You classify the user's intent. Reply with exactly one word: CHAT, SCHEDULE_LIST, or SCHEDULE_CREATE.
 
-SCHEDULE = user wants to send or receive a message at a future time, or manage reminders. Examples: "send me X in 5 minutes", "remind me to Y after one hour", "can you send me a hi message after one minute?", "list my reminders", "what's scheduled?", "cancel reminder Z". Any request involving a future time (in X min, after Y hours, at 8am, tomorrow) for a message or reminder = SCHEDULE.
+SCHEDULE_LIST = the user ONLY wants to see, list, count, or ask about existing scheduled jobs/reminders/crons. They are NOT asking to create or set up a new one. Examples: "do we have any crons?", "is there any crons set up?", "which crons are set?", "how many crons do I have?", "what's scheduled?", "list my reminders", "show my crons", "what is the next cron?", "do I have reminders?" — any phrasing that only asks about existing schedules = SCHEDULE_LIST.
 
-CHAT = greetings (Hi, Hello), general questions, conversation, or anything that does NOT ask for a future message/reminder or to list/remove reminders.`,
+SCHEDULE_CREATE = the user wants to CREATE or SET a new reminder or schedule a message at a future time. Examples: "remind me in 5 minutes", "send me X tomorrow", "set a cron for 8am", "add a reminder", "send me hello in 1 minute".
+
+CHAT = greetings, general questions, or anything that is neither listing existing schedules nor creating a new one.`,
     },
     { role: 'user', content: (userMessage || '').trim() || 'Hi' },
   ];
@@ -215,7 +217,7 @@ CHAT = greetings (Hi, Hello), general questions, conversation, or anything that 
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
     try {
       const res = await Promise.race([
-        callOne(messages, { ...opts, maxTokens: 20 }, null),
+        callOne(messages, { ...opts, maxTokens: 25 }, null),
         new Promise((_, reject) => setTimeout(() => reject(new Error('intent timeout')), INTENT_TIMEOUT_MS)),
       ]);
       if (!res.ok) {
@@ -224,14 +226,15 @@ CHAT = greetings (Hi, Hello), general questions, conversation, or anything that 
       }
       const data = await res.json();
       const content = (data.choices?.[0]?.message?.content || '').trim().toUpperCase();
-      if (content.includes('SCHEDULE')) return 'SCHEDULE';
+      if (content.includes('SCHEDULE_LIST')) return 'SCHEDULE_LIST';
+      if (content.includes('SCHEDULE_CREATE')) return 'SCHEDULE_CREATE';
+      if (content.includes('SCHEDULE')) return 'SCHEDULE_CREATE';
       return 'CHAT';
     } catch (err) {
       console.log('[LLM] intent try failed:', label, err.message);
       lastError = err;
     }
   }
-  // If all models failed or timed out, default to CHAT so we still try to reply
   if (lastError) return 'CHAT';
   throw new Error('No LLM configured');
 }

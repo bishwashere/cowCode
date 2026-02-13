@@ -171,7 +171,15 @@ async function main() {
     const in1min = new Date(now + 60_000).toISOString();
     const in2min = new Date(now + 120_000).toISOString();
     const in3min = new Date(now + 180_000).toISOString();
-    return `You are a helpful assistant with access to the cron tool for reminders. Reply concisely in the same language the user uses. Do not use <think> or any thinking/reasoning blocks—output only your final reply. Use the cron tool to add, list, or remove reminders as requested. For multiple reminders in one message, call the cron tool once per reminder. Each call must have a different schedule.at time.
+    return `You are a helpful assistant with access to the cron tool for reminders. Reply concisely in the same language the user uses. Do not use <think> or any thinking/reasoning blocks—output only your final reply.
+
+CRITICAL - Choose the right action:
+- If the user only asks to LIST, SEE, COUNT, or ask WHAT/WHICH crons exist (e.g. "how many crons?", "what is the next cron?", "which crons are set?", "list my reminders", "what's scheduled?") → call the cron tool exactly ONCE with action "list". Do NOT call "add" in the same message.
+- "Which crons are set?" means list existing crons, NOT create new ones. Use list only.
+- Use "add" only when the user explicitly asks to CREATE or SET a new reminder (e.g. "remind me in 5 minutes", "send me X tomorrow").
+- Use "remove" when the user asks to cancel/delete a specific job (by id).
+
+Use the cron tool to add, list, or remove reminders as requested. For multiple reminders in one message, call the cron tool once per reminder. Each call must have a different schedule.at time.
 
 Current time: ${nowIso}. Use future ISO 8601 for "at". Examples: "in 1 minute" = ${in1min}; "in 2 minutes" = ${in2min}; "in 3 minutes" = ${in3min}. For "every one minute for the next three minutes" you MUST call cron add THREE times: first at ${in1min}, second at ${in2min}, third at ${in3min}. Never use the same "at" for multiple jobs.
 
@@ -189,8 +197,9 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
     } catch (err) {
       console.error('[agent] intent classification failed:', err.message);
     }
-    const useTools = intent === 'SCHEDULE' && tools.length > 0;
-    if (useTools) {
+    const useTools = (intent === 'SCHEDULE_LIST' || intent === 'SCHEDULE_CREATE') && tools.length > 0;
+    const isListOnly = intent === 'SCHEDULE_LIST';
+    if (useTools && !isListOnly) {
       const immediateReply = "[CowCode] Got it, one moment.";
       const immediateSent = await sock.sendMessage(jid, { text: immediateReply });
       if (immediateSent?.key?.id && ourSentIdsRef?.current) {
@@ -215,6 +224,7 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
       { role: 'user', content: text },
     ];
     let finalContent = '';
+    let cronListResult = null;
     const maxToolRounds = 1;
     for (let round = 0; round <= maxToolRounds; round++) {
       if (!useTools) {
@@ -245,8 +255,22 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
           args = {};
         }
         const skillId = tc.name;
+        const action = args?.action && String(args.action).trim().toLowerCase();
+        const isSpuriousAdd = useTools && isListOnly && skillId === 'cron' && action === 'add';
+        if (isSpuriousAdd) {
+          console.log('[agent] tool call:', skillId, '(add skipped: list-only query)');
+          messages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: 'Skipped: user only asked to list existing crons; no job added.',
+          });
+          continue;
+        }
         console.log('[agent] tool call:', skillId, tc.arguments?.slice(0, 80));
         const result = await executeSkill(skillId, ctx, args);
+        if (skillId === 'cron' && action === 'list' && result && typeof result === 'string') {
+          cronListResult = result;
+        }
         messages.push({
           role: 'tool',
           tool_call_id: tc.id,
@@ -254,9 +278,14 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
         });
       }
     }
-    const textToSend = finalContent && stripThinking(finalContent).trim()
-      ? '[CowCode] ' + stripThinking(finalContent).trim()
-      : "[CowCode] Done. Anything else?";
+    let textToSend;
+    if (finalContent && stripThinking(finalContent).trim()) {
+      textToSend = '[CowCode] ' + stripThinking(finalContent).trim();
+    } else if (cronListResult && cronListResult.trim()) {
+      textToSend = '[CowCode] ' + cronListResult.trim();
+    } else {
+      textToSend = "[CowCode] Done. Anything else?";
+    }
     const sent = await sock.sendMessage(jid, { text: textToSend });
     if (sent?.key?.id && ourSentIdsRef?.current) {
       ourSentIdsRef.current.add(sent.key.id);
@@ -326,12 +355,19 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
       if (isJidBroadcast(m.key.remoteJid)) continue;
 
       selfJid = selfJid ?? sock.user?.id;
+      const jid = m.key.remoteJid;
+
+      // Only respond in self-chat (saved messages): from us and chat is with ourselves. Ignore all other chats.
+      if (!m.key.fromMe) continue;
+      if (!selfJid || !areJidsSameUser(jid, selfJid)) continue;
 
       const content = extractMessageContent(m.message);
       const text = (content?.conversation || content?.extendedTextMessage?.text || '').trim();
       if (!text) continue;
 
-      const jid = m.key.remoteJid;
+      // Do not treat our own CowCode replies as user input.
+      if (text.startsWith('[CowCode]')) continue;
+
       // Skip only when this is clearly our echo: fromMe and the text exactly matches what we last sent to this chat.
       const lastWeSent = lastSentByJid.get(jid);
       if (m.key.fromMe && typeof lastWeSent === 'string' && text === lastWeSent) {
