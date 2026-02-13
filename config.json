@@ -17,6 +17,11 @@
       {
         "provider": "grok",
         "apiKey": "LLM_2_API_KEY"
+      },
+      {
+        "provider": "anthropic",
+        "apiKey": "LLM_3_API_KEY",
+        "model": "claude-3-5-sonnet-20241022"
       }
     ]
   },

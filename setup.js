@@ -10,6 +10,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { spawnSync, spawn } from 'child_process';
+import select from '@inquirer/select';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = __dirname;
@@ -130,7 +131,39 @@ async function onboarding() {
   console.log('\n--- One-time setup (optional: press Enter to keep defaults or skip) ---\n');
 
   const baseUrl = await promptWithDefault('Local LLM base URL (e.g. LM Studio)', defaultBaseUrl || '');
-  const llmKey = await promptSecret('LLM API key (e.g. OpenAI) – optional', env.LLM_1_API_KEY || '');
+
+  // Cloud LLM: will they use one, and which provider?
+  const useCloud = await ask('Will you use a cloud LLM (OpenAI, Grok, Anthropic)? (y/n, Enter=no, q=quit): ');
+  checkQuit(useCloud);
+  const useCloudYes = useCloud && useCloud.toLowerCase() === 'y';
+
+  let llm1Key = env.LLM_1_API_KEY || '';
+  let llm2Key = env.LLM_2_API_KEY || '';
+  let llm3Key = env.LLM_3_API_KEY || '';
+
+  if (useCloudYes) {
+    const provider = await select({
+      message: 'Which provider?',
+      choices: [
+        { name: 'OpenAI', value: 'openai' },
+        { name: 'Grok', value: 'grok' },
+        { name: 'Anthropic', value: 'anthropic' },
+        { name: 'Quit', value: 'quit' },
+      ],
+    });
+    if (provider === 'quit') {
+      console.log('Quit.');
+      process.exit(0);
+    }
+    if (provider === 'openai') {
+      llm1Key = await promptSecret('OpenAI API key', env.LLM_1_API_KEY || '');
+    } else if (provider === 'grok') {
+      llm2Key = await promptSecret('Grok API key', env.LLM_2_API_KEY || '');
+    } else if (provider === 'anthropic') {
+      llm3Key = await promptSecret('Anthropic API key', env.LLM_3_API_KEY || '');
+    }
+  }
+
   const braveKey = await promptSecret('Brave Search API key – optional', env.BRAVE_API_KEY || '');
 
   if (baseUrl && config?.llm?.models?.[0]) {
@@ -139,10 +172,10 @@ async function onboarding() {
   }
 
   const newEnv = { ...env };
-  if (llmKey !== undefined) newEnv.LLM_1_API_KEY = llmKey;
-  if (braveKey !== undefined) newEnv.BRAVE_API_KEY = braveKey;
-  if (!newEnv.LLM_1_API_KEY) newEnv.LLM_1_API_KEY = '';
-  if (!newEnv.BRAVE_API_KEY) newEnv.BRAVE_API_KEY = '';
+  newEnv.LLM_1_API_KEY = llm1Key ?? '';
+  newEnv.LLM_2_API_KEY = llm2Key ?? '';
+  newEnv.LLM_3_API_KEY = llm3Key ?? '';
+  newEnv.BRAVE_API_KEY = braveKey ?? '';
 
   writeFileSync(ENV_PATH, stringifyEnv(newEnv), 'utf8');
   console.log('\nConfig and .env updated. Starting the app…\n');

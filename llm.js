@@ -17,13 +17,14 @@ function fromEnv(val) {
   return val;
 }
 
-/** Preset base URLs for standard providers (OpenAI-compatible). */
+/** Preset base URLs for standard providers (OpenAI-compatible except Anthropic). */
 const PRESETS = {
   openai: 'https://api.openai.com/v1',
   grok: 'https://api.x.ai/v1',
   xai: 'https://api.x.ai/v1',
   together: 'https://api.together.xyz/v1',
   deepseek: 'https://api.deepseek.com/v1',
+  anthropic: 'https://api.anthropic.com',
   ollama: 'http://127.0.0.1:11434/v1',
   lmstudio: 'http://127.0.0.1:1234/v1',
 };
@@ -44,6 +45,7 @@ const DEFAULT_CLOUD_MODELS = {
   openai: 'gpt-4o-mini',
   grok: 'grok-2',
   xai: 'grok-2',
+  anthropic: 'claude-3-5-sonnet-20241022',
   together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
   deepseek: 'deepseek-chat',
 };
@@ -118,7 +120,53 @@ function loadConfig() {
   };
 }
 
+/** Call Anthropic Messages API and return a Response-like with OpenAI-shaped JSON. */
+async function callAnthropic(messages, { apiKey, model, maxTokens }, tools) {
+  const url = 'https://api.anthropic.com/v1/messages';
+  let system = '';
+  const anthropicMessages = [];
+  for (const m of messages) {
+    const role = (m.role || '').toLowerCase();
+    const content = typeof m.content === 'string' ? m.content : (m.content && m.content[0]?.text) || '';
+    if (role === 'system') {
+      system = (system ? system + '\n\n' : '') + content;
+      continue;
+    }
+    if (role === 'user' || role === 'assistant') {
+      anthropicMessages.push({ role, content });
+    }
+  }
+  const body = {
+    model,
+    max_tokens: maxTokens,
+    ...(system ? { system } : {}),
+    messages: anthropicMessages,
+  };
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey || '',
+    'anthropic-version': '2023-06-01',
+  };
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!res.ok) {
+    return res;
+  }
+  const data = await res.json();
+  const text = data.content?.find((c) => c.type === 'text')?.text ?? '';
+  const openaiShape = { choices: [{ message: { content: text, tool_calls: [] } }] };
+  return {
+    ok: true,
+    status: res.status,
+    json: () => Promise.resolve(openaiShape),
+    text: () => Promise.resolve(JSON.stringify(openaiShape)),
+  };
+}
+
 function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null) {
+  const isAnthropic = (baseUrl || '').includes('anthropic.com');
+  if (isAnthropic) {
+    return callAnthropic(messages, { apiKey, model, maxTokens }, tools);
+  }
   const url = (baseUrl || '').replace(/\/$/, '') + '/chat/completions';
   const body = {
     model,
