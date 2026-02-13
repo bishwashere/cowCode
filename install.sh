@@ -15,8 +15,16 @@ curl -fsSL "$TARBALL" | tar xz
 mv "$EXTRACTED" "$DIR"
 cd "$DIR"
 
-echo "Running setup..."
-node setup.js
+if [ -t 0 ]; then
+  echo "Running setup..."
+  node setup.js
+else
+  echo ""
+  echo "Download complete. Setup needs an interactive terminal."
+  echo "Run:  cd $DIR && node setup.js"
+  echo ""
+  echo "Or install deps only: cd $DIR && npm install && npm start"
+fi
 
 echo ""
 echo "To start the bot later: cd $DIR && npm start"

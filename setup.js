@@ -193,6 +193,12 @@ async function onboarding() {
 }
 
 async function main() {
+  if (!process.stdin.isTTY) {
+    console.log('Setup needs an interactive terminal.');
+    console.log('Run: cd cowCode && node setup.js');
+    console.log('Or: cd cowCode && npm install && npm start\n');
+    process.exit(0);
+  }
   console.log('cowCode setup – install, configure, then run.\n');
   ensureInstall();
   await onboarding();
