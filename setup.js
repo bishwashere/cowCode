@@ -50,14 +50,20 @@ async function promptSecret(prompt, existingVal) {
   return answer || existingVal || '';
 }
 
+function hasPnpm() {
+  const r = spawnSync('pnpm', ['--version'], { encoding: 'utf8', shell: true });
+  return r.status === 0 && r.stdout && String(r.stdout).trim().length > 0;
+}
+
 function ensureInstall() {
   const nodeModules = join(ROOT, 'node_modules');
-  const pkgPath = join(ROOT, 'package.json');
   if (!existsSync(nodeModules) || !existsSync(join(nodeModules, '@whiskeysockets', 'baileys'))) {
-    console.log('Installing dependencies (pnpm install)…');
-    const res = spawnSync('pnpm', ['install'], { cwd: ROOT, stdio: 'inherit', shell: true });
+    const usePnpm = hasPnpm();
+    const cmd = usePnpm ? 'pnpm' : 'npm';
+    console.log(`Installing dependencies (${cmd} install)…`);
+    const res = spawnSync(cmd, ['install'], { cwd: ROOT, stdio: 'inherit', shell: true });
     if (res.status !== 0) {
-      console.error('pnpm install failed.');
+      console.error(`${cmd} install failed.`);
       process.exit(res.status ?? 1);
     }
     console.log('Dependencies installed.\n');

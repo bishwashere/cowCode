@@ -2,7 +2,7 @@
 
 WhatsApp bot that replies using your local or cloud LLM (LM Studio, Ollama, OpenAI, etc.). Chat in “Message yourself”; the bot answers there.
 
-**Requirements:** Node ≥18, pnpm. Your LLM server (e.g. LM Studio) should be running when you start the bot.
+**Requirements:** Node ≥18. Your LLM server (e.g. LM Studio) should be running when you start the bot. Setup works with npm or pnpm; if pnpm isn’t installed, it uses npm.
 
 ---
 
@@ -20,6 +20,8 @@ cd cowCode
 ```bash
 pnpm run setup
 ```
+
+*(No pnpm? Use `npm run setup` or `node setup.js`. Setup will install deps with npm.)*
 
 - Installs dependencies, asks for local LLM base URL and optional API keys (Brave, OpenAI), then starts the app.
 - If WhatsApp isn’t linked yet, scan the QR code with WhatsApp → Linked devices. The bot starts after that.
