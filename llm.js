@@ -50,8 +50,20 @@ const DEFAULT_CLOUD_MODELS = {
 
 function loadConfig() {
   const path = join(__dirname, 'config.json');
-  const raw = readFileSync(path, 'utf8');
-  const config = JSON.parse(raw);
+  let raw = '';
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+  let config = {};
+  if (raw && raw.trim()) {
+    try {
+      config = JSON.parse(raw);
+    } catch (_) {
+      // Invalid or truncated config; use defaults below.
+    }
+  }
   const llm = config.llm || {};
   const defaultMaxTokens = Number(fromEnv(llm.maxTokens)) || 2048;
 

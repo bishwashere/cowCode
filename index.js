@@ -53,7 +53,10 @@ const DISCONNECT_REASONS = {
 
 const RESTART_REQUIRED_CODE = 515;
 
-async function runAuthOnly() {
+/**
+ * @param {{ continueToBot?: boolean }} opts - If true, after link we continue to run the bot (no exit).
+ */
+async function runAuthOnly(opts = {}) {
   const { version } = await fetchLatestBaileysVersion();
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
@@ -74,7 +77,11 @@ async function runAuthOnly() {
       if (u.connection) {
         console.log('[connection]', u.connection);
         if (u.connection === 'open') {
-          console.log('Linked. You can Ctrl+C and run pnpm start.');
+          if (opts.continueToBot) {
+            console.log('Linked. Starting the bot…');
+          } else {
+            console.log('Linked. You can Ctrl+C and run pnpm start.');
+          }
           resolve(sock);
           return;
         }
@@ -135,20 +142,39 @@ async function main() {
     return;
   }
 
-  const { version } = await fetchLatestBaileysVersion();
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  let sock;
+  const credsPath = join(AUTH_DIR, 'creds.json');
+  const needAuth = !existsSync(AUTH_DIR) || !existsSync(credsPath);
 
-  const sock = makeWASocket({
-    version,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
-    },
-    printQRInTerminal: false,
-    logger,
-  });
-
-  sock.ev.on('creds.update', saveCreds);
+  if (needAuth) {
+    console.log('No WhatsApp session found. Scan the QR code to link your device.\n');
+    while (true) {
+      try {
+        const result = await runAuthOnly({ continueToBot: true });
+        if (result !== 'restart') {
+          sock = result;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      } catch (e) {
+        console.error(e.message);
+        process.exit(1);
+      }
+    }
+  } else {
+    const { version } = await fetchLatestBaileysVersion();
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    sock = makeWASocket({
+      version,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
+      },
+      printQRInTerminal: false,
+      logger,
+    });
+    sock.ev.on('creds.update', saveCreds);
+  }
 
   const config = loadConfig();
   const first = config.models[0];

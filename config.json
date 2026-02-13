@@ -21,8 +21,12 @@
     ]
   },
   "skills": {
-    "enabled": ["cron", "browser"],
+    "enabled": [
+      "cron",
+      "browser"
+    ],
     "cron": {},
+    "search": {},
     "browser": {
       "search": {
         "provider": "brave",
