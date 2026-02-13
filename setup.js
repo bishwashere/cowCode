@@ -10,7 +10,6 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { spawnSync, spawn } from 'child_process';
-import select from '@inquirer/select';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = __dirname;
@@ -142,15 +141,27 @@ async function onboarding() {
   let llm3Key = env.LLM_3_API_KEY || '';
 
   if (useCloudYes) {
-    const provider = await select({
-      message: 'Which provider?',
-      choices: [
-        { name: 'OpenAI', value: 'openai' },
-        { name: 'Grok', value: 'grok' },
-        { name: 'Anthropic', value: 'anthropic' },
-        { name: 'Quit', value: 'quit' },
-      ],
-    });
+    let provider;
+    try {
+      const select = (await import('@inquirer/select')).default;
+      provider = await select({
+        message: 'Which provider?',
+        choices: [
+          { name: 'OpenAI', value: 'openai' },
+          { name: 'Grok', value: 'grok' },
+          { name: 'Anthropic', value: 'anthropic' },
+          { name: 'Quit', value: 'quit' },
+        ],
+      });
+    } catch (err) {
+      if (err?.code === 'ERR_MODULE_NOT_FOUND' || err?.message?.includes('@inquirer/select')) {
+        const answer = await ask('Which provider? (openai / grok / anthropic, q to quit): ');
+        checkQuit(answer);
+        provider = (answer || '').trim().toLowerCase() || 'openai';
+      } else {
+        throw err;
+      }
+    }
     if (provider === 'quit') {
       console.log('Quit.');
       process.exit(0);
