@@ -145,7 +145,14 @@ async function main() {
   const credsPath = join(AUTH_DIR, 'creds.json');
   const needAuth = !existsSync(AUTH_DIR) || !existsSync(credsPath);
 
-  if (needAuth) {
+  // --test: use mock socket and skip WhatsApp auth so E2E tests can run without linking.
+  if (process.argv.includes('--test')) {
+    sock = {
+      sendMessage: async () => ({ key: { id: 'test-' + Date.now() } }),
+      sendPresenceUpdate: async () => {},
+      readMessages: async () => {},
+    };
+  } else if (needAuth) {
     console.log('');
     console.log('  ─────────────────────────────────────────');
     console.log('  Link your WhatsApp');
@@ -326,7 +333,10 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
           cronListResult = result;
         }
         if (skillId === 'browser' && result && typeof result === 'string') {
-          browserResult = result;
+          const newHasHeadlines = result.includes('Top news / headlines');
+          const newIsError = result.trim().startsWith('{"error":') || result.includes('The search engine returned an error');
+          const currentIsError = !browserResult || browserResult.trim().startsWith('{"error":') || browserResult.includes('The search engine returned an error');
+          if (!browserResult || newHasHeadlines || (currentIsError && !newIsError)) browserResult = result;
         }
         messages.push({
           role: 'tool',
@@ -345,9 +355,35 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
         console.error('[agent] search synthesis failed:', err.message);
       }
     }
+    // For SEARCH: prefer browserResult when the LLM returned tool-call JSON or a disclaimer without listing headlines.
+    const trimmedFinal = stripThinking(finalContent).trim();
+    const looksLikeToolCallJson = /"name"\s*:\s*"browser"|"action"\s*:\s*"search"|"parameters"\s*:\s*\{/.test(trimmedFinal);
+    const hasNumberedHeadlines = /\n\d+\.\s+.+/.test(trimmedFinal) || /^\d+\.\s+.+/.test(trimmedFinal);
+    const browserHasNewsBlock = browserResult && browserResult.includes('Top news / headlines');
+    const useBrowserResultForSearch = isSearch && browserResult && browserResult.trim() && (
+      !trimmedFinal ||
+      looksLikeToolCallJson ||
+      (browserHasNewsBlock && !hasNumberedHeadlines)
+    );
     let textToSend;
-    if (finalContent && stripThinking(finalContent).trim()) {
-      textToSend = '[CowCode] ' + stripThinking(finalContent).trim();
+    if (useBrowserResultForSearch) {
+      let browserReply = browserResult.trim();
+      try {
+        const parsed = JSON.parse(browserReply);
+        if (parsed && typeof parsed.error === 'string') {
+          const err = parsed.error;
+          if (/executable doesn't exist|doesn't exist at|playwright.*install/i.test(err)) {
+            browserReply = "I couldn't run the search because the browser isn't set up. Run: pnpm exec playwright install";
+          } else {
+            browserReply = 'Search failed: ' + err;
+          }
+        }
+      } catch (_) {
+        browserReply = browserReply.slice(0, 2000) + (browserReply.length > 2000 ? '…' : '');
+      }
+      textToSend = '[CowCode] ' + browserReply;
+    } else if (trimmedFinal) {
+      textToSend = '[CowCode] ' + trimmedFinal;
     } else if (cronListResult && cronListResult.trim()) {
       textToSend = '[CowCode] ' + cronListResult.trim();
     } else if (browserResult && browserResult.trim()) {
@@ -381,19 +417,21 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
     console.log('[replied]', useTools ? '(agent + skills)' : '(chat)');
   }
 
-  // --test: run main code path once with a fake socket, write to real cron/jobs.json then exit
+  // --test: run main code path once with mock socket (set above), then exit. No WhatsApp auth.
+  // E2E tests capture stdout and parse E2E_REPLY_START...E2E_REPLY_END to assert on the reply.
   if (process.argv.includes('--test')) {
     const testIdx = process.argv.indexOf('--test');
     const testMsg = process.argv[testIdx + 1] || process.env.TEST_MESSAGE || 'Send me hello in 1 minute';
-    const mockSock = {
-      sendMessage: async () => ({ key: { id: 'test-' + Date.now() } }),
-      sendPresenceUpdate: async () => {},
-      readMessages: async () => {},
-    };
     const lastSent = new Map();
     const sentIds = { current: new Set() };
     console.log('[test] Running main code path with message:', testMsg.slice(0, 60));
-    await runAgentWithSkills(mockSock, 'test@s.whatsapp.net', testMsg, lastSent, 'test@s.whatsapp.net', sentIds);
+    await runAgentWithSkills(sock, 'test@s.whatsapp.net', testMsg, lastSent, 'test@s.whatsapp.net', sentIds);
+    const reply = lastSent.get('test@s.whatsapp.net');
+    if (reply != null) {
+      console.log('E2E_REPLY_START');
+      console.log(reply);
+      console.log('E2E_REPLY_END');
+    }
     console.log('[test] Done. Check cron/jobs.json.');
     process.exit(0);
   }

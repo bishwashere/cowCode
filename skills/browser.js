@@ -137,10 +137,19 @@ function normalizeSearchResult(text) {
 function isNewsQuery(query) {
   if (!query || typeof query !== 'string') return false;
   const q = query.toLowerCase().trim();
+  const num = '(three|3|five|5|ten|10)';
+  const newsOrHeadlines = '(news|headlines)';
+  const lead = '(top|latest|current|today\'?s?|this week\'?s?)';
   return (
-    /^(top|latest|current|today'?s?|this week'?s?)?\s*(three|3|five|5|ten|10)?\s*(news|headlines)/.test(q) ||
+    // From start: "latest news", "top 5 headlines"
+    new RegExp(`^${lead}?\\s*${num}?\\s*${newsOrHeadlines}`).test(q) ||
+    // "news/headlines" then later "top/latest/five" etc.
     /\b(news|headlines)\b.*\b(top|latest|three|five|ten)\b/.test(q) ||
-    /\b(top|latest)\s*(three|3|five|5)?\s*news\b/.test(q)
+    // "latest news", "top five headlines" (anywhere in sentence)
+    new RegExp(`\\b${lead}\\s*${num}?\\s*${newsOrHeadlines}\\b`).test(q) ||
+    /\b(top|latest)\s*(three|3|five|5)?\s*news\b/.test(q) ||
+    // "five headlines", "give me five headlines"
+    new RegExp(`\\b${num}\\s*${newsOrHeadlines}\\b`).test(q)
   );
 }
 

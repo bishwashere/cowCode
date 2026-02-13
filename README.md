@@ -1,140 +1,173 @@
 # cowCode
 
-WhatsApp bot that replies using your local or cloud LLM (LM Studio, Ollama, OpenAI, etc.). Chat in “Message yourself”; the bot answers there.
-
-**Requirements:** Node ≥18. Your LLM server (e.g. LM Studio) should be running when you start the bot. Use **npm**, **pnpm**, or **yarn** — whichever you have; setup auto-detects and uses it for install.
+WhatsApp bot that replies using your **local or cloud LLM** (LM Studio, Ollama, OpenAI, etc.).
+You chat in **"Message yourself"**, and the bot replies there.
 
 ---
 
-## 1. Get the repo
+# 🚀 Install (Do This First)
 
-**Option A – one-liner (download + setup in one go):**
+### 1️⃣ Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/main/install.sh | bash
 ```
 
-**Option B – curl then setup:**
-
-```bash
-curl -sL https://github.com/bishwashere/cowCode/archive/refs/heads/main.tar.gz | tar xz && cd cowCode-main
-```
-
-**Option C – git clone:**
-
-```bash
-git clone https://github.com/bishwashere/cowCode
-cd cowCode
-```
-
----
-
-## 2. Setup (first time only)
-
-Use any of these (pick the package manager you use):
-
-```bash
-npm run setup
-# or
-pnpm run setup
-# or
-yarn setup
-# or (no package manager needed)
-node setup.js
-```
-
-- Installs dependencies, asks for local LLM base URL and optional API keys (Brave, OpenAI), then starts the app.
-- If WhatsApp isn’t linked yet, scan the QR code with WhatsApp → Linked devices. The bot starts after that.
-
----
-
-## 3. Everyday start
+### 2️⃣ Start the bot (every time you want to use it)
 
 ```bash
 npm start
-# or  pnpm start   or  yarn start
+# or
+pnpm start
+# or
+yarn start
 ```
 
-Use this whenever you want to run the bot again. No need to run setup unless you change config or re-link.
+That's it.
 
 ---
 
-**Tips:** Reply in “Message yourself”. You can say “remind me in 5 minutes” or “search for X”; cron and web search are on by default. If linking fails, run `npm run auth -- --pair 1234567890` (or `pnpm run auth -- --pair …` / `yarn auth -- --pair …`) and use “Link with phone number” in WhatsApp.
+# 💬 How to Use
+
+• Open WhatsApp
+• Go to **Message yourself** (or "Note to self")
+• Send a message
+• The bot replies in the same chat
+
+You can say things like:
+
+* "remind me in 5 minutes"
+* "search for AI trends"
+* "summarize today's tasks"
+
+Cron reminders and web search are already enabled.
 
 ---
 
-## Config & features
+# 🔗 If WhatsApp Linking Fails
 
-### Config (`config.json`)
+Run:
 
-**First priority is always local.** The default config uses a local provider (e.g. `lmstudio` or `ollama`) first; no URL or API key in `.env` is needed for that.
+```bash
+npm run auth -- --pair 1234567890
+```
 
-**Multiple models (priority order):**  
-You can set **`baseUrl`** in config **only for local** providers (`lmstudio`, `ollama`). Cloud models use env var names and `.env` for secrets.
+Replace with your full phone number (no +).
+
+Then in WhatsApp:
+Settings → Linked Devices → **Link with phone number** → enter the 8-digit code.
+
+---
+
+# ⚙️ Basic Requirements
+
+• Node.js 18 or newer
+• Your local LLM (like LM Studio or Ollama) must be running before starting the bot
+• npm, pnpm, or yarn
+
+---
+
+# 🧠 LLM Configuration (Optional)
+
+File: `config.json`
+
+Local models are tried first by default.
+
+Example:
 
 ```json
 {
   "llm": {
     "maxTokens": 2048,
     "models": [
-      { "provider": "lmstudio", "baseUrl": "http://127.0.0.1:1234/v1", "model": "local", "apiKey": "not-needed" },
-      { "provider": "openai", "apiKey": "LLM_1_API_KEY", "model": "gpt-4o", "priority": true },
-      { "provider": "grok", "apiKey": "LLM_2_API_KEY", "model": "grok-2" }
+      { "provider": "lmstudio", "baseUrl": "http://127.0.0.1:1234/v1", "model": "local" },
+      { "provider": "openai", "apiKey": "LLM_1_API_KEY", "model": "gpt-4o", "priority": true }
     ]
   }
 }
 ```
 
-**Priority:** Set **`"priority": true`** on exactly one model. That model is always tried first. If none has `priority`, the array order is used.
+Rules:
+• Set `"priority": true` on one model if you want it always tried first
+• Local providers (lmstudio, ollama) use `baseUrl`
+• Cloud providers use API keys in `.env`
 
-**Built-in providers:**  
-`openai`, `grok` / `xai`, `together`, `deepseek`, `ollama`, `lmstudio`. For **local** (`lmstudio`, `ollama`) you can set `baseUrl` in config; for others the URL is preset.
+Built-in providers:
+openai, grok/xai, together, deepseek, ollama, lmstudio
 
-**Skills:**  
-In `config.json`, `skills.enabled` lists which skills are on (default: `["cron", "browser"]`). Remove a name to disable that skill.
+---
+
+# 🛠 Skills (On by Default)
+
+Configured in `config.json`.
 
 ```json
 "skills": {
-  "enabled": ["cron", "browser"],
-  "cron": {},
-  "browser": { "search": { "provider": "brave", "count": 8 } }
+  "enabled": ["cron", "browser"]
 }
 ```
 
-### Where to send messages
+Remove a skill name to disable it.
 
-- **Message yourself** (or “Note to self”): send there; the bot replies in that same chat.
-- **Other chats:** The bot replies when someone messages the linked number (e.g. a contact messages you).
+---
 
-### Cron: scheduled messages
+# ⏰ Reminders (Cron)
 
-The **cron** skill is on by default. Say “remind me to X in 5 minutes”, “list my reminders”, etc. From the CLI:
+Say:
 
-- **Add:** `pnpm run cron add --name "Morning brief" --cron "0 8 * * *" --message "Summarize today's plan."`
-- **List:** `pnpm run cron list`
-- **Remove:** `pnpm run cron remove <job-id>`
-- **Enable/disable:** `pnpm run cron enable <job-id>` / `pnpm run cron disable <job-id>`
+* "remind me to call John in 10 minutes"
+* "list my reminders"
 
-Jobs are in `cron/jobs.json`. One-shot jobs are removed after they run.
+CLI commands:
 
-### Browser skill: web search
+```bash
+pnpm run cron list
+pnpm run cron remove <job-id>
+```
 
-The **browser** skill is on by default. It searches the web or opens a URL when the user asks for current info (e.g. “recent AI trends”, “search for X”).
+Jobs are stored in:
 
-- **With Brave API key:** set `BRAVE_API_KEY` in `.env` (or enter in setup). Search uses the Brave Search API.
-- **Without Brave key:** the app falls back to Playwright. Run `npx playwright install chromium` once.
+```
+cron/jobs.json
+```
 
-### Tests
+---
 
-- **Cron (unit):** `pnpm run test:schedule`
-- **Cron (E2E, needs LLM):** `pnpm run test:schedule-e2e`
-- **Browser (unit):** `pnpm run test:browser`
-- **Browser (E2E, needs LLM):** `pnpm run test:browser-e2e`
-- **Intent (needs LLM):** `pnpm run test:intent`
+# 🌐 Web Search (Browser Skill)
 
-### If linking fails
+Default search provider: Brave.
 
-- Run `pnpm run auth` and check the terminal: a `[disconnect]` line shows the reason (e.g. multi-device not enabled).
-- **Pair with phone number:** `pnpm run auth -- --pair 1234567890` (full number, no +). In WhatsApp → Linked devices → “Link with phone number”, enter the 8-digit code.
+If you have a Brave API key:
 
-**Note:** The linked device may show as “Google Chrome (Ubuntu)” (Baileys); you can ignore it.
+```
+BRAVE_API_KEY=your_key_here
+```
+
+If not:
+
+```bash
+npx playwright install chromium
+```
+
+The bot will automatically search the web when needed.
+
+---
+
+# 🧪 Tests (Optional)
+
+```bash
+pnpm run test:schedule
+pnpm run test:browser
+pnpm run test:intent
+```
+
+---
+
+# 📌 Where Messages Work
+
+• Message yourself → replies there
+• Other chats → replies when someone messages your linked number
+
+---
+
+That's all you need to start using cowCode.
