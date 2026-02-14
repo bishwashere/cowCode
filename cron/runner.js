@@ -51,7 +51,7 @@ async function runJob({ job, sock, selfJid }) {
   } catch (err) {
     console.error('[cron] Job failed:', job.name, err.message);
     try {
-      await sock.sendMessage(jid, { text: `[CowCode] Cron "${job.name}" failed: ${err.message}` });
+      await sock.sendMessage(jid, { text: `[CowCode] Moo — reminder "${job.name}" didn't go through: ${err.message}` });
     } catch (_) {}
   }
 }

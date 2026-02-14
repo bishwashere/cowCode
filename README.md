@@ -27,6 +27,18 @@ That's it.
 
 ---
 
+# 🔄 Update (get the latest code)
+
+From inside your cowCode folder (keeps your config, WhatsApp link, and reminders):
+
+```bash
+cd cowCode && curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/main/update.sh | bash
+```
+
+Then start as usual: `npm start`
+
+---
+
 # 💬 How to Use
 
 • Open WhatsApp
@@ -156,9 +168,9 @@ The bot will automatically search the web when needed.
 # 🧪 Tests (Optional)
 
 ```bash
-pnpm run test:schedule
 pnpm run test:browser
-pnpm run test:intent
+pnpm run test:browser-e2e
+pnpm run test:all
 ```
 
 ---

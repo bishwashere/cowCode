@@ -258,7 +258,7 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
     const isListOnly = intent === 'SCHEDULE_LIST';
     const isSearch = intent === 'SEARCH';
     if (useTools && !isListOnly && !isSearch) {
-      const immediateReply = "[CowCode] Got it, one moment.";
+      const immediateReply = "[CowCode] Grazing on that…";
       const immediateSent = await sock.sendMessage(jid, { text: immediateReply });
       if (immediateSent?.key?.id && ourSentIdsRef?.current) {
         ourSentIdsRef.current.add(immediateSent.key.id);
@@ -522,11 +522,11 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
 
         runAgentWithSkills(sock, jid, text, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }).catch((err) => {
           console.error('Background agent error:', err.message);
-          sock.sendMessage(jid, { text: `[CowCode] Error: ${err.message}` }).catch(() => {});
+          sock.sendMessage(jid, { text: `[CowCode] Moo — something went wrong: ${err.message}` }).catch(() => {});
         });
       } catch (err) {
         console.error('LLM error:', err.message);
-        await sock.sendMessage(jid, { text: `[CowCode] Error: ${err.message}` });
+        await sock.sendMessage(jid, { text: `[CowCode] Moo — something went wrong: ${err.message}` });
       }
     }
   });
