@@ -34,10 +34,24 @@ echo ""
 INSTALL_DIR="$(pwd)"
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
-cat > "$BIN_DIR/cowcode" << EOF
+cat > "$BIN_DIR/cowcode" << LAUNCHER
 #!/usr/bin/env bash
-cd "$INSTALL_DIR" && exec node cli.js "\$@"
-EOF
+# Use COWCODE_INSTALL_DIR if set; else use current dir if it has cli.js; else use path from install
+COWCODE_DIR="\${COWCODE_INSTALL_DIR}"
+if [ -z "\$COWCODE_DIR" ] && [ -f "\$(pwd)/cli.js" ]; then
+  COWCODE_DIR="\$(pwd)"
+fi
+if [ -z "\$COWCODE_DIR" ]; then
+  COWCODE_DIR="$INSTALL_DIR"
+fi
+if [ ! -f "\$COWCODE_DIR/cli.js" ]; then
+  echo "cowCode: install directory not found (no cli.js)."
+  echo "  Set COWCODE_INSTALL_DIR to your cowCode folder, or run install from that folder."
+  echo "  Example: export COWCODE_INSTALL_DIR=\$HOME/001apps/cowCode"
+  exit 1
+fi
+cd "\$COWCODE_DIR" && exec node cli.js "\$@"
+LAUNCHER
 chmod +x "$BIN_DIR/cowcode"
 echo "  ► Launcher installed: $BIN_DIR/cowcode"
 
@@ -82,20 +96,20 @@ else
   trap - INT
   echo ""
   echo "  ------------------------------------------------"
-  echo "  To start the bot:  cowcode"
+  echo "  To start the bot:  cowcode moo start"
   echo "  (or from this folder:  npm start)"
   echo ""
   # New shell is created only after setup.js exits (e.g. after user presses Ctrl+C).
-  # Nothing runs automatically in the new shell — user runs 'cowcode' when they want the bot.
+  # Nothing runs automatically in the new shell — user runs cowcode moo start when they want the bot.
   if [ "$ADDED_PATH" = 1 ] && [ -t 0 ]; then
-    echo "  ► Opening a new shell so  cowcode  works there. Run  cowcode  when you want to start the bot."
+    echo "  ► Opening a new shell so  cowcode  works there. Run  cowcode moo start  when you want to start the bot."
     exec "${SHELL:-/bin/zsh}" -l
   fi
   exit 0
 fi
 echo ""
 echo "  ------------------------------------------------"
-echo "  To start the bot:  cowcode"
+echo "  To start the bot:  cowcode moo start"
 echo "  (or from this folder:  npm start)"
 echo ""
 

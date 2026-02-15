@@ -162,6 +162,8 @@ cowcode moo restart
 
 First time: link WhatsApp once with `cowcode auth` (or during setup when the QR appears). Then `cowcode moo start` runs the bot in the background.
 
+If you get "install directory not found": the `cowcode` launcher looks for your project in the folder where you ran install. If your project is elsewhere (e.g. `~/001apps/cowCode`), run `cowcode moo start` from inside that folder, or set `export COWCODE_INSTALL_DIR=~/001apps/cowCode` (then run `cowcode moo start`).
+
 ---
 
 # 🌐 Web Search (Browser Skill)

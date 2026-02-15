@@ -264,7 +264,14 @@ async function main() {
     shell: false,
     env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' },
   });
-  child.on('close', (code) => process.exit(code ?? 0));
+  child.on('close', (code) => {
+    console.log('');
+    console.log('  ------------------------------------------------');
+    console.log('  To start the bot:  cowcode moo start');
+    console.log('  (or from this folder:  npm start)');
+    console.log('');
+    process.exit(code ?? 0);
+  });
 }
 
 main().catch((err) => {

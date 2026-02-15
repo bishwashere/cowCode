@@ -85,7 +85,7 @@ async function runAuthOnly(opts = {}) {
           console.log('Please send a message to your own number to get started.');
         } else {
           console.log('[connection] connection successful');
-          console.log('Linked. You can Ctrl+C and run pnpm start.');
+          console.log('Linked. You can Ctrl+C and run cowcode moo start.');
         }
         resolve(sock);
         return;

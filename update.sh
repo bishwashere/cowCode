@@ -58,5 +58,5 @@ echo "  ► Installing dependencies..."
 (cd "$ROOT" && npm install)
 
 echo ""
-echo "  ✓ Update complete. Start the bot with:  npm start"
+echo "  ✓ Update complete. Start the bot with:  cowcode moo start"
 echo ""
