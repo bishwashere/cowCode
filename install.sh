@@ -38,6 +38,7 @@ echo ""
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/cowcode" << LAUNCHER
 #!/usr/bin/env bash
+export COWCODE_INSTALL_DIR="$INSTALL_DIR"
 exec node "$INSTALL_DIR/cli.js" "\$@"
 LAUNCHER
 chmod +x "$BIN_DIR/cowcode"

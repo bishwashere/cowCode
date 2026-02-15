@@ -5,12 +5,14 @@
  */
 
 import { spawn } from 'child_process';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const INSTALL_DIR = __dirname;
+const INSTALL_DIR = process.env.COWCODE_INSTALL_DIR
+  ? resolve(process.env.COWCODE_INSTALL_DIR)
+  : __dirname;
 
 const args = process.argv.slice(2);
 const sub = args[0];
