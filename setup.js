@@ -238,6 +238,28 @@ async function onboarding() {
   newEnv.BRAVE_API_KEY = braveKey ?? '';
 
   writeFileSync(getEnvPath(), stringifyEnv(newEnv), 'utf8');
+
+  // When user adds a cloud LLM key during setup, set that model as priority — but only if no model
+  // has priority yet (so we never overwrite a choice the user made later in config).
+  const cloudKeyAdded = provider !== 'skip' && (
+    (provider === 'openai' && (llm1Key ?? '').trim()) ||
+    (provider === 'grok' && (llm2Key ?? '').trim()) ||
+    (provider === 'anthropic' && (llm3Key ?? '').trim())
+  );
+  if (cloudKeyAdded && Array.isArray(config?.llm?.models)) {
+    const models = config.llm.models;
+    const hasPriorityAlready = models.some(
+      (m) => m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true'
+    );
+    if (!hasPriorityAlready) {
+      for (let i = 0; i < models.length; i++) {
+        const p = (models[i].provider || '').toLowerCase();
+        models[i].priority = p === provider;
+      }
+      saveConfig(config);
+    }
+  }
+
   console.log('');
   console.log(C.dim + '  ✓ Config and .env saved to ~/.cowcode' + C.reset);
 }

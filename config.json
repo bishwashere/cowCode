@@ -6,13 +6,13 @@
         "provider": "lmstudio",
         "baseUrl": "http://127.0.0.1:1234/v1",
         "model": "local",
-        "apiKey": "not-needed",
-        "priority": true
+        "apiKey": "not-needed"
       },
       {
         "provider": "openai",
         "apiKey": "LLM_1_API_KEY",
-        "model": "gpt-4o"
+        "model": "gpt-4o",
+        "priority": true
       },
       {
         "provider": "grok",

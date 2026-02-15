@@ -1,6 +1,7 @@
 node_modules/
 auth_info/
 .env
+config.json
 *.log
 package-lock.json
 pnpm-lock.yaml

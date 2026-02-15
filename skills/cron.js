@@ -137,6 +137,19 @@ When the user asks for multiple new reminders (e.g. "remind me X in 1 min and Y 
         if (!Number.isFinite(atMs) || atMs <= Date.now()) {
           throw new Error('One-shot "at" time must be in the future. Use a future ISO 8601 timestamp (e.g. now + 5 minutes).');
         }
+        // Dedupe: if LLM calls add twice with same at+message+jid, only store one job.
+        const existing = loadJobs(storePath);
+        const duplicate = existing.some(
+          (j) =>
+            j.schedule?.kind === 'at' &&
+            j.schedule?.at === input.schedule?.at &&
+            (j.jid || null) === (input.jid || null) &&
+            (j.message || '') === (input.message || '')
+        );
+        if (duplicate) {
+          const when = new Date(input.schedule.at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+          return `Scheduled: "${(input.message || '').slice(0, 50)}${(input.message || '').length > 50 ? '…' : ''}" at ${when}.`;
+        }
       }
       const job = addJob(input, storePath);
       if (job.schedule?.kind === 'at') scheduleOneShot(job);

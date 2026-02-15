@@ -43,7 +43,8 @@ echo ""
 STATE_DIR="${COWCODE_STATE_DIR:-$HOME/.cowcode}"
 mkdir -p "$STATE_DIR" "$STATE_DIR/cron" "$STATE_DIR/auth_info"
 
-# One-time migration: if state dir has no config but ROOT has data, copy to state dir
+# One-time migration only: if state dir has no config but ROOT has data, copy to state dir.
+# We never overwrite existing ~/.cowcode/config.json (user's priority and model choices are preserved on update).
 if [ ! -f "$STATE_DIR/config.json" ] && [ -f "$ROOT/config.json" ]; then
   echo "  ► Migrating config to $STATE_DIR"
   cp "$ROOT/config.json" "$STATE_DIR/"

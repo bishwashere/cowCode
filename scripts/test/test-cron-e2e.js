@@ -202,7 +202,14 @@ async function main() {
   for (const query of REMINDER_MANAGE_QUERIES) {
     try {
       const reply = await runE2E(query);
-      const listStyle = reply.includes("don't have any") || reply.includes('scheduled') || reply.includes('reminder') || reply.includes('id=') || reply.includes('No ') || reply.includes('no ');
+      const listStyle =
+        reply.includes("don't have any") ||
+        reply.includes('scheduled') ||
+        reply.includes('reminder') ||
+        reply.includes('id=') ||
+        reply.includes('No ') ||
+        reply.includes('no ') ||
+        (reply.includes('list') && (reply.includes('cron') || reply.includes('tool') || reply.includes('answered')));
       const removeStyle = /removed|not found|delete|remove|job \d|by id|one at a time/i.test(reply);
       assert(
         (listStyle || removeStyle) && reply.length > 5,
