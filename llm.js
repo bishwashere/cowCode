@@ -6,6 +6,7 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { getConfigPath } from './lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -51,10 +52,10 @@ const DEFAULT_CLOUD_MODELS = {
 };
 
 function loadConfig() {
-  const path = join(__dirname, 'config.json');
+  const configPath = getConfigPath();
   let raw = '';
   try {
-    raw = readFileSync(path, 'utf8');
+    raw = readFileSync(configPath, 'utf8');
   } catch (err) {
     if (err.code !== 'ENOENT') throw err;
   }

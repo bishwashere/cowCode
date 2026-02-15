@@ -24,6 +24,8 @@ cowcode
 Or from the cowCode folder: `npm start` (or `pnpm start` / `yarn start`).  
 If `cowcode` isn’t found, add `export PATH="$HOME/.local/bin:$PATH"` to your shell config (e.g. `~/.bashrc` or `~/.zshrc`).
 
+**Config and state** (config, WhatsApp auth, cron jobs) live in **`~/.cowcode`**. Override with `COWCODE_STATE_DIR`.
+
 That's it.
 
 ---
@@ -62,8 +64,10 @@ Cron reminders and web search are already enabled.
 Run:
 
 ```bash
-npm run auth -- --pair 1234567890
+cowcode auth --pair 1234567890
 ```
+
+(or from the cowCode folder: `npm run auth -- --pair 1234567890`)
 
 Replace with your full phone number (no +).
 
@@ -82,7 +86,7 @@ Settings → Linked Devices → **Link with phone number** → enter the 8-digit
 
 # 🧠 LLM Configuration (Optional)
 
-File: `config.json`
+File: **`~/.cowcode/config.json`** (or `$COWCODE_STATE_DIR/config.json`).
 
 Local models are tried first by default.
 
@@ -112,7 +116,7 @@ openai, grok/xai, together, deepseek, ollama, lmstudio
 
 # 🛠 Skills (On by Default)
 
-Configured in `config.json`.
+Configured in `~/.cowcode/config.json`.
 
 ```json
 "skills": {
@@ -138,11 +142,22 @@ pnpm run cron list
 pnpm run cron remove <job-id>
 ```
 
-Jobs are stored in:
+Jobs are stored in **`~/.cowcode/cron/jobs.json`**.
 
+---
+
+# 🔄 Run in the background (optional)
+
+Run the bot in the background so it keeps working after you close the terminal (macOS: launchd, Linux: systemd).
+
+```bash
+cowcode moo start
+cowcode moo stop
+cowcode moo status
+cowcode moo restart
 ```
-cron/jobs.json
-```
+
+First time: link WhatsApp once with `cowcode auth` (or run the bot once in the foreground to scan the QR). Then `cowcode moo start` runs the bot in the background.
 
 ---
 

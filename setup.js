@@ -5,16 +5,15 @@
  * Usage: npm run setup | pnpm run setup | yarn setup | node setup.js
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, cpSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { spawnSync, spawn } from 'child_process';
+import { getConfigPath, getEnvPath, getAuthDir, getCronStorePath, ensureStateDir } from './lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = __dirname;
-const CONFIG_PATH = join(ROOT, 'config.json');
-const ENV_PATH = join(ROOT, '.env');
 const ENV_EXAMPLE = join(ROOT, '.env.example');
 
 const C = { reset: '\x1b[0m', cyan: '\x1b[36m', dim: '\x1b[2m', green: '\x1b[32m', bold: '\x1b[1m' };
@@ -87,6 +86,38 @@ function getPackageManager() {
   return 'npm';
 }
 
+function migrateFromRoot() {
+  ensureStateDir();
+  const stateConfig = getConfigPath();
+  const stateEnv = getEnvPath();
+  const stateAuth = getAuthDir();
+  const stateCron = getCronStorePath();
+  const rootConfig = join(ROOT, 'config.json');
+  const rootEnv = join(ROOT, '.env');
+  const rootAuth = join(ROOT, 'auth_info');
+  const rootCron = join(ROOT, 'cron', 'jobs.json');
+  if (existsSync(rootConfig) && !existsSync(stateConfig)) {
+    copyFileSync(rootConfig, stateConfig);
+    console.log(C.dim + '  ✓ Migrated config.json to ~/.cowcode' + C.reset);
+  }
+  if (existsSync(rootEnv) && !existsSync(stateEnv)) {
+    copyFileSync(rootEnv, stateEnv);
+    console.log(C.dim + '  ✓ Migrated .env to ~/.cowcode' + C.reset);
+  }
+  if (existsSync(rootAuth)) {
+    const creds = join(rootAuth, 'creds.json');
+    if (existsSync(creds) && !existsSync(join(stateAuth, 'creds.json'))) {
+      cpSync(rootAuth, stateAuth, { recursive: true });
+      console.log(C.dim + '  ✓ Migrated auth_info to ~/.cowcode' + C.reset);
+    }
+  }
+  if (existsSync(rootCron) && !existsSync(stateCron)) {
+    mkdirSync(dirname(stateCron), { recursive: true });
+    copyFileSync(rootCron, stateCron);
+    console.log(C.dim + '  ✓ Migrated cron/jobs.json to ~/.cowcode' + C.reset);
+  }
+}
+
 function ensureInstall() {
   const nodeModules = join(ROOT, 'node_modules');
   if (!existsSync(nodeModules) || !existsSync(join(nodeModules, '@whiskeysockets', 'baileys'))) {
@@ -105,16 +136,16 @@ function ensureInstall() {
 }
 
 function loadConfig() {
-  if (!existsSync(CONFIG_PATH)) return null;
+  if (!existsSync(getConfigPath())) return null;
   try {
-    return JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+    return JSON.parse(readFileSync(getConfigPath(), 'utf8'));
   } catch {
     return null;
   }
 }
 
 function saveConfig(config) {
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
+  writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), 'utf8');
 }
 
 function getDefaultBaseUrl(config) {
@@ -145,8 +176,9 @@ function stringifyEnv(obj) {
 async function onboarding() {
   const config = loadConfig();
   const defaultBaseUrl = getDefaultBaseUrl(config);
-  const hasEnv = existsSync(ENV_PATH);
-  const envContent = hasEnv ? readFileSync(ENV_PATH, 'utf8') : '';
+  const envPath = getEnvPath();
+  const hasEnv = existsSync(envPath);
+  const envContent = hasEnv ? readFileSync(envPath, 'utf8') : '';
   const env = parseEnv(envContent);
 
   section('Configuration (optional — press Enter to keep defaults or skip)');
@@ -205,9 +237,9 @@ async function onboarding() {
   newEnv.LLM_3_API_KEY = llm3Key ?? '';
   newEnv.BRAVE_API_KEY = braveKey ?? '';
 
-  writeFileSync(ENV_PATH, stringifyEnv(newEnv), 'utf8');
+  writeFileSync(getEnvPath(), stringifyEnv(newEnv), 'utf8');
   console.log('');
-  console.log(C.dim + '  ✓ Config and .env saved.' + C.reset);
+  console.log(C.dim + '  ✓ Config and .env saved to ~/.cowcode' + C.reset);
 }
 
 async function main() {
@@ -218,6 +250,7 @@ async function main() {
     process.exit(0);
   }
   welcome();
+  migrateFromRoot();
   ensureInstall();
   await onboarding();
 

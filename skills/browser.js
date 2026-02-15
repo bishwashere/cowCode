@@ -7,9 +7,9 @@
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { getConfigPath } from '../lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = join(__dirname, '..', 'config.json');
 
 const BROWSER_TIMEOUT_MS = 20_000;
 const MAX_RESULT_CHARS = 12_000;
@@ -53,7 +53,7 @@ function stripHtmlToText(html) {
  */
 function getBrowserSearchConfig() {
   try {
-    const raw = readFileSync(CONFIG_PATH, 'utf8');
+    const raw = readFileSync(getConfigPath(), 'utf8');
     const config = JSON.parse(raw);
     const search = config.skills?.browser?.search;
     if (!search || typeof search !== 'object') {

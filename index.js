@@ -1,9 +1,13 @@
 /**
  * WhatsApp + configurable LLM. On incoming message → LLM reply → send back.
- * Config values come from .env (see .env.example). No secrets in config.json.
+ * Config and state live in ~/.cowcode (or COWCODE_STATE_DIR).
  */
 
-import 'dotenv/config';
+import { getAuthDir, getCronStorePath, getEnvPath, ensureStateDir } from './lib/paths.js';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: getEnvPath() });
+
 import * as Baileys from '@whiskeysockets/baileys';
 
 const makeWASocket =
@@ -29,8 +33,6 @@ const require = createRequire(import.meta.url);
 const qrcodeTerminal = require('qrcode-terminal');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const AUTH_DIR = join(__dirname, 'auth_info');
-const CRON_STORE_PATH = join(__dirname, 'cron', 'jobs.json');
 
 if (typeof makeWASocket !== 'function') {
   throw new Error('Baileys makeWASocket not found. Check @whiskeysockets/baileys version.');
@@ -62,7 +64,7 @@ const RESTART_REQUIRED_CODE = 515;
  */
 async function runAuthOnly(opts = {}) {
   const { version } = await fetchLatestBaileysVersion();
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  const { state, saveCreds } = await useMultiFileAuthState(getAuthDir());
 
   const sock = makeWASocket({
     version,
@@ -122,9 +124,10 @@ async function runAuthOnly(opts = {}) {
 }
 
 async function main() {
-  if (authOnly && existsSync(AUTH_DIR)) {
-    rmSync(AUTH_DIR, { recursive: true });
-    mkdirSync(AUTH_DIR, { recursive: true });
+  ensureStateDir();
+  if (authOnly && existsSync(getAuthDir())) {
+    rmSync(getAuthDir(), { recursive: true });
+    mkdirSync(getAuthDir(), { recursive: true });
   }
 
   if (authOnly) {
@@ -142,8 +145,8 @@ async function main() {
   }
 
   let sock;
-  const credsPath = join(AUTH_DIR, 'creds.json');
-  const needAuth = !existsSync(AUTH_DIR) || !existsSync(credsPath);
+  const credsPath = join(getAuthDir(), 'creds.json');
+  const needAuth = !existsSync(getAuthDir()) || !existsSync(credsPath);
 
   // --test: use mock socket and skip WhatsApp auth so E2E tests can run without linking.
   if (process.argv.includes('--test')) {
@@ -176,7 +179,7 @@ async function main() {
     }
   } else {
     const { version } = await fetchLatestBaileysVersion();
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const { state, saveCreds } = await useMultiFileAuthState(getAuthDir());
     sock = makeWASocket({
       version,
       auth: {
@@ -274,10 +277,10 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
       ? (intent === 'SEARCH' ? getBrowserSystemPrompt() : getScheduleSystemPrompt())
       : chatSystemPrompt;
     const ctx = {
-      storePath: CRON_STORE_PATH,
+      storePath: getCronStorePath(),
       jid,
       scheduleOneShot,
-      startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: CRON_STORE_PATH }),
+      startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: getCronStorePath() }),
     };
     let messages = [
       { role: 'system', content: systemPrompt },
@@ -449,7 +452,7 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
       console.log('  WhatsApp connected. Message your own number to start chatting.');
       console.log('');
       if (sid) {
-        startCron({ sock, selfJid: sid, storePath: join(__dirname, 'cron', 'jobs.json') });
+        startCron({ sock, selfJid: sid, storePath: getCronStorePath() });
       }
     }
     if (u.connection === 'close') {

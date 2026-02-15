@@ -7,12 +7,11 @@
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { getConfigPath } from '../lib/paths.js';
 import { cronSkill } from './cron.js';
 import { browserSkill } from './browser.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-const CONFIG_PATH = join(__dirname, '..', 'config.json');
 
 const DEFAULT_ENABLED = ['cron', 'browser'];
 
@@ -27,7 +26,7 @@ const BUILTIN_SKILLS = {
  */
 export function getSkillsConfig() {
   try {
-    const raw = readFileSync(CONFIG_PATH, 'utf8');
+    const raw = readFileSync(getConfigPath(), 'utf8');
     const config = JSON.parse(raw);
     const skills = config.skills;
     if (!skills || typeof skills !== 'object') {

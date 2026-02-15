@@ -36,7 +36,7 @@ BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/cowcode" << EOF
 #!/usr/bin/env bash
-cd "$INSTALL_DIR" && exec node index.js "\$@"
+cd "$INSTALL_DIR" && exec node cli.js "\$@"
 EOF
 chmod +x "$BIN_DIR/cowcode"
 echo "  ► Launcher installed: $BIN_DIR/cowcode"

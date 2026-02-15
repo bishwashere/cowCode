@@ -26,13 +26,18 @@ echo ""
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-# Backup user data (do not overwrite with release)
-BACKUP="$WORK/backup"
-mkdir -p "$BACKUP"
-[ -f "$ROOT/config.json" ]     && cp "$ROOT/config.json"     "$BACKUP/"
-[ -f "$ROOT/.env" ]            && cp "$ROOT/.env"            "$BACKUP/"
-[ -f "$ROOT/cron/jobs.json" ]  && mkdir -p "$BACKUP/cron" && cp "$ROOT/cron/jobs.json" "$BACKUP/cron/"
-[ -d "$ROOT/auth_info" ]       && cp -R "$ROOT/auth_info"   "$BACKUP/"
+# State dir: config/auth/cron live here (new installs and after migration)
+STATE_DIR="${COWCODE_STATE_DIR:-$HOME/.cowcode}"
+mkdir -p "$STATE_DIR" "$STATE_DIR/cron" "$STATE_DIR/auth_info"
+
+# One-time migration: if state dir has no config but ROOT has data, copy to state dir
+if [ ! -f "$STATE_DIR/config.json" ] && [ -f "$ROOT/config.json" ]; then
+  echo "  ► Migrating config to $STATE_DIR"
+  cp "$ROOT/config.json" "$STATE_DIR/"
+  [ -f "$ROOT/.env" ]            && cp "$ROOT/.env" "$STATE_DIR/"
+  [ -f "$ROOT/cron/jobs.json" ]  && cp "$ROOT/cron/jobs.json" "$STATE_DIR/cron/"
+  [ -d "$ROOT/auth_info" ]       && rm -rf "$STATE_DIR/auth_info" && cp -R "$ROOT/auth_info" "$STATE_DIR/"
+fi
 
 echo "  ► Downloading latest..."
 curl -fsSL "$TARBALL" -o "$WORK/archive.tar.gz"
@@ -48,12 +53,6 @@ for f in "$SRC"/*; do
   rm -rf "$ROOT/$name"
   cp -R "$f" "$ROOT/"
 done
-
-# Restore user data
-[ -f "$BACKUP/config.json" ]     && cp "$BACKUP/config.json"     "$ROOT/"
-[ -f "$BACKUP/.env" ]            && cp "$BACKUP/.env"            "$ROOT/"
-[ -f "$BACKUP/cron/jobs.json" ]  && cp "$BACKUP/cron/jobs.json"  "$ROOT/cron/"
-[ -d "$BACKUP/auth_info" ]       && rm -rf "$ROOT/auth_info" && cp -R "$BACKUP/auth_info" "$ROOT/"
 
 echo "  ► Installing dependencies..."
 (cd "$ROOT" && npm install)

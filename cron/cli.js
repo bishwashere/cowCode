@@ -13,10 +13,11 @@
 
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getCronStorePath } from '../lib/paths.js';
 import { loadJobs, addJob, removeJob, updateJob } from './store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const STORE_PATH = join(__dirname, 'jobs.json');
+const STORE_PATH = getCronStorePath();
 
 const args = process.argv.slice(2);
 const cmd = args[0];
