@@ -37,7 +37,7 @@ PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 ADDED_PATH=0
 add_path_to() {
   local f="$1"
-  [ -f "$f" ] || return 0
+  [ -f "$f" ] || touch "$f" 2>/dev/null || return 0
   grep -q '.local/bin' "$f" 2>/dev/null && return 0
   echo "" >> "$f"
   echo "# cowCode" >> "$f"
