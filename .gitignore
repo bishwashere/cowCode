@@ -5,3 +5,4 @@ auth_info/
 package-lock.json
 pnpm-lock.yaml
 cron/jobs.e2e.json
+scripts/test/.tmp-cron-e2e-*
