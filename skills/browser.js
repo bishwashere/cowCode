@@ -237,19 +237,19 @@ ACTIONS:
     if (action === 'search') {
       const query = args?.query && String(args.query).trim();
       if (!query) throw new Error('query required for search');
-      // News/headlines: use RSS for reliable results (no search engine blocking).
-      if (isNewsQuery(query)) {
-        const n = /\b(three|3|five|5|ten|10)\b/.exec(query.toLowerCase());
-        const max = n ? { three: 3, 3: 3, five: 5, 5: 5, ten: 10, 10: 10 }[n[1].toLowerCase()] || 5 : 5;
-        return fetchNewsFromRss(max);
-      }
-      // Prefer Brave Search API when configured (structured results, no blocking).
+      // Brave Search first when configured (priority over RSS and browser).
       const searchConfig = getBrowserSearchConfig();
       if (searchConfig.apiKey && searchConfig.enabled !== false) {
         return braveSearch(query, {
           apiKey: searchConfig.apiKey,
           count: searchConfig.count,
         });
+      }
+      // News/headlines: use RSS when no Brave key (reliable, no search engine blocking).
+      if (isNewsQuery(query)) {
+        const n = /\b(three|3|five|5|ten|10)\b/.exec(query.toLowerCase());
+        const max = n ? { three: 3, 3: 3, five: 5, 5: 5, ten: 10, 10: 10 }[n[1].toLowerCase()] || 5 : 5;
+        return fetchNewsFromRss(max);
       }
       // Fallback: Playwright + DuckDuckGo Lite (no API key).
       return runWithBrowser(async (page) => {
