@@ -13,18 +13,21 @@ You chat in **"Message yourself"**, and the bot replies there.
 curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash
 ```
 
-### 2️⃣ Start the bot (every time you want to use it)
+### 2️⃣ Start the bot in the background (recommended)
 
-From **any terminal** (no need to cd into the folder):
+From **any terminal**:
 
 ```bash
-cowcode
+cowcode moo start
 ```
 
-Or from the cowCode folder: `npm start` (or `pnpm start` / `yarn start`).  
-If `cowcode` isn’t found, add `export PATH="$HOME/.local/bin:$PATH"` to your shell config (e.g. `~/.bashrc` or `~/.zshrc`).
+The bot runs in the background. **You can close the terminal** — it keeps running (macOS: launchd, Linux: systemd).
+
+If `cowcode` is not found, add `export PATH="$HOME/.local/bin:$PATH"` to your shell config (e.g. `~/.bashrc` or `~/.zshrc`).
 
 **Config and state** (config, WhatsApp auth, cron jobs) live in **`~/.cowcode`**. Override with `COWCODE_STATE_DIR`.
+
+Other commands: `cowcode moo stop` | `cowcode moo status` | `cowcode moo restart`. To run in the foreground instead (terminal must stay open): `cowcode`.
 
 That's it.
 
@@ -38,7 +41,7 @@ From inside your cowCode folder (keeps your config, WhatsApp link, and reminders
 cd cowCode && curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/update.sh | bash
 ```
 
-Then start as usual: `cowcode`
+Then start as usual: `cowcode moo start`
 
 ---
 
@@ -146,18 +149,18 @@ Jobs are stored in **`~/.cowcode/cron/jobs.json`**.
 
 ---
 
-# 🔄 Run in the background (optional)
+# 🔄 Moo commands (background service)
 
-Run the bot in the background so it keeps working after you close the terminal (macOS: launchd, Linux: systemd).
+`cowcode moo start` is the recommended way to run the bot (see Install step 2). Full set:
 
 ```bash
-cowcode moo start
+cowcode moo start    # start in background (survives closing terminal)
 cowcode moo stop
 cowcode moo status
 cowcode moo restart
 ```
 
-First time: link WhatsApp once with `cowcode auth` (or run the bot once in the foreground to scan the QR). Then `cowcode moo start` runs the bot in the background.
+First time: link WhatsApp once with `cowcode auth` (or during setup when the QR appears). Then `cowcode moo start` runs the bot in the background.
 
 ---
 
