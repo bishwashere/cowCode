@@ -34,6 +34,7 @@ chmod +x "$BIN_DIR/cowcode"
 echo "  ► Launcher installed: $BIN_DIR/cowcode"
 
 PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+ADDED_PATH=0
 add_path_to() {
   local f="$1"
   [ -f "$f" ] || return 0
@@ -42,12 +43,13 @@ add_path_to() {
   echo "# cowCode" >> "$f"
   echo "$PATH_LINE" >> "$f"
   echo "  ► Added ~/.local/bin to PATH in $f"
+  ADDED_PATH=1
 }
 if ! command -v cowcode >/dev/null 2>&1; then
   add_path_to "${ZDOTDIR:-$HOME}/.zshrc"
   add_path_to "$HOME/.bashrc"
   add_path_to "$HOME/.profile"
-  echo "  ► Open a new terminal, or run:  source ~/.zshrc   (then run: cowcode)"
+  [ "$ADDED_PATH" = 1 ] && echo "  ► Open a new terminal, or run:  source ~/.zshrc   (then run: cowcode)"
 fi
 echo ""
 
@@ -64,3 +66,9 @@ echo "  ------------------------------------------------"
 echo "  To start the bot:  cowcode"
 echo "  (or from this folder:  npm start)"
 echo ""
+
+# So the same terminal sees the new PATH: replace this process with a new login shell
+if [ "$ADDED_PATH" = 1 ] && [ -t 0 ]; then
+  echo "  ► Starting a new shell so  cowcode  works in this terminal..."
+  exec "${SHELL:-/bin/zsh}" -l
+fi
