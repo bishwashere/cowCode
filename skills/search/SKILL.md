@@ -1,6 +1,6 @@
-# Browser
+# Search
 
-Search the web or fetch a page. Call **run_skill** with **skill: "browser"**. The **command name** is the operation: use **command** or **arguments.action** set to exactly one of: **search**, **navigate**.
+Search the web or fetch a page. Call **run_skill** with **skill: "search"**. The **command name** is the operation: use **command** or **arguments.action** set to exactly one of: **search**, **navigate**.
 
 ## Commands (name is command)
 
@@ -11,5 +11,5 @@ You can pass the command at the top level (`command: "search"`) or inside argume
 
 ## Config
 
-- Brave Search: set `BRAVE_API_KEY` in .env or `skills.browser.search.apiKey` in config.json.
+- Brave Search: set `BRAVE_API_KEY` in .env or `skills.search.apiKey` in config.json (or `skills.browser.search.apiKey` for backward compatibility).
 - Without Brave: news queries use RSS; other queries fall back to Playwright + DuckDuckGo Lite.

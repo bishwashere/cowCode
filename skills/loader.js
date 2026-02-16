@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { getConfigPath } from '../lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_ENABLED = ['cron', 'browser', 'memory'];
+const DEFAULT_ENABLED = ['cron', 'search', 'memory'];
 const SKILL_JSON = 'skill.json';
 const MD_NAMES = ['skill.md', 'SKILL.md'];
 
@@ -73,11 +73,11 @@ export function getSkillContext() {
                   skill: {
                     type: 'string',
                     enum: available,
-                    description: 'Skill id (cron, browser, memory).',
+                    description: 'Skill id (cron, search, memory).',
                   },
                   command: {
                     type: 'string',
-                    description: 'Command name for the operation (name is command). e.g. browser: search, navigate; cron: list, add, remove. If set, this is the operation to run; otherwise use arguments.action.',
+                    description: 'Command name for the operation (name is command). e.g. search: search, navigate; cron: list, add, remove. If set, this is the operation to run; otherwise use arguments.action.',
                   },
                   arguments: {
                     type: 'object',

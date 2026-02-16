@@ -1,4 +1,0 @@
-{
-  "id": "browser",
-  "description": "Search the web or fetch a URL. Actions: search (query), navigate (url). See skill.md for arguments."
-}

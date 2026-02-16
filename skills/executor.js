@@ -9,12 +9,12 @@ import { executeMemory } from '../lib/executors/memory.js';
 
 const EXECUTORS = {
   cron: executeCron,
-  browser: executeBrowser,
+  search: executeBrowser,
   memory: executeMemory,
 };
 
 /**
- * @param {string} skillId - cron | browser | memory
+ * @param {string} skillId - cron | search | memory
  * @param {object} ctx - storePath, jid, workspaceDir, scheduleOneShot, startCron
  * @param {object} args - Parsed LLM tool arguments
  * @param {string} [toolName] - For multi-tool skills (e.g. memory_search, memory_get)

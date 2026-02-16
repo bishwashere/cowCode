@@ -73,7 +73,7 @@ function step1Print(userMessage) {
 
   console.log('\nFiles / sources used:');
   console.log('  - index.js: builds systemPrompt (getScheduleSystemPrompt + skillDocsBlock)');
-  console.log('  - skills/loader.js: getSkillContext() → skillDocs from skills/cron/SKILL.md, skills/browser/SKILL.md, skills/memory/SKILL.md; runSkillTool = single tool "run_skill"');
+  console.log('  - skills/loader.js: getSkillContext() → skillDocs from skills/cron/SKILL.md, skills/search/SKILL.md, skills/memory/SKILL.md; runSkillTool = single tool "run_skill"');
   console.log('  - No memory file is injected into the prompt; memory skill is available for the LLM to call if needed.\n');
 
   console.log('System prompt (first 800 chars):');
@@ -122,7 +122,7 @@ function step3Print(payload, storePath) {
   console.log('  - index.js runAgentWithSkills: for each tool_call we parse arguments → skillId and runArgs.');
   console.log('  - We call executeSkill(skillId, ctx, runArgs), NOT a function named "cron.add".');
   console.log('  - Where the function is defined:');
-  console.log('    skills/executor.js: EXECUTORS = { cron: executeCron, browser: executeBrowser, memory: executeMemory }');
+  console.log('    skills/executor.js: EXECUTORS = { cron: executeCron, search: executeBrowser, memory: executeMemory }');
   console.log('    → executeSkill("cron", ctx, runArgs) calls lib/executors/cron.js executeCron(ctx, runArgs)');
   console.log('  - For cron_add we build runArgs: action="add", job={ message, schedule: { kind: "at", at } }.');
   console.log('\n  Cron store path (ctx.storePath):', storePath);

@@ -32,14 +32,11 @@
     ]
   },
   "skills": {
-    "enabled": ["cron", "browser"],
+    "enabled": ["cron", "search"],
     "cron": {},
-    "search": {},
-    "browser": {
-      "search": {
-        "provider": "brave",
-        "count": 8
-      }
+    "search": {
+      "provider": "brave",
+      "count": 8
     }
   },
   "channels": {
