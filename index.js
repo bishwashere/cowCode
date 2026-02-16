@@ -30,6 +30,7 @@ import { getSkillsEnabled, getSkillContext } from './skills/loader.js';
 import { executeSkill } from './skills/executor.js';
 import { initBot, createTelegramSock } from './lib/telegram.js';
 import { getChannelsConfig } from './lib/channels-config.js';
+import { getSchedulingTimeContext } from './lib/timezone.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -260,14 +261,11 @@ async function main() {
   const skillDocsBlock = skillDocs
     ? `\n\n# Available skills (read these to decide when to use run_skill and which arguments to pass)\n\n${skillDocs}\n\n# Clarification\n${CLARIFICATION_RULE}`
     : '';
-  const now = Date.now();
-  const nowIso = new Date(now).toISOString();
-  const in1min = new Date(now + 60_000).toISOString();
-  const in2min = new Date(now + 120_000).toISOString();
-  const in3min = new Date(now + 180_000).toISOString();
+  const timeCtx = getSchedulingTimeContext();
+  const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
   const systemPrompt = useTools
-    ? chatSystemPrompt + `\n\nCurrent time (for scheduling): ${nowIso}. Examples: "in 1 minute" = ${in1min}; "in 2 minutes" = ${in2min}; "in 3 minutes" = ${in3min}.` + skillDocsBlock
-    : chatSystemPrompt;
+    ? chatSystemPrompt + timeBlock + skillDocsBlock
+    : chatSystemPrompt + `\n\n${timeCtx.timeContextLine}`;
 
   async function runAgentWithSkills(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef) {
     console.log('[agent] runAgentWithSkills started for:', text.slice(0, 60));

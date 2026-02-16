@@ -6,6 +6,7 @@ import { Cron } from 'croner';
 import { chat as llmChat } from '../llm.js';
 import { loadJobs, removeJob, updateJob } from './store.js';
 import { isTelegramChatId } from '../lib/telegram.js';
+import { getTimezoneContextLine } from '../lib/timezone.js';
 
 function stripThinking(text) {
   if (!text || typeof text !== 'string') return '';
@@ -55,8 +56,9 @@ async function runJob({ job, sock, selfJid }) {
   }
   console.log('[cron] Running job:', job.name, '→', jid);
   try {
+    const systemContent = `You are a helpful assistant. Reply concisely. Do not use <think> or any thinking/reasoning blocks—output only your final reply.\n\n${getTimezoneContextLine()}`;
     const rawReply = await llmChat([
-      { role: 'system', content: 'You are a helpful assistant. Reply concisely. Do not use <think> or any thinking/reasoning blocks—output only your final reply.' },
+      { role: 'system', content: systemContent },
       { role: 'user', content: job.message },
     ]);
     const reply = stripThinking(rawReply);

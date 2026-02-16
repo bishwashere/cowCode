@@ -4,6 +4,7 @@
  */
 
 import { chat as llmChat } from '../llm.js';
+import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 
 const SCHEDULE_SYSTEM = `You are a task interpreter. The user may:
 A) Ask to schedule a reminder or to be sent a message at a future time.
@@ -76,10 +77,18 @@ function parseJsonReply(raw) {
 export async function extractSchedule(userMessage, now = new Date()) {
   if (!userMessage || typeof userMessage !== 'string' || !userMessage.trim()) return null;
   const nowIso = now.toISOString();
-  const nowReadable = now.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
+  const tz = getResolvedTimezone();
+  const fmt = getResolvedTimeFormat();
+  const nowReadable = (() => {
+    try {
+      return now.toLocaleString(undefined, { timeZone: tz, dateStyle: 'full', timeStyle: 'short', hour12: fmt === '12' });
+    } catch {
+      return now.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
+    }
+  })();
   const system = SCHEDULE_SYSTEM
     .replace('{{NOW_ISO}}', nowIso)
-    .replace('{{NOW_READABLE}}', nowReadable);
+    .replace('{{NOW_READABLE}}', nowReadable + ` (${tz})`);
 
   const raw = await llmChat([
     { role: 'system', content: system },

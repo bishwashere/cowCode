@@ -1,4 +1,10 @@
 {
+  "agents": {
+    "defaults": {
+      "userTimezone": "auto",
+      "timeFormat": "auto"
+    }
+  },
   "llm": {
     "maxTokens": 2048,
     "models": [
@@ -26,10 +32,7 @@
     ]
   },
   "skills": {
-    "enabled": [
-      "cron",
-      "browser"
-    ],
+    "enabled": ["cron", "browser"],
     "cron": {},
     "search": {},
     "browser": {

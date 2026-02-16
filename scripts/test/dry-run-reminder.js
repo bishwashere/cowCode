@@ -23,15 +23,12 @@ dotenv.config({ path: getEnvPath() });
 import { getSkillContext } from '../../skills/loader.js';
 import { chatWithTools } from '../../llm.js';
 import { executeSkill } from '../../skills/executor.js';
+import { getSchedulingTimeContext } from '../../lib/timezone.js';
 
 const DEFAULT_MSG = 'Remind me to call Bishwas tomorrow at 5.30 p.m.';
 
 function getScheduleSystemPrompt() {
-  const now = Date.now();
-  const nowIso = new Date(now).toISOString();
-  const in1min = new Date(now + 60_000).toISOString();
-  const in2min = new Date(now + 120_000).toISOString();
-  const in3min = new Date(now + 180_000).toISOString();
+  const timeCtx = getSchedulingTimeContext();
   const CLARIFICATION_RULE = 'When information is missing or unclear (e.g. time, message, which option), or when a tool returns an error, do NOT show the error to the user. Instead reply with a short, friendly question asking for the missing or unclear detail (e.g. "Did you mean tomorrow at 9 or next week?", "What message should I send you?"). Keep the conversation going until you have everything needed—no silent failures, no raw errors.';
   return `You are a helpful assistant with access to the cron tool for reminders. Reply concisely. Do not use <think> or any thinking/reasoning blocks—output only your final reply.
 
@@ -39,7 +36,8 @@ CRITICAL - Choose the right action:
 - Use "add" only when the user explicitly asks to CREATE or SET a new reminder (e.g. "remind me in 5 minutes", "send me X tomorrow").
 Use the cron tool to add, list, or remove reminders as requested.
 
-Current time: ${nowIso}. Use future ISO 8601 for "at". Examples: "in 1 minute" = ${in1min}; "in 2 minutes" = ${in2min}; "in 3 minutes" = ${in3min}.
+${timeCtx.timeContextLine}
+Current time UTC (for "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.
 
 Important: job.message must be exactly what the user asked to receive.
 

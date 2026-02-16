@@ -148,6 +148,44 @@ function saveConfig(config) {
   writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), 'utf8');
 }
 
+/** Detect host timezone (IANA) and 12/24 format; set in config so install sets them, not "auto". */
+function ensureAgentsDefaultsFromHost() {
+  const config = loadConfig();
+  if (!config) return;
+  if (!config.agents) config.agents = {};
+  if (!config.agents.defaults) config.agents.defaults = {};
+  const def = config.agents.defaults;
+  const tz = def.userTimezone != null ? String(def.userTimezone).trim() : '';
+  const fmt = def.timeFormat != null ? String(def.timeFormat).trim().toLowerCase() : '';
+  let changed = false;
+  if (!tz || tz.toLowerCase() === 'auto') {
+    try {
+      config.agents.defaults.userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      changed = true;
+    } catch {
+      config.agents.defaults.userTimezone = 'UTC';
+      changed = true;
+    }
+  }
+  if (!fmt || fmt === 'auto') {
+    try {
+      const opts = Intl.DateTimeFormat().resolvedOptions();
+      const hour12 = opts.hour12;
+      if (hour12 === true) config.agents.defaults.timeFormat = '12';
+      else if (hour12 === false) config.agents.defaults.timeFormat = '24';
+      else {
+        const sample = new Intl.DateTimeFormat(opts.locale, { hour: 'numeric' }).formatToParts(new Date());
+        config.agents.defaults.timeFormat = sample.some((p) => p.type === 'dayPeriod') ? '12' : '24';
+      }
+      changed = true;
+    } catch {
+      config.agents.defaults.timeFormat = '12';
+      changed = true;
+    }
+  }
+  if (changed) saveConfig(config);
+}
+
 function getDefaultBaseUrl(config) {
   const first = config?.llm?.models?.[0];
   if (first?.baseUrl) return first.baseUrl;
@@ -274,6 +312,7 @@ async function main() {
   welcome();
   migrateFromRoot();
   ensureInstall();
+  ensureAgentsDefaultsFromHost();
 
   await onboarding();
 
