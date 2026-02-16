@@ -26,7 +26,7 @@ import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot } from './cron/runner.js';
-import { getEnabledTools, executeSkill, getSkillIdForToolName, getSkillsConfig } from './skills/registry.js';
+import { loadSkills, getEnabledTools, executeSkill, getSkillIdForToolName, getSkillsConfig } from './skills/registry.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -142,6 +142,7 @@ function migrateSkillsConfigToIncludeMemory() {
 
 async function main() {
   ensureStateDir();
+  await loadSkills();
   migrateSkillsConfigToIncludeMemory();
   if (authOnly && existsSync(getAuthDir())) {
     rmSync(getAuthDir(), { recursive: true });

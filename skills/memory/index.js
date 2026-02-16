@@ -3,8 +3,8 @@
  * Exposes two tools: memory_search, memory_get.
  */
 
-import { getMemoryConfig } from '../lib/memory-config.js';
-import { getMemoryIndex } from '../lib/memory-index.js';
+import { getMemoryConfig } from '../../lib/memory-config.js';
+import { getMemoryIndex } from '../../lib/memory-index.js';
 
 const MEMORY_SEARCH_SCHEMA = {
   type: 'object',

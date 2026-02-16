@@ -3,7 +3,7 @@
  * Uses cron/store and cron/runner; normalizes job input for robustness.
  */
 
-import { addJob, loadJobs, removeJob } from '../cron/store.js';
+import { addJob, loadJobs, removeJob } from '../../cron/store.js';
 
 const CRON_TOOL_SCHEMA = {
   type: 'object',
@@ -137,7 +137,6 @@ When the user asks for multiple new reminders (e.g. "remind me X in 1 min and Y 
         if (!Number.isFinite(atMs) || atMs <= Date.now()) {
           throw new Error('One-shot "at" time must be in the future. Use a future ISO 8601 timestamp (e.g. now + 5 minutes).');
         }
-        // Dedupe: if LLM calls add twice with same at+message+jid, only store one job.
         const existing = loadJobs(storePath);
         const duplicate = existing.some(
           (j) =>
@@ -153,7 +152,6 @@ When the user asks for multiple new reminders (e.g. "remind me X in 1 min and Y 
       }
       const job = addJob(input, storePath);
       if (job.schedule?.kind === 'at') scheduleOneShot(job);
-      // Do not call startCron() here: it would clear all timeouts and re-schedule from store (duplicate logs). We already scheduled this job.
       const when = job.schedule?.kind === 'at' && job.schedule?.at
         ? new Date(job.schedule.at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
         : job.schedule?.expr || 'scheduled';

@@ -1,15 +1,10 @@
 /**
  * Browser skill: search the web or fetch a URL.
- * Search: Brave Search API when configured (like OpenClaw), else Playwright + DuckDuckGo Lite.
- * Navigate: Playwright to open a URL and return page text.
+ * Search: Brave Search API when configured, else Playwright + DuckDuckGo Lite.
  */
 
 import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-import { getConfigPath } from '../lib/paths.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { getConfigPath } from '../../lib/paths.js';
 
 const BROWSER_TIMEOUT_MS = 20_000;
 const MAX_RESULT_CHARS = 12_000;
@@ -47,10 +42,6 @@ function stripHtmlToText(html) {
     .trim();
 }
 
-/**
- * Read search config: skills.browser.search from config.json, and allow apiKey from env.
- * @returns {{ apiKey?: string, count?: number, enabled?: boolean }}
- */
 function getBrowserSearchConfig() {
   try {
     const raw = readFileSync(getConfigPath(), 'utf8');
@@ -70,12 +61,6 @@ function getBrowserSearchConfig() {
   }
 }
 
-/**
- * Brave Search API (same idea as OpenClaw). Returns formatted string of results.
- * @param {string} query - Search query
- * @param {{ apiKey: string, count?: number }} opts
- * @returns {Promise<string>}
- */
 async function braveSearch(query, opts = {}) {
   const apiKey = opts.apiKey || process.env.BRAVE_API_KEY;
   if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
@@ -118,7 +103,6 @@ async function braveSearch(query, opts = {}) {
   return 'Search results:\n\n' + lines.join('\n\n');
 }
 
-/** DuckDuckGo often returns an error/block page for automated requests. Detect and return a clear message. */
 function normalizeSearchResult(text) {
   if (!text || typeof text !== 'string') return text;
   const t = text.toLowerCase();
@@ -133,7 +117,6 @@ function normalizeSearchResult(text) {
   return text;
 }
 
-/** True if the query is asking for news/headlines (we can use RSS for reliable results). */
 function isNewsQuery(query) {
   if (!query || typeof query !== 'string') return false;
   const q = query.toLowerCase().trim();
@@ -141,14 +124,10 @@ function isNewsQuery(query) {
   const newsOrHeadlines = '(news|headlines)';
   const lead = '(top|latest|current|today\'?s?|this week\'?s?)';
   return (
-    // From start: "latest news", "top 5 headlines"
     new RegExp(`^${lead}?\\s*${num}?\\s*${newsOrHeadlines}`).test(q) ||
-    // "news/headlines" then later "top/latest/five" etc.
     /\b(news|headlines)\b.*\b(top|latest|three|five|ten)\b/.test(q) ||
-    // "latest news", "top five headlines" (anywhere in sentence)
     new RegExp(`\\b${lead}\\s*${num}?\\s*${newsOrHeadlines}\\b`).test(q) ||
     /\b(top|latest)\s*(three|3|five|5)?\s*news\b/.test(q) ||
-    // "five headlines", "give me five headlines"
     new RegExp(`\\b${num}\\s*${newsOrHeadlines}\\b`).test(q)
   );
 }
@@ -158,7 +137,6 @@ const NEWS_RSS_URLS = [
   'https://feeds.npr.org/1001/rss.xml',
 ];
 
-/** Extract <item> or <entry> blocks and then <title> and <link> from RSS XML. */
 function parseRssItems(xml, maxItems = 10) {
   const items = [];
   const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>|<entry[^>]*>([\s\S]*?)<\/entry>/gi;
@@ -174,7 +152,6 @@ function parseRssItems(xml, maxItems = 10) {
   return items;
 }
 
-/** Fetch top news from public RSS feeds (no API key, no browser). Returns formatted string. */
 async function fetchNewsFromRss(maxHeadlines = 10) {
   const allItems = [];
   for (const url of NEWS_RSS_URLS) {
@@ -237,7 +214,6 @@ ACTIONS:
     if (action === 'search') {
       const query = args?.query && String(args.query).trim();
       if (!query) throw new Error('query required for search');
-      // Brave Search first when configured (priority over RSS and browser).
       const searchConfig = getBrowserSearchConfig();
       if (searchConfig.apiKey && searchConfig.enabled !== false) {
         return braveSearch(query, {
@@ -245,13 +221,11 @@ ACTIONS:
           count: searchConfig.count,
         });
       }
-      // News/headlines: use RSS when no Brave key (reliable, no search engine blocking).
       if (isNewsQuery(query)) {
         const n = /\b(three|3|five|5|ten|10)\b/.exec(query.toLowerCase());
         const max = n ? { three: 3, 3: 3, five: 5, 5: 5, ten: 10, 10: 10 }[n[1].toLowerCase()] || 5 : 5;
         return fetchNewsFromRss(max);
       }
-      // Fallback: Playwright + DuckDuckGo Lite (no API key).
       return runWithBrowser(async (page) => {
         const searchUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
         await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: BROWSER_TIMEOUT_MS });
