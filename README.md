@@ -1,4 +1,4 @@
-# 🐄 cowCode
+# cowCode
 
 Private AI bot for **WhatsApp and Telegram**.
 
@@ -35,6 +35,8 @@ It runs in the background.
 
 You can close the terminal.
 It keeps running.
+
+<img width="1024" height="1024" alt="ChatGPT Image Feb 16, 2026, 11_19_56 AM" src="https://github.com/user-attachments/assets/7d245e10-8172-4956-bc29-aaba9e30aa10" />
 
 ---
 
