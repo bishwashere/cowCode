@@ -323,7 +323,8 @@ async function main() {
           payload = {};
         }
         const skillId = payload.skill && String(payload.skill).trim();
-        const runArgs = payload.arguments && typeof payload.arguments === 'object' ? payload.arguments : {};
+        const runArgs = payload.arguments && typeof payload.arguments === 'object' ? { ...payload.arguments } : {};
+        if (payload.command && String(payload.command).trim()) runArgs.action = String(payload.command).trim();
         const toolName = skillId === 'memory' ? (runArgs.tool || 'memory_search') : undefined;
         const action = runArgs?.action && String(runArgs.action).trim().toLowerCase();
         if (!skillId) {
@@ -385,6 +386,7 @@ async function main() {
       looksLikeToolCallJson ||
       (browserHasNewsBlock && !hasNumberedHeadlines)
     );
+    const withPrefix = (s) => (s && /^\[CowCode\]\s*/i.test(s.trim()) ? s.trim() : '[CowCode] ' + (s || '').trim());
     let textToSend;
     if (useBrowserResultForSearch) {
       let browserReply = browserResult.trim();
@@ -401,11 +403,11 @@ async function main() {
       } catch (_) {
         browserReply = browserReply.slice(0, 2000) + (browserReply.length > 2000 ? '…' : '');
       }
-      textToSend = '[CowCode] ' + browserReply;
+      textToSend = withPrefix(browserReply);
     } else if (trimmedFinal) {
-      textToSend = '[CowCode] ' + trimmedFinal;
+      textToSend = withPrefix(trimmedFinal);
     } else if (cronListResult && cronListResult.trim()) {
-      textToSend = '[CowCode] ' + cronListResult.trim();
+      textToSend = withPrefix(cronListResult.trim());
     } else if (browserResult && browserResult.trim()) {
       let browserReply = browserResult.trim();
       try {
@@ -421,7 +423,7 @@ async function main() {
       } catch (_) {
         browserReply = browserReply.slice(0, 2000) + (browserReply.length > 2000 ? '…' : '');
       }
-      textToSend = '[CowCode] ' + browserReply;
+      textToSend = withPrefix(browserReply);
     } else {
       textToSend = "[CowCode] Done. Anything else?";
     }

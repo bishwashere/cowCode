@@ -66,7 +66,7 @@ export function getSkillContext() {
             type: 'function',
             function: {
               name: 'run_skill',
-              description: 'Run one of the available skills. Set "skill" to the skill id and "arguments" to the exact shape described in the skill docs (always include "action" when the skill requires it).',
+              description: 'Run one of the available skills. The command name is the operation: set "command" to the operation name (e.g. search, navigate, list, add, remove) or set "arguments.action" to the same. Set "skill" and "arguments" as described in each skill.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -75,9 +75,13 @@ export function getSkillContext() {
                     enum: available,
                     description: 'Skill id (cron, browser, memory).',
                   },
+                  command: {
+                    type: 'string',
+                    description: 'Command name for the operation (name is command). e.g. browser: search, navigate; cron: list, add, remove. If set, this is the operation to run; otherwise use arguments.action.',
+                  },
                   arguments: {
                     type: 'object',
-                    description: 'Skill-specific arguments. See skill docs. For cron always include action (add|list|remove). For browser always include action (search|navigate) and query or url.',
+                    description: 'Skill-specific arguments. See skill docs. When command is set, it overrides arguments.action.',
                     additionalProperties: true,
                   },
                 },

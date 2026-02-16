@@ -1,13 +1,13 @@
 # Browser
 
-Search the web or fetch a page. Call **run_skill** with **skill: "browser"** and **arguments** as below.
+Search the web or fetch a page. Call **run_skill** with **skill: "browser"**. The **command name** is the operation: use **command** or **arguments.action** set to exactly one of: **search**, **navigate**.
 
-**Always set arguments.action to exactly one of: search, navigate. Never omit action.**
+## Commands (name is command)
 
-## arguments shape
+- **search** — For current time, weather, date, latest news, or any live query. Set **arguments.query** (e.g. "current time", "weather in Tokyo", "latest news"). Use a clear, concrete query.
+- **navigate** — When the user gives a specific URL to read. Set **arguments.url** (full http or https URL).
 
-- **action: "search"** — For current time, weather, date, latest news, or any live query. Set **arguments.query** (e.g. "current time", "weather in Tokyo", "latest news"). Use a clear, concrete query.
-- **action: "navigate"** — When the user gives a specific URL to read. Set **arguments.url** (full http or https URL).
+You can pass the command at the top level (`command: "search"`) or inside arguments (`arguments.action: "search"`). Never omit the command/action.
 
 ## Config
 

@@ -1,267 +1,231 @@
-# cowCode
+# 🐄 cowCode
 
-WhatsApp bot that replies using your **local or cloud LLM** (LM Studio, Ollama, OpenAI, etc.).
-You chat in **"Message yourself"**, and the bot replies there.
+Private AI bot for **WhatsApp and Telegram**.
+
+Runs **on your own computer**.
+Uses your **local or cloud LLM**.
+Nothing is sent anywhere unless you configure it.
+
+Simple. Secure. Direct.
+
+You message the bot.
+It replies.
 
 ---
 
 # 🚀 Install (Do This First)
 
-### 1️⃣ Install
+## 1️⃣ One Command Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash
 ```
 
-### 2️⃣ Start the bot in the background (recommended)
+That's it.
 
-From **any terminal**:
+---
+
+## 2️⃣ Start the Bot
 
 ```bash
 cowcode moo start
 ```
 
-The bot runs in the background. **You can close the terminal** — it keeps running (macOS: launchd, Linux: systemd).
+It runs in the background.
 
-If `cowcode` is not found, add `export PATH="$HOME/.local/bin:$PATH"` to your shell config (e.g. `~/.bashrc` or `~/.zshrc`).
-
-**Code** is installed to **`~/.local/share/cowcode`** (fixed path, like OpenClaw). **Config and state** (config, WhatsApp auth, cron jobs) live in **`~/.cowcode`**. Override install path with `COWCODE_INSTALL_DIR` when running the install script.
-
-Other commands: `cowcode moo stop` | `cowcode moo status` | `cowcode moo restart`.
-
-That's it.
+You can close the terminal.
+It keeps running.
 
 ---
 
-# 🔄 Update (get the latest code)
+# 🔐 Private & Secure
 
-From anywhere (keeps your config in `~/.cowcode`):
+* Runs locally on your machine
+* WhatsApp and Telegram connect directly
+* Config and data stay in `~/.cowcode`
+* Local models are used first by default
+* No external servers required
+
+Your AI.
+Your machine.
+Your control.
+
+---
+
+# 💬 How It Works
+
+Choose one or both:
+
+* WhatsApp
+* Telegram
+
+You chat normally.
+The bot replies in that same chat.
+
+---
+
+## WhatsApp
+
+Open WhatsApp →
+Message yourself →
+Send a message →
+Bot replies there.
+
+---
+
+## Telegram
+
+Message your Telegram bot.
+Bot replies instantly.
+
+You can use both at the same time.
+
+Reminders stay on the same channel you created them.
+
+---
+
+# 🔄 Update
+
+Get latest version anytime:
 
 ```bash
 cowcode update
 ```
 
-Then start as usual: `cowcode moo start`
+Your config stays safe.
 
-If you installed to a custom path and don't use the `cowcode` launcher, run from the install directory:
+---
+
+# 📦 Where Things Live
+
+**Code**
+
+```
+~/.local/share/cowcode
+```
+
+**Config, auth, reminders**
+
+```
+~/.cowcode
+```
+
+Everything stays on your computer.
+
+---
+
+# ➕ Add Telegram Later
+
+Add this to:
+
+```
+~/.cowcode/.env
+```
+
+```
+TELEGRAM_BOT_TOKEN=your_token_here
+```
+
+Then:
 
 ```bash
-cd ~/.local/share/cowcode && curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/update.sh | bash
+cowcode moo start
 ```
 
 ---
 
-# 💬 How to Use
-
-**Setup**  
-When you run `pnpm run setup` (or the install script), you choose which to set up **first**: **WhatsApp** or **Telegram**. You can add the other anytime (see below).
-
-**WhatsApp**  
-• Open WhatsApp → **Message yourself** (or "Note to self") → send a message. The bot replies there.
-
-**Telegram**  
-• If you set up Telegram (token in `~/.cowcode/.env`), message your bot on Telegram — same skills (reminders, search, etc.).
-
-**Both**  
-• You can use WhatsApp and Telegram at the same time. Reminders created on one are delivered on that channel.
-
-You can say things like:
-
-* "remind me in 5 minutes"
-* "search for AI trends"
-* "summarize today's tasks"
-
-Cron reminders and web search are already enabled.
-
----
-
-# 📱 Adding the other transport later
-
-• **Add Telegram:** Put `TELEGRAM_BOT_TOKEN=...` (from [@BotFather](https://t.me/BotFather)) in `~/.cowcode/.env`, then `cowcode moo start`. Both WhatsApp and Telegram will work.
-• **Add WhatsApp (or Telegram-only → WhatsApp):** Run `cowcode auth` to link your phone, then `cowcode moo start`.
-• **Telegram-only mode:** If you set up Telegram first and chose not to add WhatsApp, the app runs with `COWCODE_TELEGRAM_ONLY=1` when started from setup. To run Telegram-only later: `COWCODE_TELEGRAM_ONLY=1 cowcode moo start` (or add that env to your start command).
-
----
-
-# 🔗 If WhatsApp Linking Fails
-
-Run:
+# ➕ Add WhatsApp Later
 
 ```bash
-cowcode auth --pair 1234567890
+cowcode auth
+cowcode moo start
 ```
 
-(or from the cowCode folder: `npm run auth -- --pair 1234567890`)
+---
 
-Replace with your full phone number (no +).
+# 🧠 What You Can Say
 
-Then in WhatsApp:
-Settings → Linked Devices → **Link with phone number** → enter the 8-digit code.
+* remind me in 5 minutes
+* search for AI trends
+* summarize my notes
+* list my reminders
+
+Cron and search are enabled.
 
 ---
 
-# ⚙️ Basic Requirements
+# ⚙️ Requirements
 
-• Node.js 18 or newer
-• Your local LLM (like LM Studio or Ollama) must be running before starting the bot
-• npm, pnpm, or yarn
+* Node.js 18+
+* Local LLM running (LM Studio, Ollama, etc.)
+* Or cloud API key
 
 ---
 
-# 🧠 LLM Configuration (Optional)
+# 🧩 Optional Configuration
 
-File: **`~/.cowcode/config.json`** (or `$COWCODE_STATE_DIR/config.json`).
+File:
 
-Local models are tried first by default.
+```
+~/.cowcode/config.json
+```
+
+Local models are tried first.
+
+Cloud models run only if configured.
+
+---
+
+# ⏰ Reminders
 
 Example:
 
-```json
-{
-  "llm": {
-    "maxTokens": 2048,
-    "models": [
-      { "provider": "lmstudio", "baseUrl": "http://127.0.0.1:1234/v1", "model": "local" },
-      { "provider": "openai", "apiKey": "LLM_1_API_KEY", "model": "gpt-4o", "priority": true }
-    ]
-  }
-}
-```
+remind me to call John in 10 minutes
 
-Rules:
-• Set `"priority": true` on one model if you want it always tried first
-• Local providers (lmstudio, ollama) use `baseUrl`
-• Cloud providers use API keys in `.env`
-
-Built-in providers:
-openai, grok/xai, together, deepseek, ollama, lmstudio
-
----
-
-# 🛠 Skills (On by Default)
-
-Configured in `~/.cowcode/config.json`.
-
-```json
-"skills": {
-  "enabled": ["cron", "browser", "memory"]
-}
-```
-
-Remove a skill name to disable it.
-
----
-
-# 📡 Channels (WhatsApp & Telegram)
-
-Configured in `~/.cowcode/config.json`, same file as `llm` and `skills`.
-
-```json
-"channels": {
-  "whatsapp": { "enabled": true },
-  "telegram": { "enabled": false, "botToken": "TELEGRAM_BOT_TOKEN" }
-}
-```
-
-• **whatsapp.enabled** — `true` (default) or `false`. If `false` and Telegram is enabled, the app runs in Telegram-only mode (no WhatsApp socket).
-• **telegram.enabled** — `true` to enable Telegram. Requires **telegram.botToken** (env var name or literal). Put the secret in `~/.cowcode/.env` (e.g. `TELEGRAM_BOT_TOKEN=...`).
-• **telegram.botToken** — Same pattern as LLM `apiKey`: use an env var name like `"TELEGRAM_BOT_TOKEN"` so the real token stays in `.env`.
-
-You can enable both; then WhatsApp (after linking with `cowcode auth`) and Telegram work at the same time.
-
----
-
-# ⏰ Reminders (Cron)
-
-Say:
-
-* "remind me to call John in 10 minutes"
-* "list my reminders"
-
-CLI commands:
-
-```bash
-pnpm run cron list
-pnpm run cron remove <job-id>
-```
-
-Jobs are stored in **`~/.cowcode/cron/jobs.json`**.
-
----
-
-# 🔄 Moo commands (background service)
-
-`cowcode moo start` is the recommended way to run the bot (see Install step 2). Full set:
-
-```bash
-cowcode moo start    # start in background (survives closing terminal)
-cowcode moo stop
-cowcode moo status
-cowcode moo restart
-```
-
-First time: link WhatsApp once with `cowcode auth` (or during setup when the QR appears). Then `cowcode moo start` runs the bot in the background.
-
-Code is in `~/.local/share/cowcode`; you can run `cowcode moo start` from anywhere.
-
----
-
-# 🌐 Web Search (Browser Skill)
-
-Default search provider: Brave.
-
-If you have a Brave API key:
+Stored locally:
 
 ```
-BRAVE_API_KEY=your_key_here
+~/.cowcode/cron/jobs.json
 ```
-
-If not:
-
-```bash
-npx playwright install chromium
-```
-
-The bot will automatically search the web when needed.
 
 ---
 
 # 🧠 Memory (Optional)
 
-The bot can search and read from your notes in **`~/.cowcode/workspace/`**:
+Add notes in:
 
-* **`MEMORY.md`** — main notes file
-* **`memory/*.md`** — e.g. `memory/2025-02-15.md` for dated notes
-
-Add `"memory"` to `skills.enabled` in config. For semantic search the bot uses an **embedding API** (same key as your LLM if you use OpenAI). Put the key in `.env` (e.g. `LLM_1_API_KEY` or `LLM_API_KEY`). Optional config:
-
-```json
-"memory": {
-  "embedding": { "provider": "openai", "model": "text-embedding-3-small" },
-  "search": { "maxResults": 6 }
-}
+```
+~/.cowcode/workspace/
 ```
 
-If `memory.embedding` is omitted, the first LLM model’s provider and API key are used. Then ask things like “what did I note about the project?” or “what are my preferences for meetings?” — the bot will use **memory_search** and **memory_get** to answer from your markdown.
+Ask:
+
+what did I note about the project?
+
+The bot searches your files.
 
 ---
 
-# 🧪 Tests (Optional)
+# 🛠 Background Service
 
 ```bash
-pnpm run test:browser
-pnpm run test:browser-e2e
-pnpm run test:cron-e2e
-pnpm run test:all
+cowcode moo start
+cowcode moo stop
+cowcode moo status
+cowcode moo restart
 ```
 
----
-
-# 📌 Where Messages Work
-
-• Message yourself → replies there
-• Other chats → replies when someone messages your linked number
+Runs like a proper system service.
 
 ---
 
-That's all you need to start using cowCode.
+# 📌 That's It
+
+Private.
+Secure.
+Runs on your computer.
+Works with WhatsApp and Telegram.
+Easy to install.
+Easy to update.
+
+cowCode keeps AI simple.
