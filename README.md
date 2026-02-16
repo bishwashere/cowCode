@@ -129,7 +129,7 @@ Configured in `~/.cowcode/config.json`.
 
 ```json
 "skills": {
-  "enabled": ["cron", "browser"]
+  "enabled": ["cron", "browser", "memory"]
 }
 ```
 
@@ -189,6 +189,26 @@ npx playwright install chromium
 ```
 
 The bot will automatically search the web when needed.
+
+---
+
+# 🧠 Memory (Optional)
+
+The bot can search and read from your notes in **`~/.cowcode/workspace/`**:
+
+* **`MEMORY.md`** — main notes file
+* **`memory/*.md`** — e.g. `memory/2025-02-15.md` for dated notes
+
+Add `"memory"` to `skills.enabled` in config. For semantic search the bot uses an **embedding API** (same key as your LLM if you use OpenAI). Put the key in `.env` (e.g. `LLM_1_API_KEY` or `LLM_API_KEY`). Optional config:
+
+```json
+"memory": {
+  "embedding": { "provider": "openai", "model": "text-embedding-3-small" },
+  "search": { "maxResults": 6 }
+}
+```
+
+If `memory.embedding` is omitted, the first LLM model’s provider and API key are used. Then ask things like “what did I note about the project?” or “what are my preferences for meetings?” — the bot will use **memory_search** and **memory_get** to answer from your markdown.
 
 ---
 

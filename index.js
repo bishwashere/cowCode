@@ -3,7 +3,7 @@
  * Config and state live in ~/.cowcode (or COWCODE_STATE_DIR).
  */
 
-import { getAuthDir, getCronStorePath, getEnvPath, ensureStateDir } from './lib/paths.js';
+import { getAuthDir, getCronStorePath, getEnvPath, ensureStateDir, getWorkspaceDir } from './lib/paths.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -26,7 +26,7 @@ import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync } from 'fs';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot } from './cron/runner.js';
-import { getEnabledTools, executeSkill } from './skills/registry.js';
+import { getEnabledTools, executeSkill, getSkillIdForToolName, getSkillsConfig } from './skills/registry.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -196,7 +196,6 @@ async function main() {
   console.log('LLM config:', config.models.length > 1
     ? `${config.models.length} models (priority): ${config.models.map(m => m.model).join(' → ')}`
     : { baseUrl: first.baseUrl, model: first.model });
-  const { getSkillsConfig } = await import('./skills/registry.js');
   const skillsConfig = getSkillsConfig();
   console.log('Skills enabled:', skillsConfig.enabled?.length ? skillsConfig.enabled.join(', ') : 'cron (default)');
 
@@ -205,6 +204,8 @@ async function main() {
 
   // Agent logic (shared by real socket handler and --test mode)
   const allTools = getEnabledTools();
+  const { enabled: skillsEnabled } = getSkillsConfig();
+  const memoryEnabled = Array.isArray(skillsEnabled) && skillsEnabled.includes('memory');
   function getToolsForIntent(intent) {
     if (intent === 'SCHEDULE_LIST' || intent === 'SCHEDULE_CREATE') {
       return allTools.filter((t) => t.function?.name === 'cron');
@@ -212,10 +213,14 @@ async function main() {
     if (intent === 'SEARCH') {
       return allTools.filter((t) => t.function?.name === 'browser');
     }
+    if (intent === 'CHAT' && memoryEnabled) {
+      return allTools.filter((t) => t.function?.name === 'memory_search' || t.function?.name === 'memory_get');
+    }
     return [];
   }
   const LANGUAGE_RULE = 'Reply ONLY in the same language as the user. If the user writes in English, reply in English. Do not reply in Spanish, Hindi, or any other language unless the user used that language first.';
   const chatSystemPrompt = `You are a helpful assistant. ${LANGUAGE_RULE} Reply concisely. Do not use <think> or any thinking/reasoning blocks—output only your final reply.`;
+  const memoryRecallLine = ' For questions about prior work, decisions, preferences, or todos, first use memory_search on MEMORY.md and memory/*.md, then memory_get to read only the needed lines.';
   function getBrowserSystemPrompt() {
     return `You are a helpful assistant with access to the browser tool to search the web or open a URL. ${LANGUAGE_RULE} Reply concisely. Do not use <think> or any thinking/reasoning blocks—output only your final reply.
 
@@ -261,7 +266,8 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
     const useTools = toolsToUse.length > 0;
     const isListOnly = intent === 'SCHEDULE_LIST';
     const isSearch = intent === 'SEARCH';
-    if (useTools && !isListOnly && !isSearch) {
+    const isMemoryOnly = useTools && toolsToUse.every((t) => t.function?.name === 'memory_search' || t.function?.name === 'memory_get');
+    if (useTools && !isListOnly && !isSearch && !isMemoryOnly) {
       const immediateReply = "[CowCode] Grazing on that…";
       const immediateSent = await sock.sendMessage(jid, { text: immediateReply });
       if (immediateSent?.key?.id && ourSentIdsRef?.current) {
@@ -275,11 +281,12 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
       console.log('[replied] (immediate)');
     }
     const systemPrompt = useTools
-      ? (intent === 'SEARCH' ? getBrowserSystemPrompt() : getScheduleSystemPrompt())
+      ? (intent === 'SEARCH' ? getBrowserSystemPrompt() : intent === 'CHAT' ? chatSystemPrompt + memoryRecallLine : getScheduleSystemPrompt())
       : chatSystemPrompt;
     const ctx = {
       storePath: getCronStorePath(),
       jid,
+      workspaceDir: getWorkspaceDir(),
       scheduleOneShot,
       startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: getCronStorePath() }),
     };
@@ -319,11 +326,12 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
         } catch {
           args = {};
         }
-        const skillId = tc.name;
+        const toolName = tc.name;
+        const skillId = getSkillIdForToolName(toolName);
         const action = args?.action && String(args.action).trim().toLowerCase();
         const isSpuriousAdd = useTools && isListOnly && skillId === 'cron' && action === 'add';
         if (isSpuriousAdd) {
-          console.log('[agent] tool call:', skillId, '(add skipped: list-only query)');
+          console.log('[agent] tool call:', toolName, '(add skipped: list-only query)');
           messages.push({
             role: 'tool',
             tool_call_id: tc.id,
@@ -331,8 +339,8 @@ Important: job.message must be exactly what the user asked to receive (e.g. "fun
           });
           continue;
         }
-        console.log('[agent] tool call:', skillId, tc.arguments?.slice(0, 80));
-        const result = await executeSkill(skillId, ctx, args);
+        console.log('[agent] tool call:', toolName, tc.arguments?.slice(0, 80));
+        const result = await executeSkill(skillId, ctx, args, toolName);
         if (skillId === 'cron' && action === 'list' && result && typeof result === 'string') {
           cronListResult = result;
         }
