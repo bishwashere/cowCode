@@ -20,7 +20,7 @@ const {
   extractMessageContent,
   areJidsSameUser,
 } = Baileys;
-import { chat as llmChat, chatWithTools, classifyIntent, loadConfig } from './llm.js';
+import { chat as llmChat, chatWithTools, loadConfig } from './llm.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
@@ -243,85 +243,30 @@ async function main() {
     chatHistoryByJid.set(jid, list);
   }
 
-  // Agent logic: LLM decides from skill docs; we only run what it returns (run_skill).
+  // Agent logic: LLM decides from skill docs; we only run what it returns (run_skill). No intent layer.
   const allTools = runSkillTool;
   const useSkills = Array.isArray(skillsEnabled) && skillsEnabled.length > 0 && allTools.length > 0;
-  function getToolsForIntent() {
-    return useSkills ? allTools : [];
-  }
-  const LANGUAGE_RULE = 'Reply ONLY in the same language as the user. If the user writes in English, reply in English. Do not reply in Spanish, Hindi, or any other language unless the user used that language first.';
+  const toolsToUse = useSkills ? allTools : [];
+  const useTools = toolsToUse.length > 0;
   const CLARIFICATION_RULE = 'When information is missing or unclear (e.g. time, message, which option), or when a tool returns an error, do NOT show the error to the user. Instead reply with a short, friendly question asking for the missing or unclear detail (e.g. "Did you mean tomorrow at 9 or next week?", "What message should I send you?"). Keep the conversation going until you have everything needed—no silent failures, no raw errors.';
-  const chatSystemPrompt = `You are a helpful assistant. ${LANGUAGE_RULE} Reply concisely. Do not use <think> or any thinking/reasoning blocks—output only your final reply.`;
+  const chatSystemPrompt = `You are CowCode. A helpful assistant. Answer in the language the user asked in. Pull fresh data from the browser skill for unknown or time-bound data. Do not invent things. Do not use <think> or any thinking/reasoning blocks—output only your final reply.`;
   const skillDocsBlock = skillDocs
     ? `\n\n# Available skills (read these to decide when to use run_skill and which arguments to pass)\n\n${skillDocs}\n\n# Clarification\n${CLARIFICATION_RULE}`
     : '';
-  function getBrowserSystemPrompt() {
-    return `You are a helpful assistant with access to the browser tool to search the web or open a URL. ${LANGUAGE_RULE} Reply concisely. Do not use <think> or any thinking/reasoning blocks—output only your final reply.
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const in1min = new Date(now + 60_000).toISOString();
+  const in2min = new Date(now + 120_000).toISOString();
+  const in3min = new Date(now + 180_000).toISOString();
+  const systemPrompt = useTools
+    ? chatSystemPrompt + `\n\nCurrent time (for scheduling): ${nowIso}. Examples: "in 1 minute" = ${in1min}; "in 2 minutes" = ${in2min}; "in 3 minutes" = ${in3min}.` + skillDocsBlock
+    : chatSystemPrompt;
 
-Use the browser tool to get current information: call action "search" with "query" set to the user's search (e.g. current time, weather, recent trends, latest news). Then answer based on the returned content. If the user gave a specific URL, use action "navigate" with "url".
-
-CRITICAL - Give the exact data in your reply:
-- Time, weather, date: State the actual value from the results (e.g. "The time is 3:45 PM IST", "It's 28°C and sunny"). Do NOT say "check the link" or "search for it".
-- News/headlines: When the user asks for top/latest news or headlines, LIST the actual headlines from the tool result (e.g. "1. Headline one. 2. Headline two. ..."). Do NOT reply with only a disclaimer (e.g. "headlines may change")—always include the list of headlines.
-
-${CLARIFICATION_RULE}`;
-  }
-  function getScheduleSystemPrompt() {
-    const now = Date.now();
-    const nowIso = new Date(now).toISOString();
-    const in1min = new Date(now + 60_000).toISOString();
-    const in2min = new Date(now + 120_000).toISOString();
-    const in3min = new Date(now + 180_000).toISOString();
-    return `You are a helpful assistant with access to the cron tool for reminders. ${LANGUAGE_RULE} Reply concisely. Do not use <think> or any thinking/reasoning blocks—output only your final reply.
-
-CRITICAL - Choose the right action:
-- If the user only asks to LIST, SEE, COUNT, or ask WHAT/WHICH crons exist (e.g. "how many crons?", "what is the next cron?", "which crons are set?", "list my reminders", "what's scheduled?") → call the cron tool exactly ONCE with action "list". Do NOT call "add" in the same message.
-- "Which crons are set?" means list existing crons, NOT create new ones. Use list only.
-- Use "add" only when the user explicitly asks to CREATE or SET a new reminder (e.g. "remind me in 5 minutes", "send me X tomorrow").
-- Use "remove" when the user asks to cancel/delete a specific job (by id).
-
-Use the cron tool to add, list, or remove reminders as requested. For multiple reminders in one message, call the cron tool once per reminder. Each call must have a different schedule.at time.
-
-Current time: ${nowIso}. Use future ISO 8601 for "at". Examples: "in 1 minute" = ${in1min}; "in 2 minutes" = ${in2min}; "in 3 minutes" = ${in3min}. For "every one minute for the next three minutes" you MUST call cron add THREE times: first at ${in1min}, second at ${in2min}, third at ${in3min}. Never use the same "at" for multiple jobs.
-
-Important: job.message must be exactly what the user asked to receive (e.g. "fun fact" / "Give me a fun fact"—do not substitute "Hello, how can I assist").
-
-${CLARIFICATION_RULE} If the user says "remind me" without when or what, ask e.g. "When should I remind you, and what message would you like?"`;
-  }
   async function runAgentWithSkills(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef) {
     console.log('[agent] runAgentWithSkills started for:', text.slice(0, 60));
     try {
       await sock.sendPresenceUpdate('composing', jid);
     } catch (_) {}
-    let intent = 'CHAT';
-    try {
-      intent = await classifyIntent(text);
-      console.log('[agent] intent:', intent);
-    } catch (err) {
-      console.error('[agent] intent classification failed:', err.message);
-    }
-    const toolsToUse = getToolsForIntent();
-    const useTools = toolsToUse.length > 0;
-    const isListOnly = intent === 'SCHEDULE_LIST';
-    const isSearch = intent === 'SEARCH';
-    const isMemoryOnly = useTools && intent === 'CHAT';
-    if (useTools && !isListOnly && !isSearch && !isMemoryOnly) {
-      const immediateReply = "[CowCode] Grazing on that…";
-      const immediateSent = await sock.sendMessage(jid, { text: immediateReply });
-      if (immediateSent?.key?.id && ourSentIdsRef?.current) {
-        ourSentIdsRef.current.add(immediateSent.key.id);
-        if (ourSentIdsRef.current.size > MAX_OUR_SENT_IDS) {
-          const first = ourSentIdsRef.current.values().next().value;
-          if (first) ourSentIdsRef.current.delete(first);
-        }
-      }
-      lastSentByJidMap.set(jid, immediateReply);
-      console.log('[replied] (immediate)');
-    }
-    const basePrompt = useTools
-      ? (intent === 'SEARCH' ? getBrowserSystemPrompt() : intent === 'CHAT' ? chatSystemPrompt : getScheduleSystemPrompt())
-      : chatSystemPrompt;
-    const systemPrompt = useTools ? basePrompt + skillDocsBlock : basePrompt;
     const ctx = {
       storePath: getCronStorePath(),
       jid,
@@ -413,22 +358,21 @@ ${CLARIFICATION_RULE} If the user says "remind me" without when or what, ask e.g
         console.error('[agent] clarification round failed:', err.message);
       }
     }
-    // For SEARCH: if we have search results but no LLM reply (e.g. model didn't synthesize), run one more call with no tools so the model answers with the exact data from the results.
-    if (isSearch && browserResult && !stripThinking(finalContent).trim()) {
+    // If we have browser results but no LLM reply, run one more call with no tools so the model synthesizes an answer.
+    if (browserResult && !stripThinking(finalContent).trim()) {
       try {
         const synthesized = await chatWithTools(messages, []);
         const reply = synthesized?.content && stripThinking(synthesized.content).trim();
         if (reply) finalContent = reply;
       } catch (err) {
-        console.error('[agent] search synthesis failed:', err.message);
+        console.error('[agent] synthesis failed:', err.message);
       }
     }
-    // For SEARCH: prefer browserResult when the LLM returned tool-call JSON or a disclaimer without listing headlines.
     const trimmedFinal = stripThinking(finalContent).trim();
     const looksLikeToolCallJson = /"skill"\s*:|\"run_skill\"|"action"\s*:\s*"search"|"parameters"\s*:\s*\{/.test(trimmedFinal);
     const hasNumberedHeadlines = /\n\d+\.\s+.+/.test(trimmedFinal) || /^\d+\.\s+.+/.test(trimmedFinal);
     const browserHasNewsBlock = browserResult && browserResult.includes('Top news / headlines');
-    const useBrowserResultForSearch = isSearch && browserResult && browserResult.trim() && (
+    const useBrowserResultForSearch = browserResult && browserResult.trim() && (
       !trimmedFinal ||
       looksLikeToolCallJson ||
       (browserHasNewsBlock && !hasNumberedHeadlines)
