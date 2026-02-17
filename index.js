@@ -392,18 +392,50 @@ async function main() {
     }
   }
 
+  function isBioSet() {
+    const bio = getBioFromConfig();
+    if (bio == null) return false;
+    if (typeof bio === 'string') return (bio || '').trim() !== '';
+    return typeof bio === 'object' && (bio.userName != null || bio.prompt != null);
+  }
+
+  function saveBioToConfig(paragraph) {
+    try {
+      const path = getConfigPath();
+      const raw = existsSync(path) ? readFileSync(path, 'utf8') : '{}';
+      const config = raw.trim() ? JSON.parse(raw) : {};
+      config.bio = (paragraph || '').trim() || '';
+      writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
+    } catch (err) {
+      console.error('[bio] save failed:', err.message);
+    }
+  }
+
+  const BIO_CONFIRM_PROMPT = "Hey, we haven't done some basic setup. Do you want to do it now?";
+  const BIO_PROMPT =
+    "Before we continue — I'd like to know you a bit. Please answer in one message (any format is fine):\n\nWhat is my name?\nWhat is your name?\nWho am I?\nWho are you?";
+
+  function isYesReply(text) {
+    const t = (text || '').trim().toLowerCase();
+    return /^(y|yes|yeah|yep|sure|ok|okay|1|do it|please|go ahead|sounds good)$/.test(t) || t === 'yup';
+  }
+
   function buildSystemPrompt() {
     const timeCtx = getSchedulingTimeContext();
     const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
     let bioBlock = '';
     const bio = getBioFromConfig();
-    if (bio && (bio.userName || bio.assistantName || bio.whoAmI || bio.whoAreYou)) {
-      const parts = [];
-      if (bio.userName) parts.push(`The user's name is ${bio.userName}.`);
-      if (bio.assistantName) parts.push(`Your name is ${bio.assistantName}.`);
-      if (bio.whoAmI) parts.push(`The user describes themselves: ${bio.whoAmI}.`);
-      if (bio.whoAreYou) parts.push(`You describe yourself: ${bio.whoAreYou}.`);
-      if (parts.length) bioBlock = '\n\n' + parts.join(' ');
+    if (bio != null) {
+      if (typeof bio === 'string' && bio.trim()) {
+        bioBlock = '\n\n' + bio.trim();
+      } else if (typeof bio === 'object' && (bio.userName || bio.assistantName || bio.whoAmI || bio.whoAreYou)) {
+        const parts = [];
+        if (bio.userName) parts.push(`The user's name is ${bio.userName}.`);
+        if (bio.assistantName) parts.push(`Your name is ${bio.assistantName}.`);
+        if (bio.whoAmI) parts.push(`The user describes themselves: ${bio.whoAmI}.`);
+        if (bio.whoAreYou) parts.push(`You describe yourself: ${bio.whoAreYou}.`);
+        if (parts.length) bioBlock = '\n\n' + parts.join(' ');
+      }
     }
     const base = chatSystemPrompt + bioBlock;
     return useTools
@@ -411,7 +443,7 @@ async function main() {
       : base + `\n\n${timeCtx.timeContextLine}`;
   }
 
-  async function runAgentWithSkills(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef) {
+  async function runAgentWithSkills(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts = {}) {
     console.log('[agent] handling:', text.slice(0, 50) + (text.length > 50 ? '…' : ''));
     try {
       await sock.sendPresenceUpdate('composing', jid);
@@ -449,6 +481,16 @@ async function main() {
         );
       }
       console.log('[replied]', useTools ? '(agent + skills)' : '(chat)');
+      if (bioOpts.pendingBioConfirmJids != null && !isBioSet()) {
+        try {
+          await sock.sendMessage(jid, { text: BIO_CONFIRM_PROMPT });
+          bioOpts.pendingBioConfirmJids.add(jid);
+        } catch (_) {
+          if (isTelegramChatId(jid)) addPendingTelegram(jid, BIO_CONFIRM_PROMPT);
+          else pendingReplies.push({ jid, text: BIO_CONFIRM_PROMPT });
+          bioOpts.pendingBioConfirmJids.add(jid);
+        }
+      }
     } catch (sendErr) {
       lastSentByJidMap.set(jid, textForSend); // E2E can still assert on intended reply when send fails
       if (!isTelegramChatId(jid)) {
@@ -506,14 +548,53 @@ async function main() {
       const lastSentByJid = new Map();
       const ourSentMessageIds = new Set();
       const telegramRepliedIds = new Set();
+      const pendingBioJids = new Set();
+      const pendingBioConfirmJids = new Set();
       const MAX_TELEGRAM_REPLIED = 500;
       optsTelegramBot.on('message', async (msg) => {
         const chatId = msg.chat?.id;
-        const text = (msg.text || '').trim();
-        if (chatId == null || !text) return;
+        let text = (msg.text || '').trim();
+        if (chatId == null) return;
+        if (!text && msg.photo && msg.photo.length > 0) {
+          try {
+            const photo = msg.photo[msg.photo.length - 1];
+            const file = await optsTelegramBot.getFile(photo.file_id);
+            const token = getChannelsConfig().telegram.botToken;
+            const downloadUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+            const res = await fetch(downloadUrl);
+            const buf = Buffer.from(await res.arrayBuffer());
+            const uploadsDir = getUploadsDir();
+            if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+            const imagePath = join(uploadsDir, `tg-${chatId}-${msg.message_id}.jpg`);
+            writeFileSync(imagePath, buf);
+            const caption = (msg.caption || '').trim();
+            text = `User sent an image. Image file: ${imagePath}. ${caption ? 'Caption: ' + caption : "What's in this image?"}`;
+          } catch (err) {
+            console.error('[telegram] image download failed:', err.message);
+            return;
+          }
+        }
+        if (!text) return;
         if (msg.from?.is_bot) return;
         if (text.startsWith('[CowCode]')) return;
         await flushPendingTelegram(chatId, optsTelegramBot);
+        const jidKey = String(chatId);
+        if (pendingBioConfirmJids.has(jidKey)) {
+          pendingBioConfirmJids.delete(jidKey);
+          if (isYesReply(text)) {
+            await optsTelegramBot.sendMessage(chatId, BIO_PROMPT).catch(() => addPendingTelegram(jidKey, BIO_PROMPT));
+            pendingBioJids.add(jidKey);
+          } else {
+            await optsTelegramBot.sendMessage(chatId, "No problem. You can do it later from setup.").catch(() => addPendingTelegram(jidKey, "No problem. You can do it later from setup."));
+          }
+          return;
+        }
+        if (pendingBioJids.has(jidKey)) {
+          saveBioToConfig(text);
+          pendingBioJids.delete(jidKey);
+          await optsTelegramBot.sendMessage(chatId, "Thanks, I've saved that.").catch(() => addPendingTelegram(jidKey, "Thanks, I've saved that."));
+          return;
+        }
         const msgKey = `tg:${chatId}:${msg.message_id}`;
         if (telegramRepliedIds.has(msgKey)) return;
         telegramRepliedIds.add(msgKey);
@@ -522,14 +603,13 @@ async function main() {
           if (first) telegramRepliedIds.delete(first);
         }
         if (text.trim().toLowerCase() === '/browse-reset') {
-          await resetBrowseSession({ jid: String(chatId) });
+          await resetBrowseSession({ jid: jidKey });
           const reply = 'Browser reset. Next browse will start fresh.';
           await optsTelegramBot.sendMessage(chatId, reply).catch(() => addPendingTelegram(String(chatId), reply));
           return;
         }
         console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
-        const jidKey = String(chatId);
-        runAgentWithSkills(sock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }).catch((err) => {
+        runAgentWithSkills(sock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
           console.error('Telegram agent error:', err.message);
           const errorText = 'Moo — ' + toUserMessage(err);
           optsTelegramBot.sendMessage(chatId, errorText).catch(() => addPendingTelegram(String(chatId), errorText));
@@ -590,6 +670,8 @@ async function main() {
   const repliedIds = new Set();
   const lastSentByJid = new Map();
   const ourSentMessageIds = new Set(); // IDs of messages we sent (to ignore echo in self-chat)
+  const pendingBioJids = new Set();
+  const pendingBioConfirmJids = new Set();
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     for (const m of messages ?? []) {
@@ -645,6 +727,39 @@ async function main() {
         }
       }
 
+      if (pendingBioConfirmJids.has(jid)) {
+        pendingBioConfirmJids.delete(jid);
+        if (isYesReply(userText)) {
+          try {
+            await sock.sendMessage(jid, { text: BIO_PROMPT });
+            pendingBioJids.add(jid);
+          } catch (e) {
+            pendingReplies.push({ jid, text: BIO_PROMPT });
+            pendingBioJids.add(jid);
+          }
+        } else {
+          const noThanks = "No problem. You can do it later from setup.";
+          try {
+            await sock.sendMessage(jid, { text: noThanks });
+          } catch (e) {
+            pendingReplies.push({ jid, text: noThanks });
+          }
+        }
+        continue;
+      }
+
+      if (pendingBioJids.has(jid)) {
+        saveBioToConfig(userText);
+        pendingBioJids.delete(jid);
+        const thanks = "Thanks, I've saved that.";
+        try {
+          await sock.sendMessage(jid, { text: thanks });
+        } catch (e) {
+          pendingReplies.push({ jid, text: thanks });
+        }
+        continue;
+      }
+
       if (userText.trim().toLowerCase() === '/browse-reset') {
         await resetBrowseSession({ jid });
         const reply = 'Browser reset. Next browse will start fresh.';
@@ -664,7 +779,7 @@ async function main() {
           } catch (_) {}
         }
 
-        runAgentWithSkills(sock, jid, userText, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }).catch((err) => {
+        runAgentWithSkills(sock, jid, userText, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
           console.error('Background agent error:', err.message);
           const errorText = '[CowCode] Moo — ' + toUserMessage(err);
           sock.sendMessage(jid, { text: errorText }).catch(() => {
@@ -713,6 +828,23 @@ async function main() {
       if (msg.from?.is_bot) return;
       if (text.startsWith('[CowCode]')) return;
       await flushPendingTelegram(chatId, telegramBot);
+      const jidKey = String(chatId);
+      if (pendingBioConfirmJids.has(jidKey)) {
+        pendingBioConfirmJids.delete(jidKey);
+        if (isYesReply(text)) {
+          await telegramBot.sendMessage(chatId, BIO_PROMPT).catch(() => addPendingTelegram(jidKey, BIO_PROMPT));
+          pendingBioJids.add(jidKey);
+        } else {
+          await telegramBot.sendMessage(chatId, "No problem. You can do it later from setup.").catch(() => addPendingTelegram(jidKey, "No problem. You can do it later from setup."));
+        }
+        return;
+      }
+      if (pendingBioJids.has(jidKey)) {
+        saveBioToConfig(text);
+        pendingBioJids.delete(jidKey);
+        await telegramBot.sendMessage(chatId, "Thanks, I've saved that.").catch(() => addPendingTelegram(jidKey, "Thanks, I've saved that."));
+        return;
+      }
       const msgKey = `tg:${chatId}:${msg.message_id}`;
       if (telegramRepliedIds.has(msgKey)) return;
       telegramRepliedIds.add(msgKey);
@@ -721,14 +853,13 @@ async function main() {
         if (first) telegramRepliedIds.delete(first);
       }
       if (text.trim().toLowerCase() === '/browse-reset') {
-        await resetBrowseSession({ jid: String(chatId) });
+        await resetBrowseSession({ jid: jidKey });
         const reply = 'Browser reset. Next browse will start fresh.';
         await telegramBot.sendMessage(chatId, reply).catch(() => addPendingTelegram(String(chatId), reply));
         return;
       }
       console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
-      const jidKey = String(chatId);
-      runAgentWithSkills(telegramSock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }).catch((err) => {
+      runAgentWithSkills(telegramSock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
         console.error('Telegram agent error:', err.message);
         const errorText = 'Moo — ' + toUserMessage(err);
         telegramBot.sendMessage(chatId, errorText).catch(() => addPendingTelegram(String(chatId), errorText));

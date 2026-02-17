@@ -64,6 +64,23 @@ function ask(question) {
   });
 }
 
+/** Read one paragraph: lines until user enters an empty line. */
+function askParagraph(prompt) {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const lines = [];
+    console.log(prompt);
+    rl.on('line', (line) => {
+      if ((line || '').trim() === '') {
+        rl.close();
+        resolve(lines.join('\n').trim());
+        return;
+      }
+      lines.push(line || '');
+    });
+  });
+}
+
 function checkQuit(answer) {
   if (answer && answer.toLowerCase() === 'q') {
     console.log('Quit.');
@@ -243,32 +260,26 @@ async function askBioAndSave() {
   const config = loadConfig();
   const bio = config?.bio;
   const hasBio =
-    bio &&
-    typeof bio.userName === 'string' &&
-    typeof bio.assistantName === 'string' &&
-    typeof bio.whoAmI === 'string' &&
-    typeof bio.whoAreYou === 'string';
+    bio != null &&
+    (typeof bio === 'string' ? (bio || '').trim() !== '' : typeof bio === 'object' && (bio.userName != null || bio.prompt != null));
   if (hasBio) return;
 
   section('About you and your assistant');
-  console.log('  Answer these so the assistant can personalize replies.');
+  console.log('  ' + q('What is my name?'));
+  console.log('  ' + q('What is your name?'));
+  console.log('  ' + q('Who am I?'));
+  console.log('  ' + q('Who are you?'));
+  console.log('');
+  console.log('  (One paragraph answer is fine — any format, press Enter twice when done.)');
   console.log('');
 
-  const userName = await ask(q('What is my name?') + ' ');
-  checkQuit(userName);
-  const assistantName = await ask(q('What is your name?') + ' ');
-  checkQuit(assistantName);
-  const whoAmI = await ask(q('Who am I?') + ' ');
-  checkQuit(whoAmI);
-  const whoAreYou = await ask(q('Who are you?') + ' ');
-  checkQuit(whoAreYou);
+  const paragraph = await askParagraph('  Your answer (q to quit): ');
+  if ((paragraph || '').toLowerCase().trim() === 'q') {
+    console.log('Quit.');
+    process.exit(0);
+  }
 
-  config.bio = {
-    userName: (userName || '').trim() || 'User',
-    assistantName: (assistantName || '').trim() || 'CowCode',
-    whoAmI: (whoAmI || '').trim() || '',
-    whoAreYou: (whoAreYou || '').trim() || '',
-  };
+  config.bio = (paragraph || '').trim() || '';
   saveConfig(config);
   console.log('');
   console.log(C.dim + '  ✓ Bio saved to config.' + C.reset);

@@ -227,6 +227,29 @@ Add notes in `~/.cowcode/workspace/` (e.g. `MEMORY.md`, `memory/*.md`). Conversa
 
 ---
 
+# 📁 File skills (optional, not enabled by default)
+
+These skills live in the skills section but are **off by default**. Add them to `skills.enabled` in config if you want the bot to read, write, or edit files and apply patches.
+
+| Skill | What it does |
+|-------|----------------|
+| **read** | Peek a file: "read surface main.py" → returns every line. No changes. |
+| **write** | Create or overwrite a file: "write hello.txt with hi world". Wholesale replace. |
+| **edit** | Find exact string, replace, save. Fails if no match. e.g. "In Auth.js replace password with token". |
+| **apply-patch** | Git-style patch: feed a diff hunk (lines with `+` add, `-` remove); applies to the file. |
+
+Enable in config:
+
+```json
+"skills": {
+	"enabled": ["cron", "search", "browse", "vision", "memory", "read", "write", "edit", "apply-patch"]
+}
+```
+
+Paths are relative to the workspace (`~/.cowcode/workspace/`) unless absolute.
+
+---
+
 # 🛠 Background Service
 
 ```bash

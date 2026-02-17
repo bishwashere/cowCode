@@ -9,6 +9,10 @@ import { executeBrowse } from '../lib/executors/browse.js';
 import { executeMemory } from '../lib/executors/memory.js';
 import { executeVision } from '../lib/executors/vision.js';
 import { executeGog } from '../lib/executors/gog.js';
+import { executeRead } from '../lib/executors/read.js';
+import { executeWrite } from '../lib/executors/write.js';
+import { executeEdit } from '../lib/executors/edit.js';
+import { executeApplyPatch } from '../lib/executors/apply-patch.js';
 
 const EXECUTORS = {
   cron: executeCron,
@@ -17,6 +21,10 @@ const EXECUTORS = {
   vision: executeVision,
   memory: executeMemory,
   gog: executeGog,
+  read: executeRead,
+  write: executeWrite,
+  edit: executeEdit,
+  'apply-patch': executeApplyPatch,
 };
 
 /**

@@ -1,0 +1,1 @@
+{"id":"apply-patch","description":"Apply a Git-style diff hunk to a file. Feed a diff hunk (plus new line, minus remove). Use when the user wants to apply a patch or diff."}
