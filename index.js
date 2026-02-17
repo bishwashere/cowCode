@@ -35,6 +35,7 @@ import { getChannelsConfig } from './lib/channels-config.js';
 import { getSchedulingTimeContext } from './lib/timezone.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
+import { resetBrowseSession } from './lib/executors/browse.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -295,7 +296,7 @@ async function main() {
   const toolsToUse = useSkills ? allTools : [];
   const useTools = toolsToUse.length > 0;
   const CLARIFICATION_RULE = 'When information is missing or unclear (e.g. time, message, which option), or when a tool returns an error, do NOT show the error to the user. Instead reply with a short, friendly question asking for the missing or unclear detail (e.g. "Did you mean tomorrow at 9 or next week?", "What message should I send you?"). Keep the conversation going until you have everything needed—no silent failures, no raw errors.';
-  const chatSystemPrompt = `You are CowCode. A helpful assistant. Answer in the language the user asked in. Use the search skill for finding info (queries, news, weather). Use the browse skill when the user wants to open a URL, interact with a page (click, scroll, fill forms), or get a screenshot—local browser control, no cloud. Use the vision skill when the user sends an image, when you have an image path (e.g. from a browse screenshot), or when they want the live camera ("Show me what you see"—use image: \"webcam\"). Built-in chaining: after a browse screenshot, use that path with vision to describe, then click/fill/scroll as needed; no need for the user to say "describe this then click." Use the memory skill to search notes and chat history (e.g. \"Remember what we said yesterday?\"—chat is auto-indexed, no manual sync). Do not invent things. Do not use <think> or any thinking/reasoning blocks—output only your final reply.`;
+  const chatSystemPrompt = `You are CowCode. A helpful assistant. Answer in the language the user asked in. Use the search skill for finding info (queries, news, weather). Use the browse skill when the user wants to open a URL, interact with a page (click, scroll, fill forms), or get a screenshot—local browser control, no cloud; the same browser tab is reused across messages so follow-ups stay on the same page. For follow-up on category (e.g. "show me tech ones" after listing deals): navigate to /deals/{category} or the site's category path and extract, or click the category link; use the "Current page" URL from the last browse result. Browse screenshot auto-runs vision to describe and suggest next action. Use the vision skill when the user sends an image or wants the live camera (image: "webcam"). Use the memory skill to search notes and chat history. Do not invent things. Do not use <think> or any thinking/reasoning blocks—output only your final reply.`;
   const skillDocsBlock = skillDocs
     ? `\n\n# Available skills (read these to decide when to use run_skill and which arguments to pass)\n\n${skillDocs}\n\n# Clarification\n${CLARIFICATION_RULE}`
     : '';
@@ -318,7 +319,7 @@ async function main() {
       jid,
       workspaceDir: getWorkspaceDir(),
       scheduleOneShot,
-      startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: getCronStorePath() }),
+      startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: getCronStorePath(), telegramBot: telegramBot || undefined }),
     };
     const { textToSend } = await runAgentTurn({
       userText: text,
@@ -411,6 +412,12 @@ async function main() {
         if (telegramRepliedIds.size > MAX_TELEGRAM_REPLIED) {
           const first = telegramRepliedIds.values().next().value;
           if (first) telegramRepliedIds.delete(first);
+        }
+        if (text.trim().toLowerCase() === '/browse-reset') {
+          await resetBrowseSession({ jid: String(chatId) });
+          const reply = 'Browser reset. Next browse will start fresh.';
+          await optsTelegramBot.sendMessage(chatId, reply).catch(() => addPendingTelegram(String(chatId), reply));
+          return;
         }
         console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
         const jidKey = String(chatId);
@@ -531,6 +538,17 @@ async function main() {
         }
       }
 
+      if (userText.trim().toLowerCase() === '/browse-reset') {
+        await resetBrowseSession({ jid });
+        const reply = 'Browser reset. Next browse will start fresh.';
+        try {
+          await sock.sendMessage(jid, { text: reply });
+        } catch (e) {
+          pendingReplies.push({ jid, text: reply });
+        }
+        continue;
+      }
+
       console.log('[incoming]', userText.slice(0, 60) + (userText.length > 60 ? '…' : ''));
       try {
         if (m.key.id) {
@@ -594,6 +612,12 @@ async function main() {
       if (telegramRepliedIds.size > MAX_TELEGRAM_REPLIED) {
         const first = telegramRepliedIds.values().next().value;
         if (first) telegramRepliedIds.delete(first);
+      }
+      if (text.trim().toLowerCase() === '/browse-reset') {
+        await resetBrowseSession({ jid: String(chatId) });
+        const reply = 'Browser reset. Next browse will start fresh.';
+        await telegramBot.sendMessage(chatId, reply).catch(() => addPendingTelegram(String(chatId), reply));
+        return;
       }
       console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
       const jidKey = String(chatId);

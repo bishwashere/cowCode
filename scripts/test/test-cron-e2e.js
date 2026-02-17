@@ -43,6 +43,14 @@ const CRON_ADD_QUERIES = [
   "create a daily reminder at 8pm to review code",
 ];
 
+// Recurring (cron expr): every 5 mins, every morning, etc. Optional expectedExpr pattern (regex or string).
+const CRON_RECURRING_ADD_QUERIES = [
+  { query: 'Remind me every 5 minutes to stretch', expectedExpr: '*/5 * * * *' },
+  { query: 'Every morning at 8am remind me to drink water', expectedExpr: '0 8 * * *' },
+  { query: 'Create a daily reminder at 9am for standup', expectedExpr: '0 9 * * *' },
+  { query: 'remind me every hour to take a break', expectedExpr: '0 * * * *' },
+];
+
 // Cron manage: list reminders or remove/delete (remove needs job id; "delete all" may get explanation).
 const REMINDER_MANAGE_QUERIES = [
   "list my reminders",
@@ -173,6 +181,60 @@ function loadStore(storePath) {
   }
 }
 
+const RUN_JOB_TIMEOUT_MS = 30_000;
+
+/**
+ * Force-execute a single cron job payload (same as runner does): run cron/run-job.js with message + jid.
+ * Asserts output is valid JSON with textToSend (or error). Uses opts.stateDir for COWCODE_STATE_DIR so config/.env are loaded.
+ * @param {string} message - Job message (prompt to LLM)
+ * @param {object} [opts] - { stateDir } for isolated state (default: DEFAULT_STATE_DIR)
+ * @returns {Promise<{ textToSend?: string, error?: string }>}
+ */
+function runJobOnce(message, opts = {}) {
+  const stateDir = opts.stateDir || DEFAULT_STATE_DIR;
+  const storePath = join(stateDir, 'cron', 'jobs.json');
+  const workspaceDir = join(stateDir, 'workspace');
+  const payload = JSON.stringify({
+    message: String(message || 'Hello'),
+    jid: 'test-e2e@s.whatsapp.net',
+    storePath,
+    workspaceDir,
+  });
+  return new Promise((resolve, reject) => {
+    const child = spawn('node', [join(ROOT, 'cron', 'run-job.js')], {
+      cwd: ROOT,
+      env: { ...process.env, COWCODE_STATE_DIR: stateDir },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      reject(new Error(`run-job timed out after ${RUN_JOB_TIMEOUT_MS / 1000}s`));
+    }, RUN_JOB_TIMEOUT_MS);
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      const line = stdout.trim().split('\n').pop() || '';
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.error) resolve({ error: parsed.error });
+        else resolve({ textToSend: parsed.textToSend });
+      } catch (e) {
+        reject(new Error(`run-job invalid output (code ${code}): ${line.slice(0, 200)}. stderr: ${stderr.slice(-300)}`));
+      }
+    });
+    child.stdin.end(payload, 'utf8');
+  });
+}
+
 /** Format jobs for table cell: one line per job (at/expr + message). */
 function formatCronSet(jobs) {
   if (!Array.isArray(jobs) || jobs.length === 0) return '—';
@@ -200,6 +262,7 @@ async function runReport() {
     ...CRON_LIST_QUERIES.map((q) => ({ query: q, type: 'list' })),
     ...CRON_ADD_QUERIES.map((q) => ({ query: q, type: 'add' })),
     { query: 'Remind me to check lock after two minutes', type: 'add-single' },
+    ...CRON_RECURRING_ADD_QUERIES.map(({ query }) => ({ query, type: 'add-recurring' })),
     ...REMINDER_MANAGE_QUERIES.map((q) => ({ query: q, type: 'manage' })),
   ];
   console.log('Cron E2E report: running each query and capturing reply + store…\n');
@@ -207,7 +270,7 @@ async function runReport() {
     try {
       let reply = '';
       let cronSet = '—';
-      if (type === 'add' || type === 'add-single') {
+      if (type === 'add' || type === 'add-single' || type === 'add-recurring') {
         const { stateDir, storePath } = createTempStateDir();
         reply = await runE2E(query, { stateDir });
         const { jobs } = loadStore(storePath);
@@ -299,6 +362,54 @@ async function main() {
     passed++;
   } catch (err) {
     console.log(`  ✗ "${singleAddQuery}": ${err.message}`);
+    failed++;
+  }
+
+  console.log('\n--- Cron (add) — recurring (every 5 min, every morning, etc.) ---\n');
+  for (const { query, expectedExpr } of CRON_RECURRING_ADD_QUERIES) {
+    try {
+      const { stateDir, storePath } = createTempStateDir();
+      const reply = await runE2E(query, { stateDir });
+      assertReplyInSameLanguageAsQuery(query, reply);
+      const looksLikeConfirmation = /scheduled|set|added|reminder|every|daily|will send|will remind/i.test(reply) || reply.length > 20;
+      assert(
+        looksLikeConfirmation,
+        `Expected recurring add confirmation for "${query}". Got (first 300 chars): ${reply.slice(0, 300)}`
+      );
+      const { jobs } = loadStore(storePath);
+      const cronJobs = jobs.filter((j) => j.schedule?.kind === 'cron' && j.schedule?.expr);
+      assert(cronJobs.length >= 1, `Expected at least one cron (recurring) job for "${query}"; got ${jobs.length} jobs, cron: ${cronJobs.length}.`);
+      if (expectedExpr) {
+        const found = cronJobs.some((j) => j.schedule.expr === expectedExpr);
+        assert(found, `Expected cron expr "${expectedExpr}" for "${query}". Got: ${cronJobs.map((j) => j.schedule.expr).join(', ')}`);
+      }
+      console.log(`  ✓ "${query}" → cron ${cronJobs[0]?.schedule?.expr ?? '—'}`);
+      passed++;
+    } catch (err) {
+      console.log(`  ✗ "${query}": ${err.message}`);
+      failed++;
+    }
+  }
+
+  console.log('\n--- Cron (execute) — force run job output ---\n');
+  try {
+    const message = 'Reply with exactly: Cron E2E execute test OK';
+    const result = await runJobOnce(message, { stateDir: DEFAULT_STATE_DIR });
+    assert(!result.error, `run-job should not return error; got: ${result.error}`);
+    assert(
+      result.textToSend && result.textToSend.length > 0,
+      `run-job should return non-empty textToSend; got: ${JSON.stringify(result)}`
+    );
+    // Prefer reply that echoes the test phrase; accept any non-trivial reply as valid output
+    const hasExpected = /Cron E2E execute test OK|execute test OK/i.test(result.textToSend);
+    assert(
+      result.textToSend.length > 10 && (hasExpected || result.textToSend.length > 30),
+      `run-job should return substantive reply; got (first 200): ${result.textToSend.slice(0, 200)}`
+    );
+    console.log(`  ✓ run-job returned textToSend (${result.textToSend.length} chars)`);
+    passed++;
+  } catch (err) {
+    console.log(`  ✗ run-job: ${err.message}`);
     failed++;
   }
 

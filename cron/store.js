@@ -32,7 +32,7 @@ const DEFAULT_STORE_PATH = join(__dirname, 'jobs.json');
  * @property {boolean} enabled
  * @property {CronSchedule} schedule
  * @property {string} message - Prompt sent to the LLM
- * @property {string} [jid] - WhatsApp JID to send reply to (default: self chat)
+ * @property {string} [jid] - Reply channel: WhatsApp JID or Telegram chat id where the reminder was set up. Reply is sent here by default (even when a separate cron process runs the job).
  * @property {number} createdAtMs
  * @property {number} updatedAtMs
  * @property {number} [sentAtMs] - When set, this one-shot was already sent; do not run again (avoids duplicate after restart)

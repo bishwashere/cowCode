@@ -65,6 +65,7 @@ function sleep(ms) {
 async function runJobOnce({ job, sock, selfJid }) {
   const jid = job.jid || selfJid;
   if (!jid) throw new Error('No JID for job');
+  // Reply goes to job.jid (same channel where reminder was set up) when set; else selfJid fallback
   const storePath = currentStorePath || getCronStorePath();
   const payload = JSON.stringify({
     message: job.message,

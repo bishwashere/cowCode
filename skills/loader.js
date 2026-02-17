@@ -80,7 +80,7 @@ export function getSkillContext() {
                   },
                   command: {
                     type: 'string',
-                    description: 'Command name for the operation (name is command). e.g. search: search, navigate; browse: navigate, click, scroll, fill, screenshot; vision: describe; cron: list, add, remove. If set, this is the operation to run; otherwise use arguments.action.',
+                    description: 'Command name for the operation (name is command). e.g. search: search, navigate; browse: navigate, click, scroll, fill, screenshot, reset; vision: describe; cron: list, add, remove. If set, this is the operation to run; otherwise use arguments.action.',
                   },
                   arguments: {
                     type: 'object',
