@@ -557,6 +557,7 @@ async function main() {
   }
 
   if (!bothAlreadySetUp && messagingFirst === 'telegram') {
+    console.log('');
     const telegramToken = await promptSecret(q('Telegram bot token (from @BotFather)'), env.TELEGRAM_BOT_TOKEN || '');
     if (telegramToken) {
       env.TELEGRAM_BOT_TOKEN = telegramToken;
@@ -592,6 +593,7 @@ async function main() {
   } else if (!bothAlreadySetUp) {
     // WhatsApp first (or only Telegram exists and we're offering WhatsApp)
     if (onlyTelegramSetUp) {
+      console.log('');
       const addWa = await ask(q('Add WhatsApp? (y/n)') + ' ');
       if ((addWa || '').toLowerCase().startsWith('y')) {
         console.log('');
@@ -615,6 +617,20 @@ async function main() {
         saveConfig(config);
       }
     } else {
+      // WhatsApp first: finish linking WhatsApp, then ask about Telegram
+      console.log('');
+      console.log('  Linking WhatsApp — a QR code or pairing prompt will appear.');
+      console.log('');
+      const authResult = spawnSync(process.execPath, [join(ROOT, 'index.js'), '--auth-only'], {
+        cwd: ROOT,
+        stdio: 'inherit',
+        shell: false,
+        env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' },
+      });
+      if (authResult.status !== 0) {
+        console.log(C.dim + '  WhatsApp linking failed or skipped. You can run: cowcode auth' + C.reset);
+      }
+      console.log('');
       const addTg = await ask(q('Add Telegram too? (y/n)') + ' ');
       if ((addTg || '').toLowerCase().startsWith('y')) {
         const telegramToken = await promptSecret(q('Telegram bot token (from @BotFather)'), env.TELEGRAM_BOT_TOKEN || '');
