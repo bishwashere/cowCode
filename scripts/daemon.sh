@@ -12,6 +12,8 @@ if [ -d "$INSTALL_DIR" ]; then
 fi
 [ -d "$STATE_DIR" ] || mkdir -p "$STATE_DIR"
 STATE_DIR="$(cd "$STATE_DIR" && pwd)"
+# Pre-create log files so "tail -f daemon.log" works immediately after start; launchd will append
+touch "$STATE_DIR/daemon.log" "$STATE_DIR/daemon.err" 2>/dev/null || true
 NODE="$(command -v node 2>/dev/null || true)"
 [ -z "$NODE" ] && NODE="node"
 INDEX_JS="$INSTALL_DIR/index.js"
@@ -92,8 +94,21 @@ case "$(uname -s)" in
         if [ ! -f "$PLIST" ]; then
           ensure_plist
         fi
-        launchctl load "$PLIST" 2>/dev/null || true
-        echo "Daemon started. Logs: $STATE_DIR/daemon.log"
+        touch "$STATE_DIR/daemon.log" "$STATE_DIR/daemon.err" 2>/dev/null || true
+        set +e
+        launchctl load "$PLIST"
+        load_ret=$?
+        set -e
+        if [ "$load_ret" -ne 0 ]; then
+          if launchctl list 2>/dev/null | grep -q "$LAUNCHD_LABEL"; then
+            echo "Daemon is already running. Logs: $STATE_DIR/daemon.log"
+          else
+            echo "Daemon failed to start. Check the error above."
+            exit 1
+          fi
+        else
+          echo "Daemon started. Logs: $STATE_DIR/daemon.log"
+        fi
         ;;
       stop)
         launchctl unload "$PLIST" 2>/dev/null || true
