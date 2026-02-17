@@ -8,6 +8,7 @@ import { executeBrowser } from '../lib/executors/browser.js';
 import { executeBrowse } from '../lib/executors/browse.js';
 import { executeMemory } from '../lib/executors/memory.js';
 import { executeVision } from '../lib/executors/vision.js';
+import { executeGog } from '../lib/executors/gog.js';
 
 const EXECUTORS = {
   cron: executeCron,
@@ -15,6 +16,7 @@ const EXECUTORS = {
   browse: executeBrowse,
   vision: executeVision,
   memory: executeMemory,
+  gog: executeGog,
 };
 
 /**

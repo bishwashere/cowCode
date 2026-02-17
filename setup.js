@@ -182,6 +182,12 @@ function getPackageManager() {
   return 'npm';
 }
 
+function hasBinary(name) {
+  const cmd = process.platform === 'win32' ? 'where' : 'which';
+  const res = spawnSync(cmd, [name], { stdio: 'ignore' });
+  return res.status === 0;
+}
+
 function migrateFromRoot() {
   ensureStateDir();
   const stateConfig = getConfigPath();
@@ -398,6 +404,28 @@ async function onboarding() {
   }
 
   const braveKey = await promptSecret(q('Brave Search API key – optional'), env.BRAVE_API_KEY || '');
+
+  // Google Workspace (gog) skill
+  const enableGogAnswer = await ask(q('Enable Google Workspace (gog) skill? (y/n)') + ' ');
+  const enableGog = (enableGogAnswer || '').trim().toLowerCase().startsWith('y');
+  if (enableGog) {
+    config = loadConfig() || config;
+    if (!config.skills) config.skills = {};
+    const skills = config.skills;
+    const enabled = Array.isArray(skills.enabled) ? skills.enabled : [];
+    if (!enabled.includes('gog')) enabled.push('gog');
+    skills.enabled = enabled;
+    if (!skills.gog) skills.gog = {};
+    const existingAccount = skills.gog.account ? String(skills.gog.account) : '';
+    const gogAccount = await promptWithDefault(q('Default Google account email for gog (optional)'), existingAccount || '');
+    if (gogAccount && gogAccount.trim()) skills.gog.account = gogAccount.trim();
+    config.skills = skills;
+    saveConfig(config);
+    if (!hasBinary('gog')) {
+      console.log(C.dim + '  ! gog CLI not found in PATH. Install from https://gogcli.sh and run setup again.' + C.reset);
+    }
+    console.log(C.dim + '  ✓ gog skill enabled.' + C.reset);
+  }
 
   // Vision fallback: only ask when main model is text-only; skip step if main model already supports vision.
   let mainModelSupportsVision = false;

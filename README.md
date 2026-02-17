@@ -182,6 +182,29 @@ Cloud models run only if configured.
 
 ---
 
+# 📧 Google Workspace (gog Skill)
+
+Install the `gog` CLI and complete OAuth:
+
+```bash
+gog auth credentials /path/to/client_secret.json
+gog auth add you@gmail.com --services gmail,calendar,drive,contacts,sheets,docs
+gog auth list
+```
+
+Enable the skill and set a default account (optional):
+
+```json
+"skills": {
+	"enabled": ["cron", "search", "browse", "vision", "memory", "gog"],
+	"gog": { "account": "you@gmail.com" }
+}
+```
+
+For automation, use `--json` and `--no-input`. The assistant will ask for confirmation before sending mail or creating calendar events.
+
+---
+
 # ⏰ Reminders
 
 Example:

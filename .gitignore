@@ -1,5 +1,6 @@
 node_modules/
 auth_info/
+credentials/
 .env
 config.json
 *.log
