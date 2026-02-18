@@ -633,6 +633,7 @@ async function main() {
 
     let telegramSock = null;
     const telegramToken = getChannelsConfig().telegram.botToken;
+    // Only init and log Telegram when configured; when not set up we don't show or log anything about Telegram.
     if (telegramToken) {
       telegramBot = initBot(telegramToken);
       telegramSock = createTelegramSock(telegramBot);
