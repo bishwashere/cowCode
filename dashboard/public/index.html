@@ -104,6 +104,36 @@
     .config-json { white-space: pre-wrap; font-size: 0.8rem; overflow-x: auto; }
     .error { color: var(--red); font-size: 0.9rem; }
     .empty { color: var(--muted); font-style: italic; }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; color: var(--muted); font-size: 0.8rem; margin-bottom: 0.25rem; }
+    .field input[type="text"], .field input[type="number"] {
+      width: 100%;
+      max-width: 24rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.5rem;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    .llm-model {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .llm-model h3 { margin: 0 0 0.5rem 0; font-size: 0.95rem; color: var(--accent); }
+    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.5rem; }
+    .form-row label { margin-bottom: 0; }
+    .read-only-note { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .skill-row { cursor: pointer; }
+    .skill-row:hover { background: var(--card); }
+    .skill-desc { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; max-width: 42rem; }
+    #skill-doc-panel { margin-top: 1rem; }
+    #skill-doc-panel h3 { margin: 0 0 0.5rem 0; font-size: 1rem; }
+    #skill-doc-content { width: 100%; min-height: 20rem; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.85rem; resize: vertical; }
   </style>
 </head>
 <body>
@@ -138,22 +168,39 @@
   <div id="page-skills" class="page">
     <div class="card">
       <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skills</h2>
-      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills. Changes are saved to config.json.</p>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills; click a skill to view or edit its doc (SKILL.md).</p>
       <div id="skills-list"></div>
-      <button id="skills-save" style="display:none;">Save changes</button>
+      <button id="skills-save" style="display:none;">Save enabled/disabled</button>
+    </div>
+    <div class="card" id="skill-doc-panel" style="display:none;">
+      <h3 id="skill-doc-title"></h3>
+      <p class="skill-meta" id="skill-doc-description" style="margin:0 0 0.5rem 0;"></p>
+      <textarea id="skill-doc-content" spellcheck="false"></textarea>
+      <div style="margin-top:0.75rem;">
+        <button id="skill-doc-save">Save doc</button>
+        <span id="skill-doc-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+      </div>
     </div>
   </div>
 
   <div id="page-llm" class="page">
     <div class="card">
       <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">LLM</h2>
-      <pre id="llm-config" class="config-json"></pre>
+      <p class="skill-meta" style="margin:0 0 1rem 0;">Edit below and save. API keys are stored in .env; use the env var name here (e.g. LLM_1_API_KEY).</p>
+      <div class="field">
+        <label>Max tokens</label>
+        <input type="number" id="llm-max-tokens" min="256" max="128000" step="256" value="2048">
+      </div>
+      <div id="llm-models"></div>
+      <button id="llm-save">Save LLM settings</button>
+      <span id="llm-saved-msg" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
     </div>
   </div>
 
   <div id="page-config" class="page">
     <div class="card">
       <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Config</h2>
+      <p class="read-only-note">Final configuration (read-only). Written to config.json.</p>
       <pre id="full-config" class="config-json"></pre>
     </div>
   </div>
@@ -169,7 +216,8 @@
       if (link) link.classList.add('active');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
-      if (name === 'llm' || name === 'config') fetchConfig();
+      if (name === 'llm') renderLlmForm();
+      if (name === 'config') fetchConfig();
     }
     document.querySelectorAll('nav a[data-page]').forEach(a => {
       a.addEventListener('click', e => {
@@ -224,6 +272,8 @@
     let skillsDirty = false;
     let currentEnabled = [];
 
+    let currentSkillId = null;
+
     async function fetchSkills() {
       const r = await fetch(API + '/api/skills');
       const d = await r.json();
@@ -232,14 +282,41 @@
       const el = document.getElementById('skills-list');
       el.innerHTML = list.map(s => {
         const checked = currentEnabled.includes(s.id) ? ' checked' : '';
-        return '<div class="skill-row"><div><span class="skill-id">' + escapeHtml(s.id) + '</span></div><label><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div>';
+        const desc = (s.description || '').trim();
+        const descHtml = desc ? '<div class="skill-desc">' + escapeHtml(desc) + '</div>' : '';
+        return '<div class="skill-row" data-id="' + escapeHtml(s.id) + '"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div>';
       }).join('');
       el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
         cb.addEventListener('change', () => { skillsDirty = true; document.getElementById('skills-save').style.display = 'block'; });
       });
+      el.querySelectorAll('.skill-row').forEach(row => {
+        row.addEventListener('click', (e) => { if (!e.target.closest('label')) openSkillDoc(row.dataset.id); });
+      });
       document.getElementById('skills-save').style.display = 'none';
       skillsDirty = false;
     }
+
+    async function openSkillDoc(id) {
+      currentSkillId = id;
+      const r = await fetch(API + '/api/skills/' + encodeURIComponent(id) + '/doc');
+      if (!r.ok) return;
+      const d = await r.json();
+      document.getElementById('skill-doc-panel').style.display = 'block';
+      document.getElementById('skill-doc-title').textContent = 'Doc: ' + id;
+      document.getElementById('skill-doc-description').textContent = d.description || '';
+      document.getElementById('skill-doc-content').value = d.content || '';
+      document.getElementById('skill-doc-saved').style.display = 'none';
+    }
+
+    document.getElementById('skill-doc-save').addEventListener('click', async () => {
+      if (!currentSkillId) return;
+      const content = document.getElementById('skill-doc-content').value;
+      const r = await fetch(API + '/api/skills/' + encodeURIComponent(currentSkillId) + '/doc', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+      if (r.ok) {
+        document.getElementById('skill-doc-saved').style.display = 'inline';
+        setTimeout(() => { document.getElementById('skill-doc-saved').style.display = 'none'; }, 2000);
+      }
+    });
 
     document.getElementById('skills-save').addEventListener('click', async () => {
       const boxes = document.querySelectorAll('#skills-list input[type="checkbox"]:checked');
@@ -251,9 +328,53 @@
     async function fetchConfig() {
       const r = await fetch(API + '/api/config');
       const d = await r.json();
-      document.getElementById('llm-config').textContent = JSON.stringify(d.llm || {}, null, 2);
       document.getElementById('full-config').textContent = JSON.stringify(d, null, 2);
     }
+
+    async function renderLlmForm() {
+      const r = await fetch(API + '/api/config');
+      const d = await r.json();
+      const llm = d.llm || {};
+      const maxTokens = Number(llm.maxTokens) || 2048;
+      const models = Array.isArray(llm.models) ? llm.models : [];
+      document.getElementById('llm-max-tokens').value = maxTokens;
+      const container = document.getElementById('llm-models');
+      container.innerHTML = models.map((m, i) => {
+        const baseUrl = (m.baseUrl || '').trim();
+        const apiKey = (m.apiKey || '').trim();
+        const priority = m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true';
+        return '<div class="llm-model" data-i="' + i + '">' +
+          '<h3>Model ' + (i + 1) + ': ' + escapeHtml(m.provider || '') + '</h3>' +
+          '<div class="form-row"><div class="field"><label>Provider</label><input type="text" data-f="provider" value="' + escapeHtml(m.provider || '') + '" placeholder="openai, lmstudio, anthropic, grok"></div></div>' +
+          '<div class="form-row"><div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '" placeholder="gpt-4o, local"></div></div>' +
+          '<div class="form-row"><div class="field"><label>Base URL (optional, for local)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(baseUrl) + '" placeholder="http://127.0.0.1:1234/v1"></div></div>' +
+          '<div class="form-row"><div class="field"><label>API key env var</label><input type="text" data-f="apiKey" value="' + escapeHtml(apiKey) + '" placeholder="LLM_1_API_KEY"></div></div>' +
+          '<div class="form-row"><label><input type="checkbox" data-f="priority" ' + (priority ? 'checked' : '') + '> Priority (use first)</label></div>' +
+          '</div>';
+      }).join('');
+      if (models.length === 0) container.innerHTML = '<p class="empty">No models in config. Add entries in Config (read-only) or via setup.</p>';
+    }
+
+    document.getElementById('llm-save').addEventListener('click', async () => {
+      const maxTokens = Number(document.getElementById('llm-max-tokens').value) || 2048;
+      const modelCards = document.querySelectorAll('#llm-models .llm-model');
+      const models = Array.from(modelCards).map(card => {
+        const provider = (card.querySelector('[data-f="provider"]').value || '').trim();
+        const model = (card.querySelector('[data-f="model"]').value || '').trim();
+        const baseUrl = (card.querySelector('[data-f="baseUrl"]').value || '').trim();
+        const apiKey = (card.querySelector('[data-f="apiKey"]').value || '').trim();
+        const priority = card.querySelector('[data-f="priority"]').checked;
+        const o = { provider: provider || 'openai', model: model || 'gpt-4o', apiKey: apiKey || 'LLM_1_API_KEY' };
+        if (baseUrl) o.baseUrl = baseUrl;
+        if (priority) o.priority = true;
+        return o;
+      });
+      const r = await fetch(API + '/api/config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ llm: { maxTokens, models } }) });
+      if (r.ok) {
+        document.getElementById('llm-saved-msg').style.display = 'inline';
+        setTimeout(() => { document.getElementById('llm-saved-msg').style.display = 'none'; }, 2000);
+      }
+    });
 
     fetchStatus();
     setInterval(fetchStatus, 8000);

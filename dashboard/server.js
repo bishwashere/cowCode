@@ -60,12 +60,36 @@ function saveConfig(config) {
   writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), 'utf8');
 }
 
+const SKILL_MD_NAMES = ['SKILL.md', 'skill.md'];
+
 function getAllSkillIds() {
   if (!existsSync(SKILLS_DIR)) return [];
   return readdirSync(SKILLS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .filter((d) => existsSync(join(SKILLS_DIR, d.name, 'skill.json')))
     .map((d) => d.name);
+}
+
+function getSkillDescription(skillId) {
+  const jsonPath = join(SKILLS_DIR, skillId, 'skill.json');
+  if (!existsSync(jsonPath)) return '';
+  try {
+    const data = JSON.parse(readFileSync(jsonPath, 'utf8'));
+    return data.description || '';
+  } catch {
+    return '';
+  }
+}
+
+function getSkillMdPath(skillId) {
+  if (!/^[a-z0-9-]+$/i.test(skillId)) return null;
+  const dir = join(SKILLS_DIR, skillId);
+  if (!existsSync(dir)) return null;
+  for (const name of SKILL_MD_NAMES) {
+    const p = join(dir, name);
+    if (existsSync(p)) return p;
+  }
+  return join(dir, 'SKILL.md');
 }
 
 // ---- API ----
@@ -95,8 +119,40 @@ app.get('/api/skills', (_req, res) => {
     const config = loadConfig();
     const enabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
     const allIds = getAllSkillIds();
-    const list = allIds.map((id) => ({ id, enabled: enabled.includes(id) }));
+    const list = allIds.map((id) => ({ id, enabled: enabled.includes(id), description: getSkillDescription(id) }));
     res.json({ skills: list, enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/skills/:id/doc', (req, res) => {
+  try {
+    const id = req.params.id;
+    const mdPath = getSkillMdPath(id);
+    if (!mdPath) {
+      res.status(404).json({ error: 'Skill not found' });
+      return;
+    }
+    const content = existsSync(mdPath) ? readFileSync(mdPath, 'utf8') : '';
+    const description = getSkillDescription(id);
+    res.json({ id, description, content });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/skills/:id/doc', (req, res) => {
+  try {
+    const id = req.params.id;
+    const mdPath = getSkillMdPath(id);
+    if (!mdPath) {
+      res.status(404).json({ error: 'Skill not found' });
+      return;
+    }
+    const content = typeof req.body?.content === 'string' ? req.body.content : '';
+    writeFileSync(mdPath, content, 'utf8');
+    res.json({ id, ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
