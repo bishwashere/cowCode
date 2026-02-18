@@ -13,5 +13,5 @@ Semantic search over your **notes** (`MEMORY.md`, `memory/*.md`) and **chat hist
 
 ## Config
 
-- Add `"memory"` to `skills.enabled`. Set an embedding API key (e.g. OpenAI) in .env; if omitted, the first LLM model's key is used.
+- Add `"memory"` to `skills.enabled`. Embedding: if an OpenAI key is available (e.g. `OPENAI_API_KEY` or an OpenAI model in LLM config), OpenAI is used; otherwise local (Ollama, `nomic-embed-text`) is used. You can override with `memory.embedding` in config.
 - Workspace: `~/.cowcode/workspace/`. Create `MEMORY.md` and optionally `memory/*.md`. Chat logs live in `workspace/chat-log/` and are created automatically.
