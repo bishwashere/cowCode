@@ -110,10 +110,24 @@ if (sub === 'moo') {
     });
     child.on('close', (code) => process.exit(code ?? 0));
   }
+} else if (sub === 'uninstall') {
+  const script = join(INSTALL_DIR, 'uninstall.sh');
+  if (!existsSync(script)) {
+    console.error('cowCode: uninstall.sh not found. Re-run the installer.');
+    console.error('  curl -fsSL https://raw.githubusercontent.com/bishwashere/cowCode/master/install.sh | bash');
+    process.exit(1);
+  }
+  const child = spawn('bash', [script], {
+    stdio: 'inherit',
+    env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+    cwd: INSTALL_DIR,
+  });
+  child.on('close', (code) => process.exit(code ?? 0));
 } else {
   console.log('Usage: cowcode moo start | stop | status | restart');
   console.log('       cowcode dashboard');
   console.log('       cowcode auth [options]');
   console.log('       cowcode update [--force]');
+  console.log('       cowcode uninstall');
   process.exit(sub ? 1 : 0);
 }
