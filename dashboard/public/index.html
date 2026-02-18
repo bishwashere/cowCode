@@ -248,18 +248,24 @@
     });
 
     async function fetchStatus() {
-      const r = await fetch(API + '/api/overview');
-      const d = await r.json();
       const dot = document.getElementById('status-dot');
       const text = document.getElementById('status-text');
       const urlEl = document.getElementById('dashboard-url');
-      if (d.dashboardUrl) urlEl.textContent = d.dashboardUrl;
-      if (d.daemonRunning) {
-        dot.className = 'status-dot running';
-        text.textContent = 'Daemon is running';
-      } else {
+      try {
+        const statusRes = await fetch(API + '/api/status');
+        const statusData = await statusRes.json();
+        if (statusData.dashboardUrl) urlEl.textContent = statusData.dashboardUrl;
+        if (statusData.daemonRunning) {
+          dot.className = 'status-dot running';
+          text.textContent = 'Daemon is running';
+        } else {
+          dot.className = 'status-dot stopped';
+          text.textContent = 'Daemon is not running';
+        }
+      } catch (e) {
         dot.className = 'status-dot stopped';
         text.textContent = 'Daemon is not running';
+        urlEl.textContent = '—';
       }
       function formatUptime(sec) {
         if (sec == null || typeof sec !== 'number' || sec < 0) return '—';
@@ -274,12 +280,50 @@
         if (s > 0 || parts.length === 0) parts.push(s + 's');
         return parts.join(' ');
       }
-      document.getElementById('overview-uptime').textContent = d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—';
-      document.getElementById('overview-crons').textContent = typeof d.cronCount === 'number' ? d.cronCount : '—';
-      document.getElementById('overview-skills').textContent = typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—';
-      document.getElementById('overview-model').textContent = d.priorityModelLabel || '—';
-      document.getElementById('overview-timezone').textContent = d.timezone || '—';
-      document.getElementById('overview-time-format').textContent = d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—');
+      function setOverview(d) {
+        document.getElementById('overview-uptime').textContent = d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—';
+        document.getElementById('overview-crons').textContent = typeof d.cronCount === 'number' ? d.cronCount : '—';
+        document.getElementById('overview-skills').textContent = typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—';
+        document.getElementById('overview-model').textContent = d.priorityModelLabel || '—';
+        document.getElementById('overview-timezone').textContent = d.timezone || '—';
+        document.getElementById('overview-time-format').textContent = d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—');
+      }
+      try {
+        const overviewRes = await fetch(API + '/api/overview');
+        if (overviewRes.ok) {
+          const d = await overviewRes.json();
+          setOverview(d);
+          return;
+        }
+      } catch (_) {}
+      try {
+        const [cronsRes, skillsRes, configRes] = await Promise.all([
+          fetch(API + '/api/crons'),
+          fetch(API + '/api/skills'),
+          fetch(API + '/api/config')
+        ]);
+        const crons = cronsRes.ok ? await cronsRes.json() : {};
+        const skills = skillsRes.ok ? await skillsRes.json() : {};
+        const config = configRes.ok ? await configRes.json() : {};
+        const jobs = crons.jobs || [];
+        const cronCount = jobs.filter(function (j) { return j.enabled !== false; }).length;
+        const skillsEnabled = skills.enabled || [];
+        const models = config.llm && Array.isArray(config.llm.models) ? config.llm.models : [];
+        const priorityEntry = models.find(function (m) { return m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true'; }) || models[0];
+        const priorityModelLabel = priorityEntry ? (priorityEntry.model || priorityEntry.provider || '—') : '—';
+        const def = config.agents && config.agents.defaults ? config.agents.defaults : {};
+        const tz = def.userTimezone && String(def.userTimezone).trim() && String(def.userTimezone).toLowerCase() !== 'auto' ? def.userTimezone : (typeof Intl !== 'undefined' && Intl.DateTimeFormat && Intl.DateTimeFormat().resolvedOptions ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC');
+        const fmt = def.timeFormat === '12' || def.timeFormat === '24' ? def.timeFormat : null;
+        setOverview({
+          daemonRunning: false,
+          daemonUptimeSeconds: null,
+          cronCount: cronCount,
+          skillsEnabledCount: skillsEnabled.length,
+          priorityModelLabel: priorityModelLabel,
+          timezone: tz,
+          timeFormat: fmt || '—'
+        });
+      } catch (_) {}
     }
 
     async function fetchCrons() {
