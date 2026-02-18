@@ -38,6 +38,18 @@ if (sub === 'moo') {
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
+} else if (sub === 'dashboard') {
+  const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
+  if (!existsSync(serverPath)) {
+    console.error('cowCode: dashboard not found. Re-run the installer or run from repo.');
+    process.exit(1);
+  }
+  const child = spawn(process.execPath, [serverPath], {
+    stdio: 'inherit',
+    env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+    cwd: INSTALL_DIR,
+  });
+  child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'auth' || (args.length === 1 && args[0] === '--auth-only')) {
   const authArgs = args[0] === '--auth-only' ? args : ['--auth-only', ...args.slice(1)];
   const child = spawn(process.execPath, [join(INSTALL_DIR, 'index.js'), ...authArgs], {
@@ -89,6 +101,7 @@ if (sub === 'moo') {
   }
 } else {
   console.log('Usage: cowcode moo start | stop | status | restart');
+  console.log('       cowcode dashboard');
   console.log('       cowcode auth [options]');
   console.log('       cowcode update [--force]');
   process.exit(sub ? 1 : 0);

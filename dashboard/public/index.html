@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cowCode Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --card: #1a1a1f;
+      --text: #e4e4e7;
+      --muted: #71717a;
+      --green: #22c55e;
+      --red: #ef4444;
+      --accent: #a78bfa;
+      --border: #27272a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 1.5rem 2rem;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 1.5rem 0; color: var(--accent); }
+    nav {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 0.35rem 0.75rem;
+      border-radius: 4px;
+    }
+    nav a:hover { color: var(--text); background: var(--card); }
+    nav a.active { color: var(--accent); }
+    .page { display: none; }
+    .page.active { display: block; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+    .status-dot.running { background: var(--green); }
+    .status-dot.stopped { background: var(--red); }
+    @keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:0.6 } }
+    .url-box {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 0.75rem;
+      word-break: break-all;
+    }
+    .url-box strong { color: var(--text); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+    .badge.enabled { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+    .badge.disabled { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+    .skill-row { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+    .skill-row:last-child { border-bottom: none; }
+    .skill-id { font-weight: 500; }
+    .skill-meta { font-size: 0.8rem; color: var(--muted); }
+    label { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+    input[type="checkbox"] { accent-color: var(--accent); }
+    button {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .config-json { white-space: pre-wrap; font-size: 0.8rem; overflow-x: auto; }
+    .error { color: var(--red); font-size: 0.9rem; }
+    .empty { color: var(--muted); font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>cowCode Dashboard</h1>
+  <nav>
+    <a href="#status" data-page="status" class="active">Status</a>
+    <a href="#crons" data-page="crons">Crons</a>
+    <a href="#skills" data-page="skills">Skills</a>
+    <a href="#llm" data-page="llm">LLM</a>
+    <a href="#config" data-page="config">Config</a>
+  </nav>
+
+  <div id="page-status" class="page active">
+    <div class="card">
+      <div>
+        <span id="status-dot" class="status-dot stopped"></span>
+        <span id="status-text">Checking…</span>
+      </div>
+      <div class="url-box">
+        Dashboard URL (for future POST/API): <strong id="dashboard-url">—</strong>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-crons" class="page">
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Scheduled crons</h2>
+      <div id="crons-list"></div>
+    </div>
+  </div>
+
+  <div id="page-skills" class="page">
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skills</h2>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills. Changes are saved to config.json.</p>
+      <div id="skills-list"></div>
+      <button id="skills-save" style="display:none;">Save changes</button>
+    </div>
+  </div>
+
+  <div id="page-llm" class="page">
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">LLM</h2>
+      <pre id="llm-config" class="config-json"></pre>
+    </div>
+  </div>
+
+  <div id="page-config" class="page">
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Config</h2>
+      <pre id="full-config" class="config-json"></pre>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    function setPage(name) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+      const page = document.getElementById('page-' + name);
+      const link = document.querySelector('nav a[data-page="' + name + '"]');
+      if (page) page.classList.add('active');
+      if (link) link.classList.add('active');
+      if (name === 'crons') fetchCrons();
+      if (name === 'skills') fetchSkills();
+      if (name === 'llm' || name === 'config') fetchConfig();
+    }
+    document.querySelectorAll('nav a[data-page]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        setPage(a.dataset.page);
+      });
+    });
+    window.addEventListener('hashchange', () => {
+      const name = (location.hash || '#status').slice(1) || 'status';
+      setPage(name);
+    });
+
+    async function fetchStatus() {
+      const r = await fetch(API + '/api/status');
+      const d = await r.json();
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      const urlEl = document.getElementById('dashboard-url');
+      if (d.dashboardUrl) urlEl.textContent = d.dashboardUrl;
+      if (d.daemonRunning) {
+        dot.className = 'status-dot running';
+        text.textContent = 'Daemon is running';
+      } else {
+        dot.className = 'status-dot stopped';
+        text.textContent = 'Daemon is not running';
+      }
+    }
+
+    async function fetchCrons() {
+      const r = await fetch(API + '/api/crons');
+      const d = await r.json();
+      const el = document.getElementById('crons-list');
+      const jobs = d.jobs || [];
+      if (jobs.length === 0) {
+        el.innerHTML = '<p class="empty">No scheduled crons.</p>';
+        return;
+      }
+      el.innerHTML = '<table><thead><tr><th>Name</th><th>Enabled</th><th>Schedule</th><th>Message</th></tr></thead><tbody>' +
+        jobs.map(j => {
+          const s = j.schedule || {};
+          const sched = s.kind === 'cron' ? (s.expr || '') : (s.at || '');
+          return '<tr><td>' + escapeHtml(j.name || j.id) + '</td><td><span class="badge ' + (j.enabled ? 'enabled' : 'disabled') + '">' + (j.enabled ? 'On' : 'Off') + '</span></td><td>' + escapeHtml(sched) + '</td><td>' + escapeHtml((j.message || '').slice(0, 60)) + (j.message && j.message.length > 60 ? '…' : '') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    let skillsDirty = false;
+    let currentEnabled = [];
+
+    async function fetchSkills() {
+      const r = await fetch(API + '/api/skills');
+      const d = await r.json();
+      currentEnabled = d.enabled || [];
+      const list = d.skills || [];
+      const el = document.getElementById('skills-list');
+      el.innerHTML = list.map(s => {
+        const checked = currentEnabled.includes(s.id) ? ' checked' : '';
+        return '<div class="skill-row"><div><span class="skill-id">' + escapeHtml(s.id) + '</span></div><label><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div>';
+      }).join('');
+      el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => { skillsDirty = true; document.getElementById('skills-save').style.display = 'block'; });
+      });
+      document.getElementById('skills-save').style.display = 'none';
+      skillsDirty = false;
+    }
+
+    document.getElementById('skills-save').addEventListener('click', async () => {
+      const boxes = document.querySelectorAll('#skills-list input[type="checkbox"]:checked');
+      const enabled = Array.from(boxes).map(b => b.dataset.id);
+      const r = await fetch(API + '/api/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+      if (r.ok) { skillsDirty = false; document.getElementById('skills-save').style.display = 'none'; }
+    });
+
+    async function fetchConfig() {
+      const r = await fetch(API + '/api/config');
+      const d = await r.json();
+      document.getElementById('llm-config').textContent = JSON.stringify(d.llm || {}, null, 2);
+      document.getElementById('full-config').textContent = JSON.stringify(d, null, 2);
+    }
+
+    fetchStatus();
+    setInterval(fetchStatus, 8000);
+    setPage((location.hash || '#status').slice(1) || 'status');
+  </script>
+</body>
+</html>
