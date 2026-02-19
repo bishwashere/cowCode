@@ -254,6 +254,24 @@ function ensureInstall() {
   }
 }
 
+/** Copy repo workspace-default/*.md into state workspace if they don't exist. */
+function ensureWorkspaceDefaults() {
+  ensureStateDir();
+  const defaultDir = join(ROOT, 'workspace-default');
+  const workspaceDir = getWorkspaceDir();
+  const names = ['WhoAmI.md', 'MyHuman.md', 'SOUL.md'];
+  for (const name of names) {
+    const dest = join(workspaceDir, name);
+    if (existsSync(dest)) continue;
+    const src = join(defaultDir, name);
+    if (existsSync(src)) {
+      try {
+        copyFileSync(src, dest);
+      } catch (_) {}
+    }
+  }
+}
+
 /** On first install, ask four bio questions and save as config.bio (separate from system prompt). */
 async function askBioAndSave() {
   ensureConfig();
@@ -588,6 +606,7 @@ async function main() {
   welcome();
   migrateFromRoot();
   ensureInstall();
+  ensureWorkspaceDefaults();
   await askBioAndSave();
   ensureAgentsDefaultsFromHost();
 

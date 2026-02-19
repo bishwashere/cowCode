@@ -23,9 +23,9 @@ const {
 } = Baileys;
 import { chat as llmChat, chatWithTools, loadConfig } from './llm.js';
 import { runAgentTurn, stripThinking, CLARIFICATION_RULE } from './lib/agent.js';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
 import { getSkillsEnabled, getSkillContext, DEFAULT_ENABLED } from './skills/loader.js';
@@ -392,6 +392,10 @@ async function main() {
   const MY_HUMAN_MD = 'MyHuman.md';
   const SOUL_MD = 'SOUL.md';
 
+  const WORKSPACE_DEFAULT_FILES = [WHO_AM_I_MD, MY_HUMAN_MD, SOUL_MD];
+  const INSTALL_DIR = (process.env.COWCODE_INSTALL_DIR && resolve(process.env.COWCODE_INSTALL_DIR)) || __dirname;
+  const DEFAULT_WORKSPACE_DIR = join(INSTALL_DIR, 'workspace-default');
+
   function readWorkspaceMd(filename) {
     const p = join(getWorkspaceDir(), filename);
     try {
@@ -400,15 +404,24 @@ async function main() {
     return '';
   }
 
-  function ensureSoulMd() {
-    const p = join(getWorkspaceDir(), SOUL_MD);
-    if (existsSync(p)) return;
+  /** Copy repo workspace-default/*.md into state workspace if they don't exist. */
+  function ensureWorkspaceDefaults() {
     try {
       ensureStateDir();
-      writeFileSync(p, DEFAULT_SOUL_CONTENT, 'utf8');
+      const workspaceDir = getWorkspaceDir();
+      for (const name of WORKSPACE_DEFAULT_FILES) {
+        const dest = join(workspaceDir, name);
+        if (existsSync(dest)) continue;
+        const src = join(DEFAULT_WORKSPACE_DIR, name);
+        if (existsSync(src)) copyFileSync(src, dest);
+      }
     } catch (err) {
-      console.error('[soul] could not create SOUL.md:', err.message);
+      console.error('[workspace] could not copy default files:', err.message);
     }
+  }
+
+  function ensureSoulMd() {
+    ensureWorkspaceDefaults();
   }
 
   const DEFAULT_SOUL_CONTENT = `You are CowCode. A helpful assistant.
