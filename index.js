@@ -472,7 +472,8 @@ Do not use asterisks in replies.
     ensureSoulMd();
     const timeCtx = getSchedulingTimeContext();
     const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
-    const soulContent = readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT;
+    const pathsLine = `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${getWorkspaceDir()}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
+    const soulContent = (readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine;
     let whoAmIContent = readWorkspaceMd(WHO_AM_I_MD);
     const myHumanContent = readWorkspaceMd(MY_HUMAN_MD);
     if (!whoAmIContent && !myHumanContent) {
