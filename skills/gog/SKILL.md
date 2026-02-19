@@ -95,6 +95,8 @@ When performing Gmail searches that require counting, aggregation, or determinin
 
 Do not assume pagination exists.
 Do not refuse execution solely because pagination is unavailable.
+If additional pages exist, compute using the retrieved results and provide the answer.
+Do not refuse solely because more pages may exist.
 
 ---
 
