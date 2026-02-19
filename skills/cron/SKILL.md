@@ -8,7 +8,7 @@ Manage reminders and scheduled messages: **one-shot** (at a specific time) or **
 
 - **list** — Use when the user asks to list, see, or count reminders ("how many crons?", "list my reminders", "what's scheduled?"). Call once only. Do not also call add. No other fields needed.
 - **add** — Only when the user explicitly asks to CREATE or SET a reminder. Set **arguments.job** with **message** (exactly what to remind) and **schedule**:
-  - **One-shot:** `{ "kind": "at", "at": "<future ISO 8601>" }` (e.g. "in 1 hour", "tomorrow at 8am").
+  - **One-shot:** `{ "kind": "at", "at": "<future ISO 8601>" }`. Always use an exact full ISO 8601 timestamp (e.g. 2026-02-19T08:00:00.000Z). Schedules are saved and run at that exact time. For "in 1 hour" or "tomorrow 8am" compute the exact datetime and pass it as ISO 8601.
   - **Recurring (cron):** `{ "kind": "cron", "expr": "<cron expression>", "tz": "optional IANA timezone" }`. Use the **expr** values below for common setups. Never invent message text.
 - **remove** — When the user asks to cancel a reminder. Set **arguments.jobId** (from a previous list result).
 

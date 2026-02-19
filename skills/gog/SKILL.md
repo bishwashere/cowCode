@@ -2,50 +2,60 @@
 name: gog
 description: Google Workspace CLI for Gmail, Calendar, Drive, Contacts, Sheets, and Docs.
 homepage: https://gogcli.sh
-metadata: {"clawdbot":{"emoji":"gamepad","requires":{"bins":["gog"]},"install":[{"id":"brew","kind":"brew","formula":"steipete/tap/gogcli","bins":["gog"],"label":"Install gog (brew)"}]}}
 ---
 
 # gog
 
-Use `gog` for Gmail/Calendar/Drive/Contacts/Sheets/Docs. Requires OAuth setup.
+Use `gog` to access Gmail, Calendar, Drive, Contacts, Sheets, and Docs.
 
-Call `run_skill` with `skill: "gog"` and `arguments` as below.
+Call `run_skill` with:
+- skill: "gog"
+- arguments.action: "run"
+- arguments.argv: array of command parts (do not include `gog`)
 
-**Always set arguments.action to exactly "run". Never omit action.**
+Always use:
+--json
+--no-input
 
-## arguments shape
+Never fabricate tool output.
 
-- **action: "run"** — Run a `gog` command.
-- **argv** (required) — Array of strings for the `gog` command (do not include the `gog` prefix). Example: `["gmail","search","newer_than:7d","--max","10","--json","--no-input"]`.
-- **account** (optional) — Email account for this call (sets `GOG_ACCOUNT`).
-- **confirm** (required for sending mail or creating calendar events) — Must be `true` when using `gmail send` or calendar create/add/insert actions.
+---
 
-## Setup (once)
+## Arguments
 
-- `gog auth credentials /path/to/client_secret.json`
-- `gog auth add you@gmail.com --services gmail,calendar,drive,contacts,sheets,docs`
-- `gog auth list`
+- action: must be exactly "run"
+- argv: array of strings for the gog command
+- account: optional
+- confirm: required for gmail send or calendar create/add/insert
 
-## Common commands (examples)
+Example:
+["gmail","search","newer_than:14d","--max","20000","--json","--no-input"]
 
-- Gmail search: `gog gmail search "newer_than:7d" --max 10 --json --no-input`
-- Gmail send: `gog gmail send --to a@b.com --subject "Hi" --body "Hello" --json --no-input`
-- Calendar: `gog calendar events <calendarId> --from <iso> --to <iso> --json --no-input`
-- Drive search: `gog drive search "query" --max 10 --json --no-input`
-- Contacts: `gog contacts list --max 20 --json --no-input`
-- Sheets get: `gog sheets get <sheetId> "Tab!A1:D10" --json --no-input`
-- Sheets update: `gog sheets update <sheetId> "Tab!A1:B2" --values-json '[["A","B"],["1","2"]]' --input USER_ENTERED --json --no-input`
-- Sheets append: `gog sheets append <sheetId> "Tab!A:C" --values-json '[["x","y","z"]]' --insert INSERT_ROWS --json --no-input`
-- Sheets clear: `gog sheets clear <sheetId> "Tab!A2:Z" --json --no-input`
-- Sheets metadata: `gog sheets metadata <sheetId> --json --no-input`
-- Docs export: `gog docs export <docId> --format txt --out /tmp/doc.txt`
-- Docs cat: `gog docs cat <docId>`
+Use --max 10000 or 20000 when you need to analyze or count over many messages; the CLI does not support page tokens, so one large batch is the way to get more results.
 
-## Notes
+---
 
-- Set `GOG_ACCOUNT=you@gmail.com` to avoid repeating `--account`.
-- Or set `skills.gog.account` in config.json to provide a default account.
-- For scripting, prefer `--json` plus `--no-input`.
-- Sheets values can be passed via `--values-json` (recommended) or as inline rows.
-- Docs supports export/cat/copy. In-place edits require a Docs API client (not in gog).
-- Confirm before sending mail or creating events.
+## Gmail Behavior Policy
+
+Default mail scope:
+- Use All Mail
+- Exclude Sent
+- Do not ask for scope clarification unless explicitly requested
+
+Result retrieval:
+- The gog CLI does **not** support --page-token or pagination. Use a single call with a large --max (e.g. 10000 or 20000) when analysis or counting is required.
+- **Always answer from the data returned.** If gog returns messages/results, compute and report the answer (e.g. "top sender in the last 14 days: X with N emails"). Do not refuse to answer or say you "can't" when you have usable data.
+- Only mention truncation if the result count equals --max (e.g. "Based on the first 5000 messages…"). One short sentence is enough; then give the answer.
+- Do not offer "Option A / Option B" or ask the user to choose when you already have a result. Give the answer first; optionally add one line like "This is from the first N messages; gog does not support pagination for more."
+
+Do not refuse execution solely due to pagination or nextPageToken.
+
+---
+
+## Execution Principles
+
+- Prefer single decisive tool call when possible
+- Do not negotiate default behavior
+- Do not offer UI alternatives unless tool execution fails
+- **Provide the computed answer directly.** Never respond with "I can't" or "Which option do you want?" when the tool returned data—answer from that data.
+- Be concise and decisive

@@ -27,7 +27,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import pino from 'pino';
-import { startCron, stopCron, scheduleOneShot } from './cron/runner.js';
+import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
 import { getSkillsEnabled, getSkillContext, DEFAULT_ENABLED } from './skills/loader.js';
 import { initBot, createTelegramSock, isTelegramChatId } from './lib/telegram.js';
 import { addPending as addPendingTelegram, flushPending as flushPendingTelegram } from './lib/pending-telegram.js';
@@ -383,10 +383,41 @@ async function main() {
   const useSkills = Array.isArray(skillsEnabled) && skillsEnabled.length > 0 && allTools.length > 0;
   const toolsToUse = useSkills ? allTools : [];
   const useTools = toolsToUse.length > 0;
-  const chatSystemPrompt = `You are CowCode. A helpful assistant. Answer in the language the user asked in. Use the search skill for finding info (queries, news, weather). Use the browse skill when the user wants to open a URL, interact with a page (click, scroll, fill forms), or get a screenshot—local browser control, no cloud; the same browser tab is reused across messages so follow-ups stay on the same page. For follow-up on category (e.g. "show me tech ones" after listing deals): navigate to /deals/{category} or the site's category path and extract, or click the category link; use the "Current page" URL from the last browse result. Browse screenshot auto-runs vision to describe and suggest next action. Use the vision skill when the user sends an image or wants the live camera (image: "webcam"). Use the memory skill to search notes and chat history. Do not invent things. Do not use <think> or any thinking/reasoning blocks—output only your final reply. Do not use asterisks in your replies or in any chat items.`;
+
   const skillDocsBlock = skillDocs
     ? `\n\n# Available skills (read these to decide when to use run_skill and which arguments to pass)\n\n${skillDocs}\n\n# Clarification\n${CLARIFICATION_RULE}`
     : '';
+
+  const WHO_AM_I_MD = 'WhoAmI.md';
+  const MY_HUMAN_MD = 'MyHuman.md';
+  const SOUL_MD = 'SOUL.md';
+
+  function readWorkspaceMd(filename) {
+    const p = join(getWorkspaceDir(), filename);
+    try {
+      if (existsSync(p)) return readFileSync(p, 'utf8').trim();
+    } catch (_) {}
+    return '';
+  }
+
+  function ensureSoulMd() {
+    const p = join(getWorkspaceDir(), SOUL_MD);
+    if (existsSync(p)) return;
+    try {
+      ensureStateDir();
+      writeFileSync(p, DEFAULT_SOUL_CONTENT, 'utf8');
+    } catch (err) {
+      console.error('[soul] could not create SOUL.md:', err.message);
+    }
+  }
+
+  const DEFAULT_SOUL_CONTENT = `You are CowCode. A helpful assistant.
+Answer in the language the user asked in.
+Do not fabricate tool results or data that was not retrieved.
+You may compute and answer using available results.
+Do not use <think> or any reasoning blocks—output only the final reply.
+Do not use asterisks in replies.
+`;
 
   function getBioFromConfig() {
     try {
@@ -399,6 +430,7 @@ async function main() {
   }
 
   function isBioSet() {
+    if (readWorkspaceMd(WHO_AM_I_MD) || readWorkspaceMd(MY_HUMAN_MD)) return true;
     const bio = getBioFromConfig();
     if (bio == null) return false;
     if (typeof bio === 'string') return (bio || '').trim() !== '';
@@ -406,14 +438,24 @@ async function main() {
   }
 
   function saveBioToConfig(paragraph) {
+    const text = (paragraph || '').trim() || '';
     try {
       const path = getConfigPath();
       const raw = existsSync(path) ? readFileSync(path, 'utf8') : '{}';
       const config = raw.trim() ? JSON.parse(raw) : {};
-      config.bio = (paragraph || '').trim() || '';
+      config.bio = text;
       writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
     } catch (err) {
       console.error('[bio] save failed:', err.message);
+    }
+    if (text) {
+      try {
+        ensureStateDir();
+        const whoAmIPath = join(getWorkspaceDir(), WHO_AM_I_MD);
+        writeFileSync(whoAmIPath, text, 'utf8');
+      } catch (err) {
+        console.error('[bio] could not write WhoAmI.md:', err.message);
+      }
     }
   }
 
@@ -427,23 +469,47 @@ async function main() {
   }
 
   function buildSystemPrompt() {
+    ensureSoulMd();
     const timeCtx = getSchedulingTimeContext();
     const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
-    let bioBlock = '';
-    const bio = getBioFromConfig();
-    if (bio != null) {
-      if (typeof bio === 'string' && bio.trim()) {
-        bioBlock = '\n\n' + bio.trim();
-      } else if (typeof bio === 'object' && (bio.userName || bio.assistantName || bio.whoAmI || bio.whoAreYou)) {
-        const parts = [];
-        if (bio.userName) parts.push(`The user's name is ${bio.userName}.`);
-        if (bio.assistantName) parts.push(`Your name is ${bio.assistantName}.`);
-        if (bio.whoAmI) parts.push(`The user describes themselves: ${bio.whoAmI}.`);
-        if (bio.whoAreYou) parts.push(`You describe yourself: ${bio.whoAreYou}.`);
-        if (parts.length) bioBlock = '\n\n' + parts.join(' ');
+    const pathsLine = `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${getWorkspaceDir()}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
+    const soulContent = (readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine;
+    let whoAmIContent = readWorkspaceMd(WHO_AM_I_MD);
+    const myHumanContent = readWorkspaceMd(MY_HUMAN_MD);
+    if (!whoAmIContent && !myHumanContent) {
+      const bio = getBioFromConfig();
+      const bioText = typeof bio === 'string' && (bio || '').trim() ? bio.trim() : null;
+      if (bioText) {
+        try {
+          ensureStateDir();
+          const whoAmIPath = join(getWorkspaceDir(), WHO_AM_I_MD);
+          if (!existsSync(whoAmIPath)) {
+            writeFileSync(whoAmIPath, bioText, 'utf8');
+            whoAmIContent = bioText;
+          }
+        } catch (_) {}
       }
     }
-    const base = chatSystemPrompt + bioBlock;
+    let identityBlock = '';
+    if (whoAmIContent || myHumanContent) {
+      if (whoAmIContent) identityBlock += '\n\n' + whoAmIContent;
+      if (myHumanContent) identityBlock += '\n\n' + myHumanContent;
+    } else {
+      const bio = getBioFromConfig();
+      if (bio != null) {
+        if (typeof bio === 'string' && bio.trim()) {
+          identityBlock = '\n\n' + bio.trim();
+        } else if (typeof bio === 'object' && (bio.userName || bio.assistantName || bio.whoAmI || bio.whoAreYou)) {
+          const parts = [];
+          if (bio.userName) parts.push(`The user's name is ${bio.userName}.`);
+          if (bio.assistantName) parts.push(`Your name is ${bio.assistantName}.`);
+          if (bio.whoAmI) parts.push(`The user describes themselves: ${bio.whoAmI}.`);
+          if (bio.whoAreYou) parts.push(`You describe yourself: ${bio.whoAreYou}.`);
+          if (parts.length) identityBlock = '\n\n' + parts.join(' ');
+        }
+      }
+    }
+    const base = soulContent + identityBlock;
     return useTools
       ? base + timeBlock + skillDocsBlock
       : base + `\n\n${timeCtx.timeContextLine}`;
@@ -616,6 +682,7 @@ async function main() {
           return;
         }
         console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
+        await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
         runAgentWithSkills(sock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
           console.error('Telegram agent error:', err.message);
           const errorText = 'Moo — ' + toUserMessage(err);
@@ -633,6 +700,7 @@ async function main() {
 
     let telegramSock = null;
     const telegramToken = getChannelsConfig().telegram.botToken;
+    // Only init and log Telegram when configured; when not set up we don't show or log anything about Telegram.
     if (telegramToken) {
       telegramBot = initBot(telegramToken);
       telegramSock = createTelegramSock(telegramBot);
@@ -781,6 +849,7 @@ async function main() {
 
       console.log('[incoming]', userText.slice(0, 60) + (userText.length > 60 ? '…' : ''));
       try {
+        await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
         if (m.key.id) {
           try {
             await sock.readMessages([{ remoteJid: jid, id: m.key.id, participant: m.key.participant, fromMe: false }]);
@@ -867,6 +936,7 @@ async function main() {
         return;
       }
       console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
+      await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
       runAgentWithSkills(telegramSock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
         console.error('Telegram agent error:', err.message);
         const errorText = 'Moo — ' + toUserMessage(err);

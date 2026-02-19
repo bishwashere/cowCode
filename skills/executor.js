@@ -13,6 +13,7 @@ import { executeRead } from '../lib/executors/read.js';
 import { executeWrite } from '../lib/executors/write.js';
 import { executeEdit } from '../lib/executors/edit.js';
 import { executeApplyPatch } from '../lib/executors/apply-patch.js';
+import { executeCore } from '../lib/executors/core.js';
 
 const EXECUTORS = {
   cron: executeCron,
@@ -25,6 +26,7 @@ const EXECUTORS = {
   write: executeWrite,
   edit: executeEdit,
   'apply-patch': executeApplyPatch,
+  core: executeCore,
 };
 
 /**

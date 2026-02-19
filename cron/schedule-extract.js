@@ -26,8 +26,8 @@ If the user wants to CREATE a schedule/reminder, use exactly one of these shapes
 If the user is just chatting (not scheduling, not listing), respond with: {"schedule":false}
 
 Rules:
-- "at" and "times" must be ISO 8601. Use {{NOW_ISO}} as the base. For "tomorrow 8am" use the correct date and 08:00.
-- For relative times (e.g. "after one minute", "in 30 seconds", "in two hours", "send me X in 5 minutes") compute "at" as now + that duration and output the resulting ISO8601 timestamp. Accept both digits ("1 minute") and words ("one minute").
+- "at" and "times" must be exact full ISO 8601 timestamps (e.g. 2026-02-19T14:30:00.000Z) with date and time. Schedules are saved with these exact times. Use {{NOW_ISO}} as the base. For "tomorrow 8am" use the correct date and 08:00 in ISO 8601.
+- For relative times (e.g. "in 5 minutes", "in two hours") compute the exact future moment (now + duration) and output that as a single ISO 8601 string. Accept both digits ("1 minute") and words ("one minute").
 - "message" is the exact content to send (e.g. "hello", "HI").
 - For "every minute for the next 3 minutes" use type "series" with 3 "times" at 1min, 2min, 3min from now.
 - For "send me X in 1 minute and Y in 2 minutes" (two different messages at two times) use type "multiple" with "items": [{"message":"X","at":"ISO8601"},{"message":"Y","at":"ISO8601"}].

@@ -10,7 +10,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { spawnSync, spawn } from 'child_process';
-import { getConfigPath, getEnvPath, getAuthDir, getCronStorePath, ensureStateDir } from './lib/paths.js';
+import { getConfigPath, getEnvPath, getAuthDir, getCronStorePath, ensureStateDir, getWorkspaceDir } from './lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = __dirname;
@@ -279,10 +279,17 @@ async function askBioAndSave() {
     process.exit(0);
   }
 
-  config.bio = (paragraph || '').trim() || '';
+  const text = (paragraph || '').trim() || '';
+  config.bio = text;
   saveConfig(config);
+  if (text) {
+    try {
+      ensureStateDir();
+      writeFileSync(join(getWorkspaceDir(), 'WhoAmI.md'), text, 'utf8');
+    } catch (_) {}
+  }
   console.log('');
-  console.log(C.dim + '  ✓ Bio saved to config.' + C.reset);
+  console.log(C.dim + '  ✓ Bio saved to config and WhoAmI.md.' + C.reset);
 }
 
 function loadConfig() {

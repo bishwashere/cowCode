@@ -11,7 +11,10 @@ import { getConfigPath } from '../lib/paths.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** Default skill ids enabled on new install and added by migration on update. */
-export const DEFAULT_ENABLED = ['cron', 'search', 'browse', 'vision', 'memory', 'gog'];
+export const DEFAULT_ENABLED = ['cron', 'search', 'browse', 'vision', 'memory', 'gog', 'read'];
+
+/** Core commands (ls, cd, pwd, cat, less, cp, mv, rm, touch, chmod). Always loaded; no need to enable in config. */
+const CORE_SKILL_IDS = ['core'];
 
 const SKILL_JSON = 'skill.json';
 const MD_NAMES = ['skill.md', 'SKILL.md'];
@@ -43,10 +46,11 @@ export function getSkillsEnabled() {
  */
 export function getSkillContext() {
   const enabled = getSkillsEnabled();
+  const idsToLoad = [...new Set([...enabled, ...CORE_SKILL_IDS])];
   const parts = [];
   const available = [];
 
-  for (const id of enabled) {
+  for (const id of idsToLoad) {
     const jsonPath = join(__dirname, id, SKILL_JSON);
     if (!existsSync(jsonPath)) continue;
     try {
@@ -76,7 +80,7 @@ export function getSkillContext() {
                   skill: {
                     type: 'string',
                     enum: available,
-                    description: 'Skill id (cron, search, browse, vision, memory, gog).',
+                    description: 'Skill id (cron, search, browse, vision, memory, gog, read, core, etc.).',
                   },
                   command: {
                     type: 'string',

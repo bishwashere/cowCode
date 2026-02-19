@@ -204,6 +204,31 @@ export function startCron({ sock, selfJid, storePath, telegramBot }) {
 }
 
 /**
+ * Run any one-shot jobs that are past due (at <= now and not yet sent). Use when the user sends
+ * a message so we catch up if something was missed (e.g. process was busy or startCron hadn't run).
+ * Uses current sock/telegramBot/selfJid/storePath from startCron. No-op if no store or no transport.
+ */
+export async function runPastDueOneShots() {
+  if (!currentStorePath || (!currentSock && !currentTelegramBot)) return;
+  const jobs = loadJobs(currentStorePath);
+  const now = Date.now();
+  const atJobs = jobs.filter(
+    (j) => j.enabled && j.schedule?.kind === 'at' && j.schedule?.at && !j.sentAtMs && new Date(j.schedule.at).getTime() <= now
+  );
+  for (const job of atJobs) {
+    console.log('[cron] Running past-due one-shot:', job.name);
+    updateJob(job.id, { sentAtMs: Date.now() }, currentStorePath);
+    try {
+      await runJob({ job, sock: currentSock, selfJid: currentSelfJid });
+      removeJob(job.id, currentStorePath);
+      console.log('[cron] Past-due one-shot sent and removed:', job.name);
+    } catch (err) {
+      console.error('[cron] Past-due one-shot failed:', job.name, err.message);
+    }
+  }
+}
+
+/**
  * Schedule a one-shot job to run at job.schedule.at. Uses current sock/selfJid/storePath from startCron.
  * Call this after addJob() when creating a job from chat (e.g. "send me X in N minutes").
  * Requires at least one transport (WhatsApp sock or Telegram bot) so the reply can be sent when due.
