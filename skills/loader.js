@@ -8,7 +8,6 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { getConfigPath } from '../lib/paths.js';
 import { getGroupSkillsEnabled } from '../lib/group-config.js';
-import { SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER } from './executor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -50,8 +49,8 @@ export function getSkillsEnabled() {
 export function getSkillContext(options = {}) {
   const { groupNonOwner = false, groupJid } = options;
   const enabled = groupNonOwner ? getGroupSkillsEnabled(groupJid) : getSkillsEnabled();
-  let idsToLoad = groupNonOwner
-    ? enabled.filter((id) => !SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER.has(id))
+  const idsToLoad = groupNonOwner
+    ? enabled
     : [...new Set([...enabled, ...CORE_SKILL_IDS])];
   const parts = [];
   const available = [];

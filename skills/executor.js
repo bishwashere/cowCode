@@ -1,7 +1,7 @@
 /**
  * Central executor: runs tool operations (add, delete, list, etc.) with LLM-provided args.
  * No logic in skill folders; tool schemas come from tools.json + config.
- * When ctx.groupNonOwner is true (any message from a group), certain skills are not allowed for anyone in the group.
+ * Skill availability is determined only by config (main or per-group); no extra group restrictions.
  */
 
 import { executeCron } from '../lib/executors/cron.js';
@@ -16,11 +16,6 @@ import { executeEdit } from '../lib/executors/edit.js';
 import { executeApplyPatch } from '../lib/executors/apply-patch.js';
 import { executeCore } from '../lib/executors/core.js';
 import { executeSpeech } from '../lib/executors/speech.js';
-
-/** Skills that no one in a group can use (group-only restriction; private chats and DMs are not restricted). Exported for loader to hide from group tool list. */
-export const SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER = new Set([
-  'core', 'read', 'write', 'edit', 'apply-patch', 'browse', 'cron', 'gog',
-]);
 
 const EXECUTORS = {
   cron: executeCron,
@@ -50,9 +45,6 @@ const CORE_SKILL_ID = 'core';
 export async function executeSkill(skillId, ctx, args, toolName) {
   if (skillId === CORE_SKILL_ID) {
     return JSON.stringify({ error: 'The core skill is not available.' });
-  }
-  if (ctx.groupNonOwner && SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER.has(skillId)) {
-    return JSON.stringify({ error: 'This skill is not allowed for group members.' });
   }
   const run = EXECUTORS[skillId];
   if (!run) return JSON.stringify({ error: `Unknown skill: ${skillId}` });

@@ -611,7 +611,7 @@ Do not use asterisks in replies.
     const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
       : getLast5Exchanges(jid);
-    const { textToSend } = await runAgentTurn({
+    const { textToSend, voiceReplyText } = await runAgentTurn({
       userText: text,
       ctx,
       systemPrompt: buildSystemPrompt(systemPromptOpts),
@@ -620,23 +620,26 @@ Do not use asterisks in replies.
     });
     const textForSend = isTelegramChatId(jid) ? textToSend.replace(/^\[CowCode\]\s*/i, '').trim() : textToSend;
     const isGroupNoReply = bioOpts.groupNonOwner && !bioOpts.groupMentioned &&
+      !(voiceReplyText && voiceReplyText.trim()) &&
       (!textForSend || !textForSend.trim() || /^\[NO_REPLY\]\s*$/i.test(textForSend.trim()));
     if (!isGroupNoReply) {
       let voiceBuffer = null;
-      if (bioOpts.replyWithVoice && textForSend && textForSend.trim()) {
+      const textForVoice = (voiceReplyText && voiceReplyText.trim()) ? voiceReplyText.trim() : null;
+      if (textForVoice) {
         try {
           const speechConfig = getSpeechConfig();
           if (speechConfig?.elevenLabsApiKey) {
-            voiceBuffer = await synthesizeToBuffer(speechConfig.elevenLabsApiKey, textForSend, speechConfig.defaultVoiceId);
+            voiceBuffer = await synthesizeToBuffer(speechConfig.elevenLabsApiKey, textForVoice, speechConfig.defaultVoiceId);
           }
         } catch (err) {
           console.error('[speech] synthesize failed:', err.message);
         }
       }
+      const replyText = (voiceReplyText && voiceReplyText.trim()) ? voiceReplyText.trim() : textForSend;
       try {
         const sent = voiceBuffer
           ? await sock.sendMessage(jid, isTelegramChatId(jid) ? { voice: voiceBuffer } : { audio: voiceBuffer, ptt: true })
-          : await sock.sendMessage(jid, { text: textForSend });
+          : await sock.sendMessage(jid, { text: replyText });
         if (sent?.key?.id && ourSentIdsRef?.current) {
           ourSentIdsRef.current.add(sent.key.id);
           if (ourSentIdsRef.current.size > MAX_OUR_SENT_IDS) {
@@ -644,10 +647,10 @@ Do not use asterisks in replies.
             if (first) ourSentIdsRef.current.delete(first);
           }
         }
-        lastSentByJidMap.set(jid, textForSend);
-        pushExchange(jid, text, textForSend);
+        lastSentByJidMap.set(jid, replyText);
+        pushExchange(jid, text, replyText);
         const ts = Date.now();
-        const exchange = { user: text, assistant: textForSend, timestampMs: ts, jid };
+        const exchange = { user: text, assistant: replyText, timestampMs: ts, jid };
         if (bioOpts.logExchange) {
           bioOpts.logExchange(exchange);
         } else {
@@ -678,12 +681,12 @@ Do not use asterisks in replies.
           }
         }
       } catch (sendErr) {
-        lastSentByJidMap.set(jid, textForSend); // E2E can still assert on intended reply when send fails
+        lastSentByJidMap.set(jid, replyText); // E2E can still assert on intended reply when send fails
         if (!isTelegramChatId(jid)) {
-          pendingReplies.push({ jid, text: textForSend });
+          pendingReplies.push({ jid, text: replyText });
           console.log('[replied] queued (send failed, will retry after reconnect):', sendErr.message);
         } else {
-          addPendingTelegram(jid, textForSend);
+          addPendingTelegram(jid, replyText);
           console.log('[replied] Telegram queued (send failed, will retry on next message):', sendErr.message);
         }
       }
@@ -907,7 +910,7 @@ Do not use asterisks in replies.
 
       const content = extractMessageContent(m.message);
       let userText = (content?.conversation || content?.extendedTextMessage?.text || '').trim();
-      let replyWithVoice = false;
+      let userSentVoice = false;
       if (!userText && content?.imageMessage) {
         try {
           const buf = await downloadMediaMessage(m, 'buffer', {});
@@ -935,7 +938,7 @@ Do not use asterisks in replies.
             const audioPath = join(uploadsDir, `voice-${msgId}.${ext}`);
             writeFileSync(audioPath, buf);
             userText = await transcribe(speechConfig.whisperApiKey, audioPath);
-            if (userText && userText.trim()) replyWithVoice = true;
+            if (userText && userText.trim()) userSentVoice = true;
           }
         } catch (err) {
           console.error('[voice] transcribe failed:', err.message);
@@ -1010,6 +1013,10 @@ Do not use asterisks in replies.
         continue;
       }
 
+      if (userSentVoice && userText) {
+        userText += '\n\n[The user sent a voice message. Reply using the speech skill with action reply_as_voice so your reply is sent as a voice message.]';
+      }
+
       console.log('[incoming]', userText.slice(0, 60) + (userText.length > 60 ? '…' : ''));
       try {
         await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
@@ -1019,7 +1026,7 @@ Do not use asterisks in replies.
           } catch (_) {}
         }
 
-        runAgentWithSkills(sock, jid, userText, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice }).catch((err) => {
+        runAgentWithSkills(sock, jid, userText, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
           console.error('Background agent error:', err.message);
           const errorText = '[CowCode] Moo — ' + toUserMessage(err);
           sock.sendMessage(jid, { text: errorText }).catch(() => {
