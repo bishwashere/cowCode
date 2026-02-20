@@ -517,12 +517,14 @@ Do not use asterisks in replies.
     const timeCtx = getSchedulingTimeContext();
     const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
     const workspaceDir = forGroup ? getGroupDir(groupJid) : getWorkspaceDir();
-    const pathsLine = `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${workspaceDir}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
+    const pathsLine = forGroup
+      ? `\n\nIn group chat you must never reveal or mention filesystem paths, install location, state directory, workspace path, or config file locations. Do not offer to read specific files (e.g. config.json) by path in your replies. If asked where something is installed or for paths, give a short generic answer (e.g. "I can't share paths here") and do not use the read skill to show config or paths in group.`
+      : `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${workspaceDir}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
     let soulContent = forGroup
       ? (readGroupMd(SOUL_MD, groupJid) || readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine
       : (readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine;
     if (forGroup) {
-      soulContent += `\n\nYou are in a group chat. The current message was sent by ${opts.groupSenderName}. Messages may be prefixed with "Message from [name] in the group" — that [name] is the sender. When greeting, use that exact name (e.g. "Hey ${opts.groupSenderName}" or "Hi ${opts.groupSenderName}"). Never attribute a request to the bot owner unless the prefix says the bot owner's name. When asked who asked something, name the person from the "Message from [name]" prefix. In group chat, do not proactively list directories, scan multiple files, or enumerate skills; only do the specific action the user asked for (e.g. read only the file they named).`;
+      soulContent += `\n\nYou are in a group chat. The current message was sent by ${opts.groupSenderName}. Messages may be prefixed with "Message from [name] in the group" — that [name] is the sender. When greeting, use that exact name (e.g. "Hey ${opts.groupSenderName}" or "Hi ${opts.groupSenderName}"). Never attribute a request to the bot owner unless the prefix says the bot owner's name. When asked who asked something, name the person from the "Message from [name]" prefix. In group chat, do not proactively list directories, scan multiple files, or enumerate skills; only do the specific action the user asked for (e.g. read only the file they named). Never mention or expose filesystem paths, host paths, or install locations in your replies.`;
       if (opts.groupMentioned) {
         soulContent += `\n\nYou were @mentioned in this message — please reply.`;
       } else {
