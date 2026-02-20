@@ -500,7 +500,7 @@ Do not use asterisks in replies.
     const pathsLine = `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${getWorkspaceDir()}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
     let soulContent = (readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine;
     if (opts.groupSenderName) {
-      soulContent += `\n\nYou are in a group chat. The current message was sent by ${opts.groupSenderName}. Messages may be prefixed with "Message from [name] in the group" — that [name] is the sender. Never attribute a request to the bot owner unless the prefix says the bot owner's name. When asked who asked something, name the person from the "Message from [name]" prefix.`;
+      soulContent += `\n\nYou are in a group chat. The current message was sent by ${opts.groupSenderName}. Messages may be prefixed with "Message from [name] in the group" — that [name] is the sender. When greeting, use that exact name (e.g. "Hey ${opts.groupSenderName}" or "Hi ${opts.groupSenderName}"). Never attribute a request to the bot owner unless the prefix says the bot owner's name. When asked who asked something, name the person from the "Message from [name]" prefix. In group chat, do not proactively list directories, scan multiple files, or enumerate skills; only do the specific action the user asked for (e.g. read only the file they named).`;
     }
     let whoAmIContent = readWorkspaceMd(WHO_AM_I_MD);
     const myHumanContent = readWorkspaceMd(MY_HUMAN_MD);
@@ -775,7 +775,9 @@ Do not use asterisks in replies.
         }
         const groupNonOwner = inGroup && !!ownerCfg.telegramUserId && !isOwner(msg.from?.id);
         console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
-        const senderName = inGroup && msg.from ? (msg.from.first_name || msg.from.username || 'A group member') : null;
+        const senderName = inGroup && msg.from
+          ? ([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || msg.from.username || 'A group member')
+          : null;
         const shouldGreet = inGroup && msg.from?.id != null && shouldGreetMember(String(chatId), msg.from.id);
         if (inGroup && msg.from?.id != null) recordMemberSeen(String(chatId), msg.from.id);
         const greetingHint = shouldGreet ? ' [Greet this person — they just started chatting or we haven\'t seen them in the last hour.]' : '';
@@ -1094,7 +1096,9 @@ Do not use asterisks in replies.
       }
       const groupNonOwner = inGroup && !!ownerCfg.telegramUserId && !isOwner(msg.from?.id);
       console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
-      const senderName = inGroup && msg.from ? (msg.from.first_name || msg.from.username || 'A group member') : null;
+      const senderName = inGroup && msg.from
+        ? ([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || msg.from.username || 'A group member')
+        : null;
       const shouldGreet = inGroup && msg.from?.id != null && shouldGreetMember(String(chatId), msg.from.id);
       if (inGroup && msg.from?.id != null) recordMemberSeen(String(chatId), msg.from.id);
       const greetingHint = shouldGreet ? ' [Greet this person — they just started chatting or we haven\'t seen them in the last hour.]' : '';
