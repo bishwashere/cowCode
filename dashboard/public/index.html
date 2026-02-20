@@ -152,6 +152,9 @@
     .skill-doc-inline.open { display: block; }
     .skill-doc-inline h3 { margin: 0 0 0.5rem 0; font-size: 1rem; }
     .skill-doc-inline .skill-doc-textarea { width: 100%; min-height: 16rem; background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.85rem; resize: vertical; }
+    .skill-item.disabled-in-group { opacity: 0.75; }
+    .skill-item.disabled-in-group .skill-id::after { content: ' (not available in groups)'; font-weight: normal; color: var(--muted); font-size: 0.8rem; }
+    code { font-size: 0.85em; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -177,6 +180,7 @@
         <div class="overview-item"><span class="overview-label">Daemon uptime</span><span id="overview-uptime">—</span></div>
         <div class="overview-item"><span class="overview-label">Crons activated</span><span id="overview-crons">—</span></div>
         <div class="overview-item"><span class="overview-label">Skills activated</span><span id="overview-skills">—</span></div>
+        <div class="overview-item"><span class="overview-label">Group skills</span><span id="overview-group-skills">—</span></div>
         <div class="overview-item"><span class="overview-label">Priority model</span><span id="overview-model">—</span></div>
         <div class="overview-item"><span class="overview-label">Time zone</span><span id="overview-timezone">—</span></div>
         <div class="overview-item"><span class="overview-label">Time format</span><span id="overview-time-format">—</span></div>
@@ -193,10 +197,16 @@
 
   <div id="page-skills" class="page">
     <div class="card">
-      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skills</h2>
-      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills; click a skill to view or edit its doc (SKILL.md).</p>
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skills (main / one-on-one)</h2>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills for private chat; click a skill to view or edit its doc (SKILL.md).</p>
       <div id="skills-list"></div>
       <button id="skills-save" style="display:none;">Save enabled/disabled</button>
+    </div>
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Group skills</h2>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills for group chats. Core, read, and cron are not available in groups. Stored in <code>~/.cowcode/group/config.json</code>.</p>
+      <div id="group-skills-list"></div>
+      <button id="group-skills-save" style="display:none;">Save group skills</button>
     </div>
   </div>
 
@@ -232,7 +242,7 @@
       if (page) page.classList.add('active');
       if (link) link.classList.add('active');
       if (name === 'crons') fetchCrons();
-      if (name === 'skills') fetchSkills();
+      if (name === 'skills') { fetchSkills(); fetchGroupSkills(); }
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
     }
@@ -284,6 +294,7 @@
         document.getElementById('overview-uptime').textContent = d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—';
         document.getElementById('overview-crons').textContent = typeof d.cronCount === 'number' ? d.cronCount : '—';
         document.getElementById('overview-skills').textContent = typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—';
+        document.getElementById('overview-group-skills').textContent = typeof d.groupSkillsEnabledCount === 'number' ? d.groupSkillsEnabledCount : '—';
         document.getElementById('overview-model').textContent = d.priorityModelLabel || '—';
         document.getElementById('overview-timezone').textContent = d.timezone || '—';
         document.getElementById('overview-time-format').textContent = d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—');
@@ -297,17 +308,20 @@
         }
       } catch (_) {}
       try {
-        const [cronsRes, skillsRes, configRes] = await Promise.all([
+        const [cronsRes, skillsRes, groupSkillsRes, configRes] = await Promise.all([
           fetch(API + '/api/crons'),
           fetch(API + '/api/skills'),
+          fetch(API + '/api/group/skills'),
           fetch(API + '/api/config')
         ]);
         const crons = cronsRes.ok ? await cronsRes.json() : {};
         const skills = skillsRes.ok ? await skillsRes.json() : {};
+        const groupSkills = groupSkillsRes.ok ? await groupSkillsRes.json() : {};
         const config = configRes.ok ? await configRes.json() : {};
         const jobs = crons.jobs || [];
         const cronCount = jobs.filter(function (j) { return j.enabled !== false; }).length;
         const skillsEnabled = skills.enabled || [];
+        const groupSkillsEnabled = groupSkills.enabled || [];
         const models = config.llm && Array.isArray(config.llm.models) ? config.llm.models : [];
         const priorityEntry = models.find(function (m) { return m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true'; }) || models[0];
         const priorityModelLabel = priorityEntry ? (priorityEntry.model || priorityEntry.provider || '—') : '—';
@@ -319,6 +333,7 @@
           daemonUptimeSeconds: null,
           cronCount: cronCount,
           skillsEnabledCount: skillsEnabled.length,
+          groupSkillsEnabledCount: groupSkillsEnabled.length,
           priorityModelLabel: priorityModelLabel,
           timezone: tz,
           timeFormat: fmt || '—'
@@ -409,6 +424,40 @@
       const enabled = Array.from(boxes).map(b => b.dataset.id);
       const r = await fetch(API + '/api/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
       if (r.ok) { skillsDirty = false; document.getElementById('skills-save').style.display = 'none'; }
+    });
+
+    let groupSkillsDirty = false;
+    let currentGroupEnabled = [];
+
+    async function fetchGroupSkills() {
+      const r = await fetch(API + '/api/group/skills');
+      const d = await r.json();
+      currentGroupEnabled = d.enabled || [];
+      const list = d.skills || [];
+      const el = document.getElementById('group-skills-list');
+      el.innerHTML = list.map(s => {
+        const disabledInGroup = s.disabledInGroups === true;
+        const checked = disabledInGroup ? false : currentGroupEnabled.includes(s.id);
+        const desc = (s.description || '').trim();
+        const descHtml = desc ? '<div class="skill-desc">' + escapeHtml(desc) + '</div>' : '';
+        const itemClass = disabledInGroup ? 'skill-item disabled-in-group' : 'skill-item';
+        const cb = disabledInGroup
+          ? '<span class="skill-meta">Not available in groups</span>'
+          : '<label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + (checked ? ' checked' : '') + '> Enabled</label>';
+        return '<div class="' + itemClass + '"><div class="skill-row"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + descHtml + '</div>' + cb + '</div></div>';
+      }).join('');
+      el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => { groupSkillsDirty = true; document.getElementById('group-skills-save').style.display = 'block'; });
+      });
+      document.getElementById('group-skills-save').style.display = 'none';
+      groupSkillsDirty = false;
+    }
+
+    document.getElementById('group-skills-save').addEventListener('click', async () => {
+      const boxes = document.querySelectorAll('#group-skills-list input[type="checkbox"]:checked');
+      const enabled = Array.from(boxes).map(b => b.dataset.id);
+      const r = await fetch(API + '/api/group/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+      if (r.ok) { groupSkillsDirty = false; document.getElementById('group-skills-save').style.display = 'none'; }
     });
 
     async function fetchConfig() {

@@ -3,7 +3,7 @@
  * Config and state live in ~/.cowcode (or COWCODE_STATE_DIR).
  */
 
-import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir } from './lib/paths.js';
+import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getGroupDir } from './lib/paths.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -40,6 +40,7 @@ import { indexChatExchange } from './lib/memory-index.js';
 import { appendGroupExchange } from './lib/chat-log.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
+import { ensureGroupDirInitialized, readGroupMd } from './lib/group-config.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
 import { toUserMessage } from './lib/user-error.js';
 import { getSpeechConfig, transcribe, synthesizeToBuffer } from './lib/speech-client.js';
@@ -488,19 +489,27 @@ Do not use asterisks in replies.
   }
 
   function buildSystemPrompt(opts = {}) {
-    ensureSoulMd();
+    const forGroup = !!opts.groupSenderName;
+    if (forGroup) {
+      ensureGroupDirInitialized();
+    } else {
+      ensureSoulMd();
+    }
     const timeCtx = getSchedulingTimeContext();
     const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
-    const pathsLine = `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${getWorkspaceDir()}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
-    let soulContent = (readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine;
-    if (opts.groupSenderName) {
+    const workspaceDir = forGroup ? getGroupDir() : getWorkspaceDir();
+    const pathsLine = `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${workspaceDir}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
+    let soulContent = forGroup
+      ? (readGroupMd(SOUL_MD) || readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine
+      : (readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine;
+    if (forGroup) {
       soulContent += `\n\nYou are in a group chat. The current message was sent by ${opts.groupSenderName}. Messages may be prefixed with "Message from [name] in the group" — that [name] is the sender. When greeting, use that exact name (e.g. "Hey ${opts.groupSenderName}" or "Hi ${opts.groupSenderName}"). Never attribute a request to the bot owner unless the prefix says the bot owner's name. When asked who asked something, name the person from the "Message from [name]" prefix. In group chat, do not proactively list directories, scan multiple files, or enumerate skills; only do the specific action the user asked for (e.g. read only the file they named).`;
     }
     const effectiveSkillDocsBlock = opts.skillDocsBlock != null ? opts.skillDocsBlock : skillDocsBlock;
     const effectiveUseTools = opts.useTools != null ? opts.useTools : useTools;
-    let whoAmIContent = readWorkspaceMd(WHO_AM_I_MD);
-    const myHumanContent = readWorkspaceMd(MY_HUMAN_MD);
-    if (!whoAmIContent && !myHumanContent) {
+    let whoAmIContent = forGroup ? readGroupMd(WHO_AM_I_MD) : readWorkspaceMd(WHO_AM_I_MD);
+    const myHumanContent = forGroup ? readGroupMd(MY_HUMAN_MD) : readWorkspaceMd(MY_HUMAN_MD);
+    if (!forGroup && !whoAmIContent && !myHumanContent) {
       const bio = getBioFromConfig();
       const bioText = typeof bio === 'string' && (bio || '').trim() ? bio.trim() : null;
       if (bioText) {
@@ -518,7 +527,7 @@ Do not use asterisks in replies.
     if (whoAmIContent || myHumanContent) {
       if (whoAmIContent) identityBlock += '\n\n' + whoAmIContent;
       if (myHumanContent) identityBlock += '\n\n' + myHumanContent;
-    } else {
+    } else if (!forGroup) {
       const bio = getBioFromConfig();
       if (bio != null) {
         if (typeof bio === 'string' && bio.trim()) {

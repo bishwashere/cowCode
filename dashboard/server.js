@@ -10,10 +10,11 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
-import { getConfigPath, getCronStorePath, getStateDir } from '../lib/paths.js';
+import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigPath } from '../lib/paths.js';
 import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED } from '../skills/loader.js';
+import { ensureGroupDirInitialized } from '../lib/group-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -59,6 +60,22 @@ function loadConfig() {
 
 function saveConfig(config) {
   writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), 'utf8');
+}
+
+function loadGroupConfig() {
+  ensureGroupDirInitialized();
+  const path = getGroupConfigPath();
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveGroupConfig(config) {
+  ensureGroupDirInitialized();
+  writeFileSync(getGroupConfigPath(), JSON.stringify(config, null, 2), 'utf8');
 }
 
 const SKILL_MD_NAMES = ['SKILL.md', 'skill.md'];
@@ -129,6 +146,9 @@ app.get('/api/overview', async (_req, res) => {
     const config = loadConfig();
     const skillsEnabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
     const skillsEnabledCount = skillsEnabled.length;
+    const groupConfig = loadGroupConfig();
+    const groupSkillsEnabled = Array.isArray(groupConfig.skills?.enabled) ? groupConfig.skills.enabled : [];
+    const groupSkillsEnabledCount = groupSkillsEnabled.length;
     const models = Array.isArray(config.llm?.models) ? config.llm.models : [];
     const priorityEntry = models.find((m) => m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true') || models[0];
     const priorityModelLabel = priorityEntry ? (priorityEntry.model ? `${priorityEntry.model}` : priorityEntry.provider || '—') : '—';
@@ -141,6 +161,7 @@ app.get('/api/overview', async (_req, res) => {
       port: PORT,
       cronCount,
       skillsEnabledCount,
+      groupSkillsEnabledCount,
       priorityModelLabel,
       timezone,
       timeFormat,
@@ -217,6 +238,44 @@ app.patch('/api/skills', (req, res) => {
     config.skills.enabled = enabled;
     saveConfig(config);
     res.json({ enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Group skills: same skill list, enabled from group/config.json (core, read, cron not available in groups)
+const GROUP_SKILLS_EXCLUDED = new Set(['core', 'read', 'cron']);
+
+app.get('/api/group/skills', (_req, res) => {
+  try {
+    const groupConfig = loadGroupConfig();
+    const enabled = Array.isArray(groupConfig.skills?.enabled) ? groupConfig.skills.enabled : [];
+    const allIds = getAllSkillIds();
+    const list = allIds.map((id) => ({
+      id,
+      enabled: enabled.includes(id),
+      description: getSkillDescription(id),
+      disabledInGroups: GROUP_SKILLS_EXCLUDED.has(id),
+    }));
+    res.json({ skills: list, enabled: enabled.filter((id) => !GROUP_SKILLS_EXCLUDED.has(id)) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/group/skills', (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (!Array.isArray(enabled)) {
+      res.status(400).json({ error: 'enabled must be an array' });
+      return;
+    }
+    const filtered = enabled.filter((id) => !GROUP_SKILLS_EXCLUDED.has(id));
+    const config = loadGroupConfig();
+    if (!config.skills) config.skills = {};
+    config.skills.enabled = filtered;
+    saveGroupConfig(config);
+    res.json({ enabled: filtered });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
