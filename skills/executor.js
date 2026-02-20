@@ -1,6 +1,7 @@
 /**
  * Central executor: runs tool operations (add, delete, list, etc.) with LLM-provided args.
  * No logic in skill folders; tool schemas come from tools.json + config.
+ * When ctx.groupNonOwner is true (any message from a group), certain skills are not allowed for anyone in the group.
  */
 
 import { executeCron } from '../lib/executors/cron.js';
@@ -14,6 +15,12 @@ import { executeWrite } from '../lib/executors/write.js';
 import { executeEdit } from '../lib/executors/edit.js';
 import { executeApplyPatch } from '../lib/executors/apply-patch.js';
 import { executeCore } from '../lib/executors/core.js';
+import { executeSpeech } from '../lib/executors/speech.js';
+
+/** Skills that no one in a group can use (group-only restriction; private chats and DMs are not restricted). Exported for loader to hide from group tool list. */
+export const SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER = new Set([
+  'core', 'read', 'write', 'edit', 'apply-patch', 'browse', 'cron', 'gog',
+]);
 
 const EXECUTORS = {
   cron: executeCron,
@@ -21,6 +28,7 @@ const EXECUTORS = {
   browse: executeBrowse,
   vision: executeVision,
   memory: executeMemory,
+  speech: executeSpeech,
   gog: executeGog,
   read: executeRead,
   write: executeWrite,
@@ -28,6 +36,9 @@ const EXECUTORS = {
   'apply-patch': executeApplyPatch,
   core: executeCore,
 };
+
+/** Core skill (shell commands) is disabled for everyone — not available. */
+const CORE_SKILL_ID = 'core';
 
 /**
  * @param {string} skillId - cron | search | memory
@@ -37,6 +48,12 @@ const EXECUTORS = {
  * @returns {Promise<string>}
  */
 export async function executeSkill(skillId, ctx, args, toolName) {
+  if (skillId === CORE_SKILL_ID) {
+    return JSON.stringify({ error: 'The core skill is not available.' });
+  }
+  if (ctx.groupNonOwner && SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER.has(skillId)) {
+    return JSON.stringify({ error: 'This skill is not allowed for group members.' });
+  }
   const run = EXECUTORS[skillId];
   if (!run) return JSON.stringify({ error: `Unknown skill: ${skillId}` });
   try {

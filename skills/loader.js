@@ -7,11 +7,13 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { getConfigPath } from '../lib/paths.js';
+import { getGroupSkillsEnabled } from '../lib/group-config.js';
+import { SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER } from './executor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** Default skill ids enabled on new install and added by migration on update. */
-export const DEFAULT_ENABLED = ['cron', 'search', 'browse', 'vision', 'memory', 'gog', 'read'];
+export const DEFAULT_ENABLED = ['cron', 'search', 'browse', 'vision', 'memory', 'speech', 'gog', 'read'];
 
 /** Core commands (ls, cd, pwd, cat, less, cp, mv, rm, touch, chmod). Always loaded; no need to enable in config. */
 const CORE_SKILL_IDS = ['core'];
@@ -42,11 +44,15 @@ export function getSkillsEnabled() {
 /**
  * Load skill folders (skill.json + skill.md) for enabled ids. Return docs string and one run_skill tool.
  * No branching: one tool, LLM fills skill + arguments from the prompts. Code stays dumb.
+ * @param {{ groupNonOwner?: boolean, groupJid?: string }} [options] - When groupNonOwner true, use group config; groupJid = that group's id for per-group skills.
  * @returns {{ skillDocs: string, runSkillTool: Array }}
  */
-export function getSkillContext() {
-  const enabled = getSkillsEnabled();
-  const idsToLoad = [...new Set([...enabled, ...CORE_SKILL_IDS])];
+export function getSkillContext(options = {}) {
+  const { groupNonOwner = false, groupJid } = options;
+  const enabled = groupNonOwner ? getGroupSkillsEnabled(groupJid) : getSkillsEnabled();
+  let idsToLoad = groupNonOwner
+    ? enabled.filter((id) => !SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER.has(id))
+    : [...new Set([...enabled, ...CORE_SKILL_IDS])];
   const parts = [];
   const available = [];
 

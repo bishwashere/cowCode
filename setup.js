@@ -254,6 +254,24 @@ function ensureInstall() {
   }
 }
 
+/** Copy repo workspace-default/*.md into state workspace if they don't exist. */
+function ensureWorkspaceDefaults() {
+  ensureStateDir();
+  const defaultDir = join(ROOT, 'workspace-default');
+  const workspaceDir = getWorkspaceDir();
+  const names = ['WhoAmI.md', 'MyHuman.md', 'SOUL.md'];
+  for (const name of names) {
+    const dest = join(workspaceDir, name);
+    if (existsSync(dest)) continue;
+    const src = join(defaultDir, name);
+    if (existsSync(src)) {
+      try {
+        copyFileSync(src, dest);
+      } catch (_) {}
+    }
+  }
+}
+
 /** On first install, ask four bio questions and save as config.bio (separate from system prompt). */
 async function askBioAndSave() {
   ensureConfig();
@@ -530,6 +548,48 @@ async function onboarding() {
     saveConfig(config);
   }
 
+  // Speech (voice): Whisper = voice-to-text, 11Labs = text-to-voice. Separate from LLM setup.
+  section('Speech (voice)');
+  let speechWhisperKey = '';
+  let elevenLabsKey = env.ELEVEN_LABS_API_KEY || '';
+  const hasOpenAIKey = (env.LLM_1_API_KEY || '').trim().length > 0;
+  let whisperChoice = 'skip';
+  try {
+    const select = (await import('@inquirer/select')).default;
+    whisperChoice = await select({
+      message: q('Whisper (voice to text)?'),
+      choices: [
+        { name: 'Skip', value: 'skip' },
+        ...(hasOpenAIKey ? [{ name: 'Use existing OpenAI key (LLM_1_API_KEY)', value: 'openai' }] : []),
+        { name: 'Enter separate Whisper/OpenAI key', value: 'separate' },
+      ],
+      theme: selectTheme(),
+    });
+  } catch (err) {
+    if (err?.code === 'ERR_MODULE_NOT_FOUND' || err?.message?.includes('@inquirer/select')) {
+      const answer = await ask(q('Whisper?') + ' (skip / openai / separate, q to quit): ');
+      checkQuit(answer);
+      whisperChoice = (answer || '').trim().toLowerCase() || 'skip';
+      if (whisperChoice === 'openai' && !hasOpenAIKey) whisperChoice = 'skip';
+    } else {
+      throw err;
+    }
+  }
+  if (whisperChoice === 'separate') {
+    speechWhisperKey = await promptSecret(q('Whisper/OpenAI API key'), env.SPEECH_WHISPER_API_KEY || '');
+  }
+  elevenLabsKey = await promptSecret(q('11Labs API key (text to voice) – optional'), elevenLabsKey || '');
+  config = loadConfig() || config;
+  if (!config.skills) config.skills = {};
+  if (!config.skills.speech) config.skills.speech = {};
+  if (whisperChoice === 'openai') {
+    config.skills.speech.whisper = { apiKey: 'LLM_1_API_KEY' };
+  } else if (whisperChoice === 'separate' && (speechWhisperKey || env.SPEECH_WHISPER_API_KEY)) {
+    config.skills.speech.whisper = { apiKey: 'SPEECH_WHISPER_API_KEY' };
+  }
+  config.skills.speech.elevenLabs = { apiKey: 'ELEVEN_LABS_API_KEY' };
+  saveConfig(config);
+
   if (baseUrl && config?.llm?.models?.[0]) {
     config.llm.models[0].baseUrl = baseUrl;
     saveConfig(config);
@@ -540,6 +600,8 @@ async function onboarding() {
   newEnv.LLM_2_API_KEY = llm2Key ?? '';
   newEnv.LLM_3_API_KEY = llm3Key ?? '';
   newEnv.BRAVE_API_KEY = braveKey ?? '';
+  newEnv.SPEECH_WHISPER_API_KEY = speechWhisperKey ?? '';
+  newEnv.ELEVEN_LABS_API_KEY = elevenLabsKey ?? '';
 
   writeFileSync(getEnvPath(), stringifyEnv(newEnv), 'utf8');
 
@@ -588,6 +650,7 @@ async function main() {
   welcome();
   migrateFromRoot();
   ensureInstall();
+  ensureWorkspaceDefaults();
   await askBioAndSave();
   ensureAgentsDefaultsFromHost();
 

@@ -33,7 +33,7 @@
   },
   "skills": {
     "enabled": ["cron", "search", "browse", "vision", "memory"],
-    "cron": {},
+    "available": ["cron", "search", "browse", "vision", "memory", "gog", "read", "write", "edit", "apply-patch"],
     "search": {
       "provider": "brave",
       "count": 8

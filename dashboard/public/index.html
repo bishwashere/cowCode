@@ -152,6 +152,19 @@
     .skill-doc-inline.open { display: block; }
     .skill-doc-inline h3 { margin: 0 0 0.5rem 0; font-size: 1rem; }
     .skill-doc-inline .skill-doc-textarea { width: 100%; min-height: 16rem; background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.85rem; resize: vertical; }
+    code { font-size: 0.85em; color: var(--muted); }
+    .groups-layout { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .groups-sidebar { min-width: 14rem; max-width: 18rem; }
+    .groups-ul { list-style: none; margin: 0; padding: 0; }
+    .groups-ul li { margin: 0.25rem 0; }
+    .groups-ul a, .groups-ul button.link { background: none; border: none; font: inherit; color: var(--accent); cursor: pointer; padding: 0.35rem 0; text-align: left; width: 100%; }
+    .groups-ul a:hover, .groups-ul button.link:hover { text-decoration: underline; }
+    .groups-ul li.selected a, .groups-ul li.selected button.link { color: var(--text); font-weight: 500; }
+    .groups-main { flex: 1; min-width: 20rem; }
+    .groups-detail-body .detail-row { margin-bottom: 0.75rem; }
+    .groups-detail-body .detail-label { font-size: 0.8rem; color: var(--muted); }
+    .groups-detail-body .detail-value { font-size: 0.9rem; word-break: break-all; }
+    .groups-detail-body .log-files { font-size: 0.85rem; max-height: 12rem; overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -160,6 +173,7 @@
     <a href="#status" data-page="status" class="active">Status</a>
     <a href="#crons" data-page="crons">Crons</a>
     <a href="#skills" data-page="skills">Skills</a>
+    <a href="#groups" data-page="groups">Groups</a>
     <a href="#llm" data-page="llm">LLM</a>
     <a href="#config" data-page="config">Config</a>
   </nav>
@@ -177,6 +191,7 @@
         <div class="overview-item"><span class="overview-label">Daemon uptime</span><span id="overview-uptime">—</span></div>
         <div class="overview-item"><span class="overview-label">Crons activated</span><span id="overview-crons">—</span></div>
         <div class="overview-item"><span class="overview-label">Skills activated</span><span id="overview-skills">—</span></div>
+        <div class="overview-item"><span class="overview-label">Group skills</span><span id="overview-group-skills">—</span></div>
         <div class="overview-item"><span class="overview-label">Priority model</span><span id="overview-model">—</span></div>
         <div class="overview-item"><span class="overview-label">Time zone</span><span id="overview-timezone">—</span></div>
         <div class="overview-item"><span class="overview-label">Time format</span><span id="overview-time-format">—</span></div>
@@ -193,10 +208,43 @@
 
   <div id="page-skills" class="page">
     <div class="card">
-      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skills</h2>
-      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills; click a skill to view or edit its doc (SKILL.md).</p>
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skills (main / one-on-one)</h2>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills for private chat; click a skill to view or edit its doc (SKILL.md).</p>
       <div id="skills-list"></div>
       <button id="skills-save" style="display:none;">Save enabled/disabled</button>
+    </div>
+  </div>
+
+  <div id="page-groups" class="page">
+    <div class="groups-layout">
+      <div class="groups-sidebar card">
+        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Groups</h2>
+        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Click a group to edit its skills and LLM. Default settings are used by new groups.</p>
+        <ul id="groups-list" class="groups-ul"></ul>
+      </div>
+      <div class="groups-main">
+        <div id="groups-detail-content" class="groups-detail card">
+          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="groups-detail-title">Select a group</h2>
+          <p class="skill-meta" id="groups-detail-meta" style="margin:0 0 0.75rem 0;"></p>
+          <div id="groups-detail-skills" style="display:none;">
+            <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">Skills</h3>
+            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Enable or disable skills; click a skill to view its doc (SKILL.md).</p>
+            <div id="group-skills-list"></div>
+            <button id="group-skills-save" style="display:none;">Save skills</button>
+          </div>
+          <div id="groups-detail-llm" style="display:none; margin-top:1.5rem;">
+            <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">LLM</h3>
+            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Max tokens and models for this group. API keys from .env.</p>
+            <div class="field" style="margin-top:0.5rem;">
+              <label>Max tokens</label>
+              <input type="number" id="group-llm-max-tokens" min="256" max="128000" step="256" value="2048">
+            </div>
+            <div id="group-llm-models" class="llm-models-grid"></div>
+            <button id="group-llm-save">Save LLM</button>
+            <span id="group-llm-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -224,20 +272,23 @@
 
   <script>
     const API = '';
+    var validPages = ['status', 'crons', 'skills', 'groups', 'llm', 'config'];
     function setPage(name) {
+      if (!name || !validPages.includes(name)) name = 'status';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-      const page = document.getElementById('page-' + name);
-      const link = document.querySelector('nav a[data-page="' + name + '"]');
+      var page = document.getElementById('page-' + name);
+      var link = document.querySelector('nav a[data-page="' + name + '"]');
       if (page) page.classList.add('active');
       if (link) link.classList.add('active');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
+      if (name === 'groups') fetchGroups();
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
     }
-    document.querySelectorAll('nav a[data-page]').forEach(a => {
-      a.addEventListener('click', e => {
+    document.querySelectorAll('nav a[data-page]').forEach(function (a) {
+      a.addEventListener('click', function (e) {
         e.preventDefault();
         setPage(a.dataset.page);
       });
@@ -284,6 +335,7 @@
         document.getElementById('overview-uptime').textContent = d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—';
         document.getElementById('overview-crons').textContent = typeof d.cronCount === 'number' ? d.cronCount : '—';
         document.getElementById('overview-skills').textContent = typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—';
+        document.getElementById('overview-group-skills').textContent = typeof d.groupSkillsEnabledCount === 'number' ? d.groupSkillsEnabledCount : '—';
         document.getElementById('overview-model').textContent = d.priorityModelLabel || '—';
         document.getElementById('overview-timezone').textContent = d.timezone || '—';
         document.getElementById('overview-time-format').textContent = d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—');
@@ -297,17 +349,20 @@
         }
       } catch (_) {}
       try {
-        const [cronsRes, skillsRes, configRes] = await Promise.all([
+        const [cronsRes, skillsRes, groupSkillsRes, configRes] = await Promise.all([
           fetch(API + '/api/crons'),
           fetch(API + '/api/skills'),
+          fetch(API + '/api/group/skills'),
           fetch(API + '/api/config')
         ]);
         const crons = cronsRes.ok ? await cronsRes.json() : {};
         const skills = skillsRes.ok ? await skillsRes.json() : {};
+        const groupSkills = groupSkillsRes.ok ? await groupSkillsRes.json() : {};
         const config = configRes.ok ? await configRes.json() : {};
         const jobs = crons.jobs || [];
         const cronCount = jobs.filter(function (j) { return j.enabled !== false; }).length;
         const skillsEnabled = skills.enabled || [];
+        const groupSkillsEnabled = groupSkills.enabled || [];
         const models = config.llm && Array.isArray(config.llm.models) ? config.llm.models : [];
         const priorityEntry = models.find(function (m) { return m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true'; }) || models[0];
         const priorityModelLabel = priorityEntry ? (priorityEntry.model || priorityEntry.provider || '—') : '—';
@@ -319,6 +374,7 @@
           daemonUptimeSeconds: null,
           cronCount: cronCount,
           skillsEnabledCount: skillsEnabled.length,
+          groupSkillsEnabledCount: groupSkillsEnabled.length,
           priorityModelLabel: priorityModelLabel,
           timezone: tz,
           timeFormat: fmt || '—'
@@ -409,6 +465,159 @@
       const enabled = Array.from(boxes).map(b => b.dataset.id);
       const r = await fetch(API + '/api/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
       if (r.ok) { skillsDirty = false; document.getElementById('skills-save').style.display = 'none'; }
+    });
+
+    let groupSkillsDirty = false;
+    let selectedGroupId = 'default';
+
+    async function fetchGroups() {
+      try {
+        var ul = document.getElementById('groups-list');
+        if (!ul) return;
+        var oldHint = document.getElementById('groups-path-hint');
+        if (oldHint) oldHint.remove();
+        var r = await fetch(API + '/api/groups');
+        var d = await r.json().catch(function () { return {}; });
+        var groups = Array.isArray(d.groups) ? d.groups : [];
+        if (d.error) console.error('[groups]', d.error);
+        ul.innerHTML =
+          '<li class="' + (selectedGroupId === 'default' ? 'selected' : '') + '"><button type="button" class="link" data-id="default">Default settings</button></li>' +
+          groups.map(function (g) {
+            return '<li class="' + (selectedGroupId === (g && g.id) ? 'selected' : '') + '"><button type="button" class="link" data-id="' + escapeHtml(String((g && g.id) || '')) + '">' + escapeHtml(String((g && g.label) || (g && g.id) || '')) + '</button></li>';
+          }).join('');
+        if (groups.length === 0 && (d._path || d.error) && ul.parentNode) {
+          var hint = document.createElement('p');
+          hint.id = 'groups-path-hint';
+          hint.className = 'skill-meta';
+          hint.style.marginTop = '0.5rem';
+          hint.textContent = d.error ? ('Error: ' + d.error + (d._path ? ' (path: ' + d._path + ')' : '')) : ('No groups yet. Server reading: ' + (d._path || ''));
+          ul.parentNode.insertBefore(hint, ul.nextSibling);
+        }
+        ul.querySelectorAll('button.link').forEach(function (btn) {
+          btn.addEventListener('click', function () { selectGroup(btn.getAttribute('data-id')); });
+        });
+        selectGroup(selectedGroupId);
+      } catch (e) {
+        console.error('[groups]', e);
+        var ul = document.getElementById('groups-list');
+        if (ul) ul.innerHTML = '<li><button type="button" class="link" data-id="default">Default settings</button></li><li class="skill-meta">Error loading groups.</li>';
+      }
+    }
+
+    function selectGroup(id) {
+      selectedGroupId = id;
+      document.querySelectorAll('#groups-list li').forEach(function (li) {
+        var btn = li.querySelector('button.link');
+        li.classList.toggle('selected', btn && btn.getAttribute('data-id') === id);
+      });
+      var titleEl = document.getElementById('groups-detail-title');
+      var metaEl = document.getElementById('groups-detail-meta');
+      var skillsEl = document.getElementById('groups-detail-skills');
+      var llmEl = document.getElementById('groups-detail-llm');
+      titleEl.textContent = id === 'default' ? 'Default group settings' : ('Group ' + id);
+      skillsEl.style.display = 'block';
+      llmEl.style.display = 'block';
+      loadGroupSkills(id);
+      loadGroupConfig(id);
+      if (id !== 'default') {
+        fetch(API + '/api/groups/' + encodeURIComponent(id))
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (d && d.chatLogPath) metaEl.textContent = 'Chat log: ' + d.chatLogPath;
+            else metaEl.textContent = '';
+          })
+          .catch(function () { metaEl.textContent = ''; });
+      } else {
+        metaEl.textContent = 'Used as template for new groups. Stored in ~/.cowcode/group/.';
+      }
+    }
+
+    async function loadGroupSkills(groupId) {
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/skills');
+      var d = await r.json();
+      var enabled = d.enabled || [];
+      var list = d.skills || [];
+      var el = document.getElementById('group-skills-list');
+      el.innerHTML = list.map(function (s) {
+        var checked = enabled.includes(s.id) ? ' checked' : '';
+        var desc = (s.description || '').trim();
+        var descHtml = desc ? '<div class="skill-desc">' + escapeHtml(desc) + '</div>' : '';
+        return '<div class="skill-item"><div class="skill-row" data-id="' + escapeHtml(s.id) + '"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div><div class="skill-doc-inline" data-id="' + escapeHtml(s.id) + '"><h3>Doc: ' + escapeHtml(s.id) + '</h3><p class="skill-meta skill-doc-desc" style="margin:0 0 0.5rem 0;"></p><textarea class="skill-doc-textarea" spellcheck="false"></textarea><div style="margin-top:0.75rem;"><button type="button" class="skill-doc-save-btn">Save doc</button><span class="skill-doc-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div></div></div>';
+      }).join('');
+      el.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+        cb.addEventListener('change', function () { groupSkillsDirty = true; document.getElementById('group-skills-save').style.display = 'block'; });
+      });
+      el.querySelectorAll('.skill-row').forEach(function (row) {
+        row.addEventListener('click', function (e) { if (!e.target.closest('label')) openGroupSkillDoc(row.getAttribute('data-id'), row.closest('.skill-item')); });
+      });
+      el.querySelectorAll('.skill-doc-save-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var panel = btn.closest('.skill-doc-inline');
+          var skillId = panel && panel.getAttribute('data-id');
+          if (!skillId) return;
+          var content = panel.querySelector('.skill-doc-textarea').value;
+          fetch(API + '/api/skills/' + encodeURIComponent(skillId) + '/doc', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) }).then(function (r) {
+            if (r.ok) { var saved = panel.querySelector('.skill-doc-saved'); if (saved) { saved.style.display = 'inline'; setTimeout(function () { saved.style.display = 'none'; }, 2000); } }
+          });
+        });
+      });
+      document.getElementById('group-skills-save').style.display = 'none';
+      groupSkillsDirty = false;
+    }
+
+    async function openGroupSkillDoc(id, skillItem) {
+      var listEl = document.getElementById('group-skills-list');
+      listEl.querySelectorAll('.skill-doc-inline').forEach(function (p) { p.classList.remove('open'); });
+      var panel = skillItem ? skillItem.querySelector('.skill-doc-inline') : listEl.querySelector('.skill-doc-inline[data-id="' + id + '"]');
+      if (!panel) return;
+      var r = await fetch(API + '/api/skills/' + encodeURIComponent(id) + '/doc');
+      if (!r.ok) return;
+      var d = await r.json();
+      panel.querySelector('.skill-doc-desc').textContent = d.description || '';
+      panel.querySelector('.skill-doc-textarea').value = d.content || '';
+      panel.classList.add('open');
+    }
+
+    document.getElementById('group-skills-save').addEventListener('click', async function () {
+      var boxes = document.querySelectorAll('#group-skills-list input[type="checkbox"]:checked');
+      var enabled = Array.from(boxes).map(function (b) { return b.getAttribute('data-id'); });
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enabled }) });
+      if (r.ok) { groupSkillsDirty = false; document.getElementById('group-skills-save').style.display = 'none'; }
+    });
+
+    async function loadGroupConfig(groupId) {
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/config');
+      var config = await r.json();
+      var llm = config.llm || {};
+      var maxTokens = Number(llm.maxTokens) || 2048;
+      var models = Array.isArray(llm.models) ? llm.models : [];
+      document.getElementById('group-llm-max-tokens').value = maxTokens;
+      var container = document.getElementById('group-llm-models');
+      container.innerHTML = models.map(function (m, i) {
+        var baseUrl = (m.baseUrl || '').trim();
+        var apiKey = (m.apiKey || '').trim();
+        var priority = m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true';
+        return '<div class="llm-model" data-i="' + i + '"><h3>Model ' + (i + 1) + ': ' + escapeHtml(m.provider || '') + '</h3><div class="form-row"><div class="field"><label>Provider</label><input type="text" data-f="provider" value="' + escapeHtml(m.provider || '') + '"></div></div><div class="form-row"><div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '"></div></div><div class="form-row"><div class="field"><label>Base URL (optional)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(baseUrl) + '"></div></div><div class="form-row"><div class="field"><label>API key env var</label><input type="text" data-f="apiKey" value="' + escapeHtml(apiKey) + '"></div></div><div class="form-row"><label><input type="checkbox" data-f="priority" ' + (priority ? 'checked' : '') + '> Priority</label></div></div>';
+      }).join('');
+      if (models.length === 0) { container.innerHTML = '<p class="empty">No models. Add in main Config or paste JSON.</p>'; }
+    }
+
+    document.getElementById('group-llm-save').addEventListener('click', async function () {
+      var maxTokens = Number(document.getElementById('group-llm-max-tokens').value) || 2048;
+      var cards = document.querySelectorAll('#group-llm-models .llm-model');
+      var models = Array.from(cards).map(function (card) {
+        var provider = (card.querySelector('[data-f="provider"]').value || '').trim();
+        var model = (card.querySelector('[data-f="model"]').value || '').trim();
+        var baseUrl = (card.querySelector('[data-f="baseUrl"]').value || '').trim();
+        var apiKey = (card.querySelector('[data-f="apiKey"]').value || '').trim();
+        var priority = card.querySelector('[data-f="priority"]').checked;
+        var o = { provider: provider || 'openai', model: model || 'gpt-4o', apiKey: apiKey || 'LLM_1_API_KEY' };
+        if (baseUrl) o.baseUrl = baseUrl;
+        if (priority) o.priority = true;
+        return o;
+      });
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ llm: { maxTokens: maxTokens, models: models } }) });
+      if (r.ok) { document.getElementById('group-llm-saved').style.display = 'inline'; setTimeout(function () { document.getElementById('group-llm-saved').style.display = 'none'; }, 2000); }
     });
 
     async function fetchConfig() {

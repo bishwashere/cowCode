@@ -3,7 +3,7 @@
  * Config and state live in ~/.cowcode (or COWCODE_STATE_DIR).
  */
 
-import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir } from './lib/paths.js';
+import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getGroupDir } from './lib/paths.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -23,20 +23,27 @@ const {
 } = Baileys;
 import { chat as llmChat, chatWithTools, loadConfig } from './llm.js';
 import { runAgentTurn, stripThinking, CLARIFICATION_RULE } from './lib/agent.js';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
 import { getSkillsEnabled, getSkillContext, DEFAULT_ENABLED } from './skills/loader.js';
-import { initBot, createTelegramSock, isTelegramChatId } from './lib/telegram.js';
+import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid } from './lib/telegram.js';
 import { addPending as addPendingTelegram, flushPending as flushPendingTelegram } from './lib/pending-telegram.js';
 import { getChannelsConfig } from './lib/channels-config.js';
 import { getSchedulingTimeContext } from './lib/timezone.js';
+import { getOwnerConfig, isOwner } from './lib/owner-config.js';
+import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
+import { appendGroupExchange, readLastGroupExchanges } from './lib/chat-log.js';
+import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
+import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
+import { ensureGroupConfigFor, readGroupMd } from './lib/group-config.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
 import { toUserMessage } from './lib/user-error.js';
+import { getSpeechConfig, transcribe, synthesizeToBuffer } from './lib/speech-client.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -253,7 +260,7 @@ async function runAuthOnly(opts = {}) {
   });
 }
 
-/** Migration: ensure all default skills (cron, search, browse, vision, memory) are in skills.enabled so new installs and updates get them without fresh install. */
+/** Migration: ensure all default skills (cron, search, browse, vision, memory, speech, etc.) are in skills.enabled so new installs and updates get them without fresh install. */
 function migrateSkillsConfigToIncludeDefaults() {
   try {
     const path = getConfigPath();
@@ -342,6 +349,23 @@ async function main() {
   /** Set in runBot (WhatsApp: initBot; Telegram-only: opts); null in --test so cron ctx does not throw. */
   let telegramBot = null;
 
+  /** Returns a function that resolves to the given bot's username (cached after first getMe()). */
+  function createGetBotUsername(bot) {
+    let cached = undefined;
+    return async function getBotUsername() {
+      if (!bot) return null;
+      if (cached !== undefined) return cached;
+      try {
+        const me = await bot.getMe();
+        cached = me.username ?? null;
+        return cached;
+      } catch {
+        cached = null;
+        return null;
+      }
+    };
+  }
+
   const config = loadConfig();
   const first = config.models[0];
   console.log('LLM config:', config.models.length > 1
@@ -392,6 +416,10 @@ async function main() {
   const MY_HUMAN_MD = 'MyHuman.md';
   const SOUL_MD = 'SOUL.md';
 
+  const WORKSPACE_DEFAULT_FILES = [WHO_AM_I_MD, MY_HUMAN_MD, SOUL_MD];
+  const INSTALL_DIR = (process.env.COWCODE_INSTALL_DIR && resolve(process.env.COWCODE_INSTALL_DIR)) || __dirname;
+  const DEFAULT_WORKSPACE_DIR = join(INSTALL_DIR, 'workspace-default');
+
   function readWorkspaceMd(filename) {
     const p = join(getWorkspaceDir(), filename);
     try {
@@ -400,15 +428,24 @@ async function main() {
     return '';
   }
 
-  function ensureSoulMd() {
-    const p = join(getWorkspaceDir(), SOUL_MD);
-    if (existsSync(p)) return;
+  /** Copy repo workspace-default/*.md into state workspace if they don't exist. */
+  function ensureWorkspaceDefaults() {
     try {
       ensureStateDir();
-      writeFileSync(p, DEFAULT_SOUL_CONTENT, 'utf8');
+      const workspaceDir = getWorkspaceDir();
+      for (const name of WORKSPACE_DEFAULT_FILES) {
+        const dest = join(workspaceDir, name);
+        if (existsSync(dest)) continue;
+        const src = join(DEFAULT_WORKSPACE_DIR, name);
+        if (existsSync(src)) copyFileSync(src, dest);
+      }
     } catch (err) {
-      console.error('[soul] could not create SOUL.md:', err.message);
+      console.error('[workspace] could not copy default files:', err.message);
     }
+  }
+
+  function ensureSoulMd() {
+    ensureWorkspaceDefaults();
   }
 
   const DEFAULT_SOUL_CONTENT = `You are CowCode. A helpful assistant.
@@ -468,15 +505,34 @@ Do not use asterisks in replies.
     return /^(y|yes|yeah|yep|sure|ok|okay|1|do it|please|go ahead|sounds good)$/.test(t) || t === 'yup';
   }
 
-  function buildSystemPrompt() {
-    ensureSoulMd();
+  function buildSystemPrompt(opts = {}) {
+    const forGroup = !!opts.groupSenderName;
+    const groupJid = opts.groupJid || 'default';
+    if (forGroup) {
+      ensureGroupConfigFor(groupJid);
+    } else {
+      ensureSoulMd();
+    }
     const timeCtx = getSchedulingTimeContext();
     const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
-    const pathsLine = `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${getWorkspaceDir()}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
-    const soulContent = (readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine;
-    let whoAmIContent = readWorkspaceMd(WHO_AM_I_MD);
-    const myHumanContent = readWorkspaceMd(MY_HUMAN_MD);
-    if (!whoAmIContent && !myHumanContent) {
+    const workspaceDir = forGroup ? getGroupDir(groupJid) : getWorkspaceDir();
+    const pathsLine = `\n\nCowCode on this system: state dir ${getStateDir()}, workspace ${workspaceDir}. When the user asks where cowcode is installed or where config is, use the read skill with path \`~/.cowcode/config.json\` (or the state dir path above) to show config and confirm.`;
+    let soulContent = forGroup
+      ? (readGroupMd(SOUL_MD, groupJid) || readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine
+      : (readWorkspaceMd(SOUL_MD) || DEFAULT_SOUL_CONTENT) + pathsLine;
+    if (forGroup) {
+      soulContent += `\n\nYou are in a group chat. The current message was sent by ${opts.groupSenderName}. Messages may be prefixed with "Message from [name] in the group" — that [name] is the sender. When greeting, use that exact name (e.g. "Hey ${opts.groupSenderName}" or "Hi ${opts.groupSenderName}"). Never attribute a request to the bot owner unless the prefix says the bot owner's name. When asked who asked something, name the person from the "Message from [name]" prefix. In group chat, do not proactively list directories, scan multiple files, or enumerate skills; only do the specific action the user asked for (e.g. read only the file they named).`;
+      if (opts.groupMentioned) {
+        soulContent += `\n\nYou were @mentioned in this message — please reply.`;
+      } else {
+        soulContent += `\n\nYou were NOT @mentioned. Reply only when: (1) you notice important information is missing or incorrect and you can add value, or (2) there has been a long gap since your last message and it's natural to chime in. If you have nothing important to add, output exactly: [NO_REPLY] and nothing else.`;
+      }
+    }
+    const effectiveSkillDocsBlock = opts.skillDocsBlock != null ? opts.skillDocsBlock : skillDocsBlock;
+    const effectiveUseTools = opts.useTools != null ? opts.useTools : useTools;
+    let whoAmIContent = forGroup ? readGroupMd(WHO_AM_I_MD, groupJid) : readWorkspaceMd(WHO_AM_I_MD);
+    const myHumanContent = forGroup ? readGroupMd(MY_HUMAN_MD, groupJid) : readWorkspaceMd(MY_HUMAN_MD);
+    if (!forGroup && !whoAmIContent && !myHumanContent) {
       const bio = getBioFromConfig();
       const bioText = typeof bio === 'string' && (bio || '').trim() ? bio.trim() : null;
       if (bioText) {
@@ -494,7 +550,7 @@ Do not use asterisks in replies.
     if (whoAmIContent || myHumanContent) {
       if (whoAmIContent) identityBlock += '\n\n' + whoAmIContent;
       if (myHumanContent) identityBlock += '\n\n' + myHumanContent;
-    } else {
+    } else if (!forGroup) {
       const bio = getBioFromConfig();
       if (bio != null) {
         if (typeof bio === 'string' && bio.trim()) {
@@ -510,8 +566,8 @@ Do not use asterisks in replies.
       }
     }
     const base = soulContent + identityBlock;
-    return useTools
-      ? base + timeBlock + skillDocsBlock
+    return effectiveUseTools
+      ? base + timeBlock + effectiveSkillDocsBlock
       : base + `\n\n${timeCtx.timeContextLine}`;
   }
 
@@ -526,51 +582,106 @@ Do not use asterisks in replies.
       workspaceDir: getWorkspaceDir(),
       scheduleOneShot,
       startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: getCronStorePath(), telegramBot: telegramBot || undefined }),
+      groupNonOwner: !!bioOpts.groupNonOwner,
     };
+    const isGroupNonOwner = !!bioOpts.groupNonOwner;
+    const { toolsForRequest, systemPromptOpts } = isGroupNonOwner
+      ? (() => {
+          const groupJid = jid;
+          const { skillDocs: groupSkillDocs, runSkillTool: groupTools } = getSkillContext({ groupNonOwner: true, groupJid });
+          const groupSkillDocsBlock = groupSkillDocs
+            ? `\n\n# Available skills (read these to decide when to use run_skill and which arguments to pass)\n\n${groupSkillDocs}\n\n# Clarification\n${CLARIFICATION_RULE}`
+            : '';
+          return {
+            toolsForRequest: groupTools,
+            systemPromptOpts: {
+              groupSenderName: bioOpts.groupSenderName,
+              groupJid,
+              groupMentioned: !!bioOpts.groupMentioned,
+              skillDocsBlock: groupSkillDocsBlock,
+              useTools: groupTools.length > 0,
+            },
+          };
+        })()
+      : { toolsForRequest: toolsToUse, systemPromptOpts: { groupSenderName: bioOpts.groupSenderName } };
+    const historyMessages = isTelegramGroupJid(jid)
+      ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
+      : getLast5Exchanges(jid);
     const { textToSend } = await runAgentTurn({
       userText: text,
       ctx,
-      systemPrompt: buildSystemPrompt(),
-      tools: toolsToUse,
-      historyMessages: getLast5Exchanges(jid),
+      systemPrompt: buildSystemPrompt(systemPromptOpts),
+      tools: toolsForRequest,
+      historyMessages,
     });
     const textForSend = isTelegramChatId(jid) ? textToSend.replace(/^\[CowCode\]\s*/i, '').trim() : textToSend;
-    try {
-      const sent = await sock.sendMessage(jid, { text: textForSend });
-      if (sent?.key?.id && ourSentIdsRef?.current) {
-        ourSentIdsRef.current.add(sent.key.id);
-        if (ourSentIdsRef.current.size > MAX_OUR_SENT_IDS) {
-          const first = ourSentIdsRef.current.values().next().value;
-          if (first) ourSentIdsRef.current.delete(first);
-        }
-      }
-      lastSentByJidMap.set(jid, textForSend);
-      pushExchange(jid, text, textForSend);
-      const memoryConfig = getMemoryConfig();
-      if (memoryConfig) {
-        indexChatExchange(memoryConfig, { user: text, assistant: textForSend, timestampMs: Date.now(), jid }).catch((err) =>
-          console.error('[memory] auto-index failed:', err.message)
-        );
-      }
-      console.log('[replied]', useTools ? '(agent + skills)' : '(chat)');
-      if (bioOpts.pendingBioConfirmJids != null && !isBioSet()) {
+    const isGroupNoReply = bioOpts.groupNonOwner && !bioOpts.groupMentioned &&
+      (!textForSend || !textForSend.trim() || /^\[NO_REPLY\]\s*$/i.test(textForSend.trim()));
+    if (!isGroupNoReply) {
+      let voiceBuffer = null;
+      if (bioOpts.replyWithVoice && textForSend && textForSend.trim()) {
         try {
-          await sock.sendMessage(jid, { text: BIO_CONFIRM_PROMPT });
-          bioOpts.pendingBioConfirmJids.add(jid);
-        } catch (_) {
-          if (isTelegramChatId(jid)) addPendingTelegram(jid, BIO_CONFIRM_PROMPT);
-          else pendingReplies.push({ jid, text: BIO_CONFIRM_PROMPT });
-          bioOpts.pendingBioConfirmJids.add(jid);
+          const speechConfig = getSpeechConfig();
+          if (speechConfig?.elevenLabsApiKey) {
+            voiceBuffer = await synthesizeToBuffer(speechConfig.elevenLabsApiKey, textForSend, speechConfig.defaultVoiceId);
+          }
+        } catch (err) {
+          console.error('[speech] synthesize failed:', err.message);
         }
       }
-    } catch (sendErr) {
-      lastSentByJidMap.set(jid, textForSend); // E2E can still assert on intended reply when send fails
-      if (!isTelegramChatId(jid)) {
-        pendingReplies.push({ jid, text: textForSend });
-        console.log('[replied] queued (send failed, will retry after reconnect):', sendErr.message);
-      } else {
-        addPendingTelegram(jid, textForSend);
-        console.log('[replied] Telegram queued (send failed, will retry on next message):', sendErr.message);
+      try {
+        const sent = voiceBuffer
+          ? await sock.sendMessage(jid, isTelegramChatId(jid) ? { voice: voiceBuffer } : { audio: voiceBuffer, ptt: true })
+          : await sock.sendMessage(jid, { text: textForSend });
+        if (sent?.key?.id && ourSentIdsRef?.current) {
+          ourSentIdsRef.current.add(sent.key.id);
+          if (ourSentIdsRef.current.size > MAX_OUR_SENT_IDS) {
+            const first = ourSentIdsRef.current.values().next().value;
+            if (first) ourSentIdsRef.current.delete(first);
+          }
+        }
+        lastSentByJidMap.set(jid, textForSend);
+        pushExchange(jid, text, textForSend);
+        const ts = Date.now();
+        const exchange = { user: text, assistant: textForSend, timestampMs: ts, jid };
+        if (bioOpts.logExchange) {
+          bioOpts.logExchange(exchange);
+        } else {
+          if (isTelegramGroupJid(jid)) {
+            try {
+              appendGroupExchange(getWorkspaceDir(), jid, exchange);
+            } catch (err) {
+              console.error('[group-chat-log] write failed:', err.message);
+            }
+          } else {
+            const memoryConfig = getMemoryConfig();
+            if (memoryConfig) {
+              indexChatExchange(memoryConfig, exchange).catch((err) =>
+                console.error('[memory] auto-index failed:', err.message)
+              );
+            }
+          }
+        }
+        console.log('[replied]', useTools ? '(agent + skills)' : '(chat)');
+        if (bioOpts.pendingBioConfirmJids != null && !isBioSet()) {
+          try {
+            await sock.sendMessage(jid, { text: BIO_CONFIRM_PROMPT });
+            bioOpts.pendingBioConfirmJids.add(jid);
+          } catch (_) {
+            if (isTelegramChatId(jid)) addPendingTelegram(jid, BIO_CONFIRM_PROMPT);
+            else pendingReplies.push({ jid, text: BIO_CONFIRM_PROMPT });
+            bioOpts.pendingBioConfirmJids.add(jid);
+          }
+        }
+      } catch (sendErr) {
+        lastSentByJidMap.set(jid, textForSend); // E2E can still assert on intended reply when send fails
+        if (!isTelegramChatId(jid)) {
+          pendingReplies.push({ jid, text: textForSend });
+          console.log('[replied] queued (send failed, will retry after reconnect):', sendErr.message);
+        } else {
+          addPendingTelegram(jid, textForSend);
+          console.log('[replied] Telegram queued (send failed, will retry on next message):', sendErr.message);
+        }
       }
     }
   }
@@ -624,70 +735,39 @@ Do not use asterisks in replies.
       const pendingBioJids = new Set();
       const pendingBioConfirmJids = new Set();
       const MAX_TELEGRAM_REPLIED = 500;
+      const telegramCtx = {
+        bot: optsTelegramBot,
+        sock,
+        getChannelsConfig,
+        getSpeechConfig,
+        getUploadsDir,
+        transcribe,
+        flushPendingTelegram,
+        addPendingTelegram,
+        getOwnerConfig,
+        isOwner,
+        pendingBioConfirmJids,
+        pendingBioJids,
+        saveBioToConfig,
+        telegramRepliedIds,
+        MAX_TELEGRAM_REPLIED,
+        resetBrowseSession,
+        runPastDueOneShots,
+        runAgentWithSkills,
+        lastSentByJid,
+        ourSentMessageIds,
+        getMemoryConfig,
+        indexChatExchange,
+        getWorkspaceDir,
+        toUserMessage,
+        getBotUsername: createGetBotUsername(optsTelegramBot),
+      };
       optsTelegramBot.on('message', async (msg) => {
-        const chatId = msg.chat?.id;
-        let text = (msg.text || '').trim();
-        if (chatId == null) return;
-        if (!text && msg.photo && msg.photo.length > 0) {
-          try {
-            const photo = msg.photo[msg.photo.length - 1];
-            const file = await optsTelegramBot.getFile(photo.file_id);
-            const token = getChannelsConfig().telegram.botToken;
-            const downloadUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-            const res = await fetch(downloadUrl);
-            const buf = Buffer.from(await res.arrayBuffer());
-            const uploadsDir = getUploadsDir();
-            if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-            const imagePath = join(uploadsDir, `tg-${chatId}-${msg.message_id}.jpg`);
-            writeFileSync(imagePath, buf);
-            const caption = (msg.caption || '').trim();
-            text = `User sent an image. Image file: ${imagePath}. ${caption ? 'Caption: ' + caption : "What's in this image?"}`;
-          } catch (err) {
-            console.error('[telegram] image download failed:', err.message);
-            return;
-          }
+        if (isTelegramGroup(msg.chat)) {
+          await handleTelegramGroupMessage(msg, telegramCtx);
+        } else {
+          await handleTelegramPrivateMessage(msg, telegramCtx);
         }
-        if (!text) return;
-        if (msg.from?.is_bot) return;
-        if (text.startsWith('[CowCode]')) return;
-        await flushPendingTelegram(chatId, optsTelegramBot);
-        const jidKey = String(chatId);
-        if (pendingBioConfirmJids.has(jidKey)) {
-          pendingBioConfirmJids.delete(jidKey);
-          if (isYesReply(text)) {
-            await optsTelegramBot.sendMessage(chatId, BIO_PROMPT).catch(() => addPendingTelegram(jidKey, BIO_PROMPT));
-            pendingBioJids.add(jidKey);
-          } else {
-            await optsTelegramBot.sendMessage(chatId, "No problem. You can do it later from setup.").catch(() => addPendingTelegram(jidKey, "No problem. You can do it later from setup."));
-          }
-          return;
-        }
-        if (pendingBioJids.has(jidKey)) {
-          saveBioToConfig(text);
-          pendingBioJids.delete(jidKey);
-          await optsTelegramBot.sendMessage(chatId, "Thanks, I've saved that.").catch(() => addPendingTelegram(jidKey, "Thanks, I've saved that."));
-          return;
-        }
-        const msgKey = `tg:${chatId}:${msg.message_id}`;
-        if (telegramRepliedIds.has(msgKey)) return;
-        telegramRepliedIds.add(msgKey);
-        if (telegramRepliedIds.size > MAX_TELEGRAM_REPLIED) {
-          const first = telegramRepliedIds.values().next().value;
-          if (first) telegramRepliedIds.delete(first);
-        }
-        if (text.trim().toLowerCase() === '/browse-reset') {
-          await resetBrowseSession({ jid: jidKey });
-          const reply = 'Browser reset. Next browse will start fresh.';
-          await optsTelegramBot.sendMessage(chatId, reply).catch(() => addPendingTelegram(String(chatId), reply));
-          return;
-        }
-        console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
-        await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-        runAgentWithSkills(sock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
-          console.error('Telegram agent error:', err.message);
-          const errorText = 'Moo — ' + toUserMessage(err);
-          optsTelegramBot.sendMessage(chatId, errorText).catch(() => addPendingTelegram(String(chatId), errorText));
-        });
       });
       return;
     }
@@ -763,6 +843,7 @@ Do not use asterisks in replies.
 
       const content = extractMessageContent(m.message);
       let userText = (content?.conversation || content?.extendedTextMessage?.text || '').trim();
+      let replyWithVoice = false;
       if (!userText && content?.imageMessage) {
         try {
           const buf = await downloadMediaMessage(m, 'buffer', {});
@@ -776,6 +857,24 @@ Do not use asterisks in replies.
         } catch (err) {
           console.error('[image] download failed:', err.message);
           continue;
+        }
+      }
+      if (!userText && content?.audioMessage) {
+        try {
+          const speechConfig = getSpeechConfig();
+          if (speechConfig?.whisperApiKey) {
+            const buf = await downloadMediaMessage(m, 'buffer', {});
+            const uploadsDir = getUploadsDir();
+            if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+            const msgId = m.key?.id || Date.now();
+            const ext = (content.audioMessage.mimetype || '').includes('ogg') ? 'ogg' : 'm4a';
+            const audioPath = join(uploadsDir, `voice-${msgId}.${ext}`);
+            writeFileSync(audioPath, buf);
+            userText = await transcribe(speechConfig.whisperApiKey, audioPath);
+            if (userText && userText.trim()) replyWithVoice = true;
+          }
+        } catch (err) {
+          console.error('[voice] transcribe failed:', err.message);
         }
       }
       if (!userText) continue;
@@ -856,7 +955,7 @@ Do not use asterisks in replies.
           } catch (_) {}
         }
 
-        runAgentWithSkills(sock, jid, userText, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
+        runAgentWithSkills(sock, jid, userText, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice }).catch((err) => {
           console.error('Background agent error:', err.message);
           const errorText = '[CowCode] Moo — ' + toUserMessage(err);
           sock.sendMessage(jid, { text: errorText }).catch(() => {
@@ -878,70 +977,39 @@ Do not use asterisks in replies.
   if (telegramSock && telegramBot) {
     const telegramRepliedIds = new Set();
     const MAX_TELEGRAM_REPLIED = 500;
+    const telegramCtx = {
+      bot: telegramBot,
+      sock: telegramSock,
+      getChannelsConfig,
+      getSpeechConfig,
+      getUploadsDir,
+      transcribe,
+      flushPendingTelegram,
+      addPendingTelegram,
+      getOwnerConfig,
+      isOwner,
+      pendingBioConfirmJids,
+      pendingBioJids,
+      saveBioToConfig,
+      telegramRepliedIds,
+      MAX_TELEGRAM_REPLIED,
+      resetBrowseSession,
+      runPastDueOneShots,
+      runAgentWithSkills,
+      lastSentByJid,
+      ourSentMessageIds,
+      getMemoryConfig,
+      indexChatExchange,
+      getWorkspaceDir,
+      toUserMessage,
+      getBotUsername: createGetBotUsername(telegramBot),
+    };
     telegramBot.on('message', async (msg) => {
-      const chatId = msg.chat?.id;
-      let text = (msg.text || '').trim();
-      if (chatId == null) return;
-      if (!text && msg.photo && msg.photo.length > 0) {
-        try {
-          const photo = msg.photo[msg.photo.length - 1];
-          const file = await telegramBot.getFile(photo.file_id);
-          const token = getChannelsConfig().telegram.botToken;
-          const downloadUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-          const res = await fetch(downloadUrl);
-          const buf = Buffer.from(await res.arrayBuffer());
-          const uploadsDir = getUploadsDir();
-          if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-          const imagePath = join(uploadsDir, `tg-${chatId}-${msg.message_id}.jpg`);
-          writeFileSync(imagePath, buf);
-          const caption = (msg.caption || '').trim();
-          text = `User sent an image. Image file: ${imagePath}. ${caption ? 'Caption: ' + caption : "What's in this image?"}`;
-        } catch (err) {
-          console.error('[telegram] image download failed:', err.message);
-          return;
-        }
+      if (isTelegramGroup(msg.chat)) {
+        await handleTelegramGroupMessage(msg, telegramCtx);
+      } else {
+        await handleTelegramPrivateMessage(msg, telegramCtx);
       }
-      if (!text) return;
-      if (msg.from?.is_bot) return;
-      if (text.startsWith('[CowCode]')) return;
-      await flushPendingTelegram(chatId, telegramBot);
-      const jidKey = String(chatId);
-      if (pendingBioConfirmJids.has(jidKey)) {
-        pendingBioConfirmJids.delete(jidKey);
-        if (isYesReply(text)) {
-          await telegramBot.sendMessage(chatId, BIO_PROMPT).catch(() => addPendingTelegram(jidKey, BIO_PROMPT));
-          pendingBioJids.add(jidKey);
-        } else {
-          await telegramBot.sendMessage(chatId, "No problem. You can do it later from setup.").catch(() => addPendingTelegram(jidKey, "No problem. You can do it later from setup."));
-        }
-        return;
-      }
-      if (pendingBioJids.has(jidKey)) {
-        saveBioToConfig(text);
-        pendingBioJids.delete(jidKey);
-        await telegramBot.sendMessage(chatId, "Thanks, I've saved that.").catch(() => addPendingTelegram(jidKey, "Thanks, I've saved that."));
-        return;
-      }
-      const msgKey = `tg:${chatId}:${msg.message_id}`;
-      if (telegramRepliedIds.has(msgKey)) return;
-      telegramRepliedIds.add(msgKey);
-      if (telegramRepliedIds.size > MAX_TELEGRAM_REPLIED) {
-        const first = telegramRepliedIds.values().next().value;
-        if (first) telegramRepliedIds.delete(first);
-      }
-      if (text.trim().toLowerCase() === '/browse-reset') {
-        await resetBrowseSession({ jid: jidKey });
-        const reply = 'Browser reset. Next browse will start fresh.';
-        await telegramBot.sendMessage(chatId, reply).catch(() => addPendingTelegram(String(chatId), reply));
-        return;
-      }
-      console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
-      await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-      runAgentWithSkills(telegramSock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids }).catch((err) => {
-        console.error('Telegram agent error:', err.message);
-        const errorText = 'Moo — ' + toUserMessage(err);
-        telegramBot.sendMessage(chatId, errorText).catch(() => addPendingTelegram(String(chatId), errorText));
-      });
     });
   }
   }
