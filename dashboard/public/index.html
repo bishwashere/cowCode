@@ -219,19 +219,30 @@
     <div class="groups-layout">
       <div class="groups-sidebar card">
         <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Groups</h2>
-        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Default settings apply to all groups. Select a group for details.</p>
+        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Click a group to edit its skills and LLM. Default settings are used by new groups.</p>
         <ul id="groups-list" class="groups-ul"></ul>
       </div>
       <div class="groups-main">
-        <div id="groups-detail-default" class="groups-detail card">
-          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Default group settings</h2>
-          <p class="skill-meta" style="margin:0 0 0.75rem 0;">Enable or disable skills for group chats. Core, read, and cron are available but not enabled by default. Stored in <code>~/.cowcode/group/config.json</code>.</p>
-          <div id="group-skills-list"></div>
-          <button id="group-skills-save" style="display:none;">Save group skills</button>
-        </div>
-        <div id="groups-detail-one" class="groups-detail card" style="display:none;">
-          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="groups-detail-title">Group</h2>
-          <div id="groups-detail-body"></div>
+        <div id="groups-detail-content" class="groups-detail card">
+          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="groups-detail-title">Select a group</h2>
+          <p class="skill-meta" id="groups-detail-meta" style="margin:0 0 0.75rem 0;"></p>
+          <div id="groups-detail-skills" style="display:none;">
+            <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">Skills</h3>
+            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Enable or disable skills; click a skill to view its doc (SKILL.md).</p>
+            <div id="group-skills-list"></div>
+            <button id="group-skills-save" style="display:none;">Save skills</button>
+          </div>
+          <div id="groups-detail-llm" style="display:none; margin-top:1.5rem;">
+            <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">LLM</h3>
+            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Max tokens and models for this group. API keys from .env.</p>
+            <div class="field" style="margin-top:0.5rem;">
+              <label>Max tokens</label>
+              <input type="number" id="group-llm-max-tokens" min="256" max="128000" step="256" value="2048">
+            </div>
+            <div id="group-llm-models" class="llm-models-grid"></div>
+            <button id="group-llm-save">Save LLM</button>
+            <span id="group-llm-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+          </div>
         </div>
       </div>
     </div>
@@ -270,7 +281,7 @@
       if (link) link.classList.add('active');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
-      if (name === 'groups') { fetchGroups(); fetchGroupSkills(); }
+      if (name === 'groups') { fetchGroups(); }
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
     }
@@ -455,34 +466,6 @@
     });
 
     let groupSkillsDirty = false;
-    let currentGroupEnabled = [];
-
-    async function fetchGroupSkills() {
-      const r = await fetch(API + '/api/group/skills');
-      const d = await r.json();
-      currentGroupEnabled = d.enabled || [];
-      const list = d.skills || [];
-      const el = document.getElementById('group-skills-list');
-      el.innerHTML = list.map(s => {
-        const checked = currentGroupEnabled.includes(s.id);
-        const desc = (s.description || '').trim();
-        const descHtml = desc ? '<div class="skill-desc">' + escapeHtml(desc) + '</div>' : '';
-        return '<div class="skill-item"><div class="skill-row"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + (checked ? ' checked' : '') + '> Enabled</label></div></div>';
-      }).join('');
-      el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => { groupSkillsDirty = true; document.getElementById('group-skills-save').style.display = 'block'; });
-      });
-      document.getElementById('group-skills-save').style.display = 'none';
-      groupSkillsDirty = false;
-    }
-
-    document.getElementById('group-skills-save').addEventListener('click', async () => {
-      const boxes = document.querySelectorAll('#group-skills-list input[type="checkbox"]:checked');
-      const enabled = Array.from(boxes).map(b => b.dataset.id);
-      const r = await fetch(API + '/api/group/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
-      if (r.ok) { groupSkillsDirty = false; document.getElementById('group-skills-save').style.display = 'none'; }
-    });
-
     let selectedGroupId = 'default';
 
     async function fetchGroups() {
@@ -490,48 +473,132 @@
       const d = await r.json();
       const groups = d.groups || [];
       const ul = document.getElementById('groups-list');
-      ul.innerHTML = '<li class="' + (selectedGroupId === 'default' ? 'selected' : '') + '"><button type="button" class="link" data-id="default">Default settings</button></li>' +
-        groups.map(g => '<li class="' + (selectedGroupId === g.id ? 'selected' : '') + '"><button type="button" class="link" data-id="' + escapeHtml(g.id) + '">' + escapeHtml(g.label) + '</button></li>').join('');
-      ul.querySelectorAll('button.link').forEach(btn => {
-        btn.addEventListener('click', () => selectGroup(btn.dataset.id));
+      ul.innerHTML =
+        '<li class="' + (selectedGroupId === 'default' ? 'selected' : '') + '"><button type="button" class="link" data-id="default">Default settings</button></li>' +
+        groups.map(function (g) {
+          return '<li class="' + (selectedGroupId === g.id ? 'selected' : '') + '"><button type="button" class="link" data-id="' + escapeHtml(g.id) + '">' + escapeHtml(g.label) + '</button></li>';
+        }).join('');
+      ul.querySelectorAll('button.link').forEach(function (btn) {
+        btn.addEventListener('click', function () { selectGroup(btn.getAttribute('data-id')); });
       });
       selectGroup(selectedGroupId);
     }
 
     function selectGroup(id) {
       selectedGroupId = id;
-      document.querySelectorAll('#groups-list li').forEach(li => {
-        li.classList.toggle('selected', li.querySelector('button.link').dataset.id === id);
+      document.querySelectorAll('#groups-list li').forEach(function (li) {
+        var btn = li.querySelector('button.link');
+        li.classList.toggle('selected', btn && btn.getAttribute('data-id') === id);
       });
-      if (id === 'default') {
-        document.getElementById('groups-detail-default').style.display = 'block';
-        document.getElementById('groups-detail-one').style.display = 'none';
-        return;
+      var titleEl = document.getElementById('groups-detail-title');
+      var metaEl = document.getElementById('groups-detail-meta');
+      var skillsEl = document.getElementById('groups-detail-skills');
+      var llmEl = document.getElementById('groups-detail-llm');
+      titleEl.textContent = id === 'default' ? 'Default group settings' : ('Group ' + id);
+      skillsEl.style.display = 'block';
+      llmEl.style.display = 'block';
+      loadGroupSkills(id);
+      loadGroupConfig(id);
+      if (id !== 'default') {
+        fetch(API + '/api/groups/' + encodeURIComponent(id))
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (d && d.chatLogPath) metaEl.textContent = 'Chat log: ' + d.chatLogPath;
+            else metaEl.textContent = '';
+          })
+          .catch(function () { metaEl.textContent = ''; });
+      } else {
+        metaEl.textContent = 'Used as template for new groups. Stored in ~/.cowcode/group/.';
       }
-      document.getElementById('groups-detail-default').style.display = 'none';
-      document.getElementById('groups-detail-one').style.display = 'block';
-      document.getElementById('groups-detail-title').textContent = 'Group ' + escapeHtml(id);
-      fetchGroupDetail(id);
     }
 
-    async function fetchGroupDetail(id) {
-      const bodyEl = document.getElementById('groups-detail-body');
-      bodyEl.innerHTML = '<p class="empty">Loading…</p>';
-      try {
-        const r = await fetch(API + '/api/groups/' + encodeURIComponent(id));
-        if (!r.ok) { bodyEl.innerHTML = '<p class="error">Group not found.</p>'; return; }
-        const d = await r.json();
-        bodyEl.innerHTML =
-          '<div class="detail-row"><div class="detail-label">Group ID</div><div class="detail-value">' + escapeHtml(d.id) + '</div></div>' +
-          '<div class="detail-row"><div class="detail-label">Chat log path</div><div class="detail-value">' + escapeHtml(d.chatLogPath || '') + '</div></div>' +
-          '<div class="detail-row"><div class="detail-label">Uses default group settings</div><div class="detail-value">' + (d.usesDefaultSettings ? 'Yes' : 'No') + '</div></div>' +
-          (d.logFiles && d.logFiles.length > 0
-            ? '<div class="detail-row"><div class="detail-label">Log files (' + d.logFiles.length + ')</div><div class="detail-value log-files"><ul style="margin:0; padding-left:1.25rem;">' + d.logFiles.map(f => '<li>' + escapeHtml(f) + '</li>').join('') + '</ul></div></div>'
-            : '<div class="detail-row"><div class="detail-label">Log files</div><div class="detail-value empty">None yet.</div></div>');
-      } catch (e) {
-        bodyEl.innerHTML = '<p class="error">Failed to load group.</p>';
-      }
+    async function loadGroupSkills(groupId) {
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/skills');
+      var d = await r.json();
+      var enabled = d.enabled || [];
+      var list = d.skills || [];
+      var el = document.getElementById('group-skills-list');
+      el.innerHTML = list.map(function (s) {
+        var checked = enabled.includes(s.id) ? ' checked' : '';
+        var desc = (s.description || '').trim();
+        var descHtml = desc ? '<div class="skill-desc">' + escapeHtml(desc) + '</div>' : '';
+        return '<div class="skill-item"><div class="skill-row" data-id="' + escapeHtml(s.id) + '"><div><span class="skill-id">' + escapeHtml(s.id) + '</span>' + descHtml + '</div><label onclick="event.stopPropagation()"><input type="checkbox" data-id="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div><div class="skill-doc-inline" data-id="' + escapeHtml(s.id) + '"><h3>Doc: ' + escapeHtml(s.id) + '</h3><p class="skill-meta skill-doc-desc" style="margin:0 0 0.5rem 0;"></p><textarea class="skill-doc-textarea" spellcheck="false"></textarea><div style="margin-top:0.75rem;"><button type="button" class="skill-doc-save-btn">Save doc</button><span class="skill-doc-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div></div></div>';
+      }).join('');
+      el.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+        cb.addEventListener('change', function () { groupSkillsDirty = true; document.getElementById('group-skills-save').style.display = 'block'; });
+      });
+      el.querySelectorAll('.skill-row').forEach(function (row) {
+        row.addEventListener('click', function (e) { if (!e.target.closest('label')) openGroupSkillDoc(row.getAttribute('data-id'), row.closest('.skill-item')); });
+      });
+      el.querySelectorAll('.skill-doc-save-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var panel = btn.closest('.skill-doc-inline');
+          var skillId = panel && panel.getAttribute('data-id');
+          if (!skillId) return;
+          var content = panel.querySelector('.skill-doc-textarea').value;
+          fetch(API + '/api/skills/' + encodeURIComponent(skillId) + '/doc', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) }).then(function (r) {
+            if (r.ok) { var saved = panel.querySelector('.skill-doc-saved'); if (saved) { saved.style.display = 'inline'; setTimeout(function () { saved.style.display = 'none'; }, 2000); } }
+          });
+        });
+      });
+      document.getElementById('group-skills-save').style.display = 'none';
+      groupSkillsDirty = false;
     }
+
+    async function openGroupSkillDoc(id, skillItem) {
+      var listEl = document.getElementById('group-skills-list');
+      listEl.querySelectorAll('.skill-doc-inline').forEach(function (p) { p.classList.remove('open'); });
+      var panel = skillItem ? skillItem.querySelector('.skill-doc-inline') : listEl.querySelector('.skill-doc-inline[data-id="' + id + '"]');
+      if (!panel) return;
+      var r = await fetch(API + '/api/skills/' + encodeURIComponent(id) + '/doc');
+      if (!r.ok) return;
+      var d = await r.json();
+      panel.querySelector('.skill-doc-desc').textContent = d.description || '';
+      panel.querySelector('.skill-doc-textarea').value = d.content || '';
+      panel.classList.add('open');
+    }
+
+    document.getElementById('group-skills-save').addEventListener('click', async function () {
+      var boxes = document.querySelectorAll('#group-skills-list input[type="checkbox"]:checked');
+      var enabled = Array.from(boxes).map(function (b) { return b.getAttribute('data-id'); });
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enabled }) });
+      if (r.ok) { groupSkillsDirty = false; document.getElementById('group-skills-save').style.display = 'none'; }
+    });
+
+    async function loadGroupConfig(groupId) {
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/config');
+      var config = await r.json();
+      var llm = config.llm || {};
+      var maxTokens = Number(llm.maxTokens) || 2048;
+      var models = Array.isArray(llm.models) ? llm.models : [];
+      document.getElementById('group-llm-max-tokens').value = maxTokens;
+      var container = document.getElementById('group-llm-models');
+      container.innerHTML = models.map(function (m, i) {
+        var baseUrl = (m.baseUrl || '').trim();
+        var apiKey = (m.apiKey || '').trim();
+        var priority = m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true';
+        return '<div class="llm-model" data-i="' + i + '"><h3>Model ' + (i + 1) + ': ' + escapeHtml(m.provider || '') + '</h3><div class="form-row"><div class="field"><label>Provider</label><input type="text" data-f="provider" value="' + escapeHtml(m.provider || '') + '"></div></div><div class="form-row"><div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '"></div></div><div class="form-row"><div class="field"><label>Base URL (optional)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(baseUrl) + '"></div></div><div class="form-row"><div class="field"><label>API key env var</label><input type="text" data-f="apiKey" value="' + escapeHtml(apiKey) + '"></div></div><div class="form-row"><label><input type="checkbox" data-f="priority" ' + (priority ? 'checked' : '') + '> Priority</label></div></div>';
+      }).join('');
+      if (models.length === 0) { container.innerHTML = '<p class="empty">No models. Add in main Config or paste JSON.</p>'; }
+    }
+
+    document.getElementById('group-llm-save').addEventListener('click', async function () {
+      var maxTokens = Number(document.getElementById('group-llm-max-tokens').value) || 2048;
+      var cards = document.querySelectorAll('#group-llm-models .llm-model');
+      var models = Array.from(cards).map(function (card) {
+        var provider = (card.querySelector('[data-f="provider"]').value || '').trim();
+        var model = (card.querySelector('[data-f="model"]').value || '').trim();
+        var baseUrl = (card.querySelector('[data-f="baseUrl"]').value || '').trim();
+        var apiKey = (card.querySelector('[data-f="apiKey"]').value || '').trim();
+        var priority = card.querySelector('[data-f="priority"]').checked;
+        var o = { provider: provider || 'openai', model: model || 'gpt-4o', apiKey: apiKey || 'LLM_1_API_KEY' };
+        if (baseUrl) o.baseUrl = baseUrl;
+        if (priority) o.priority = true;
+        return o;
+      });
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ llm: { maxTokens: maxTokens, models: models } }) });
+      if (r.ok) { document.getElementById('group-llm-saved').style.display = 'inline'; setTimeout(function () { document.getElementById('group-llm-saved').style.display = 'none'; }, 2000); }
+    });
 
     async function fetchConfig() {
       const r = await fetch(API + '/api/config');

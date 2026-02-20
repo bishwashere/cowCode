@@ -44,12 +44,12 @@ export function getSkillsEnabled() {
 /**
  * Load skill folders (skill.json + skill.md) for enabled ids. Return docs string and one run_skill tool.
  * No branching: one tool, LLM fills skill + arguments from the prompts. Code stays dumb.
- * @param {{ groupNonOwner?: boolean }} [options] - When true, exclude skills not allowed for group members (so LLM never sees or calls them).
+ * @param {{ groupNonOwner?: boolean, groupJid?: string }} [options] - When groupNonOwner true, use group config; groupJid = that group's id for per-group skills.
  * @returns {{ skillDocs: string, runSkillTool: Array }}
  */
 export function getSkillContext(options = {}) {
-  const { groupNonOwner = false } = options;
-  const enabled = groupNonOwner ? getGroupSkillsEnabled() : getSkillsEnabled();
+  const { groupNonOwner = false, groupJid } = options;
+  const enabled = groupNonOwner ? getGroupSkillsEnabled(groupJid) : getSkillsEnabled();
   let idsToLoad = groupNonOwner
     ? enabled.filter((id) => !SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER.has(id))
     : [...new Set([...enabled, ...CORE_SKILL_IDS])];

@@ -14,7 +14,7 @@ import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigPath, getWo
 import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED } from '../skills/loader.js';
-import { ensureGroupDirInitialized } from '../lib/group-config.js';
+import { ensureGroupConfigFor } from '../lib/group-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -62,9 +62,10 @@ function saveConfig(config) {
   writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), 'utf8');
 }
 
-function loadGroupConfig() {
-  ensureGroupDirInitialized();
-  const path = getGroupConfigPath();
+function loadGroupConfig(groupId) {
+  const id = groupId || 'default';
+  ensureGroupConfigFor(id);
+  const path = getGroupConfigPath(id);
   if (!existsSync(path)) return {};
   try {
     return JSON.parse(readFileSync(path, 'utf8'));
@@ -73,9 +74,10 @@ function loadGroupConfig() {
   }
 }
 
-function saveGroupConfig(config) {
-  ensureGroupDirInitialized();
-  writeFileSync(getGroupConfigPath(), JSON.stringify(config, null, 2), 'utf8');
+function saveGroupConfig(groupId, config) {
+  const id = groupId || 'default';
+  ensureGroupConfigFor(id);
+  writeFileSync(getGroupConfigPath(id), JSON.stringify(config, null, 2), 'utf8');
 }
 
 const SKILL_MD_NAMES = ['SKILL.md', 'skill.md'];
@@ -146,7 +148,7 @@ app.get('/api/overview', async (_req, res) => {
     const config = loadConfig();
     const skillsEnabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
     const skillsEnabledCount = skillsEnabled.length;
-    const groupConfig = loadGroupConfig();
+    const groupConfig = loadGroupConfig('default');
     const groupSkillsEnabled = Array.isArray(groupConfig.skills?.enabled) ? groupConfig.skills.enabled : [];
     const groupSkillsEnabledCount = groupSkillsEnabled.length;
     const models = Array.isArray(config.llm?.models) ? config.llm.models : [];
@@ -247,7 +249,7 @@ app.patch('/api/skills', (req, res) => {
 
 app.get('/api/group/skills', (_req, res) => {
   try {
-    const groupConfig = loadGroupConfig();
+    const groupConfig = loadGroupConfig('default');
     const enabled = Array.isArray(groupConfig.skills?.enabled) ? groupConfig.skills.enabled : [];
     const allIds = getAllSkillIds();
     const list = allIds.map((id) => ({
@@ -268,10 +270,69 @@ app.patch('/api/group/skills', (req, res) => {
       res.status(400).json({ error: 'enabled must be an array' });
       return;
     }
-    const config = loadGroupConfig();
+    const config = loadGroupConfig('default');
     if (!config.skills) config.skills = {};
     config.skills.enabled = enabled;
-    saveGroupConfig(config);
+    saveGroupConfig('default', config);
+    res.json({ enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/groups/:id/config', (req, res) => {
+  try {
+    const id = req.params.id;
+    const config = loadGroupConfig(id);
+    res.json(config);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/groups/:id/config', (req, res) => {
+  try {
+    const id = req.params.id;
+    const patch = req.body || {};
+    const config = loadGroupConfig(id);
+    if (patch.llm !== undefined) config.llm = patch.llm;
+    if (patch.skills !== undefined) config.skills = patch.skills;
+    saveGroupConfig(id, config);
+    res.json(config);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/groups/:id/skills', (req, res) => {
+  try {
+    const id = req.params.id;
+    const groupConfig = loadGroupConfig(id);
+    const enabled = Array.isArray(groupConfig.skills?.enabled) ? groupConfig.skills.enabled : [];
+    const allIds = getAllSkillIds();
+    const list = allIds.map((sid) => ({
+      id: sid,
+      enabled: enabled.includes(sid),
+      description: getSkillDescription(sid),
+    }));
+    res.json({ skills: list, enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/groups/:id/skills', (req, res) => {
+  try {
+    const id = req.params.id;
+    const { enabled } = req.body;
+    if (!Array.isArray(enabled)) {
+      res.status(400).json({ error: 'enabled must be an array' });
+      return;
+    }
+    const config = loadGroupConfig(id);
+    if (!config.skills) config.skills = {};
+    config.skills.enabled = enabled;
+    saveGroupConfig(id, config);
     res.json({ enabled });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -300,6 +361,13 @@ app.get('/api/groups', (_req, res) => {
 app.get('/api/groups/:id', (req, res) => {
   try {
     const id = req.params.id;
+    if (id === 'default') {
+      return res.json({
+        id: 'default',
+        label: 'Default settings',
+        usesDefaultSettings: true,
+      });
+    }
     const groupDir = join(getWorkspaceDir(), GROUP_CHAT_LOG_DIR, id);
     if (!existsSync(groupDir)) {
       res.status(404).json({ error: 'Group not found' });
