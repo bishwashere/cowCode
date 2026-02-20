@@ -37,7 +37,7 @@ import { getOwnerConfig, isOwner } from './lib/owner-config.js';
 import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
-import { appendGroupExchange } from './lib/chat-log.js';
+import { appendGroupExchange, readLastGroupExchanges } from './lib/chat-log.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
 import { ensureGroupConfigFor, readGroupMd } from './lib/group-config.js';
@@ -581,12 +581,15 @@ Do not use asterisks in replies.
           };
         })()
       : { toolsForRequest: toolsToUse, systemPromptOpts: { groupSenderName: bioOpts.groupSenderName } };
+    const historyMessages = isTelegramGroupJid(jid)
+      ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
+      : getLast5Exchanges(jid);
     const { textToSend } = await runAgentTurn({
       userText: text,
       ctx,
       systemPrompt: buildSystemPrompt(systemPromptOpts),
       tools: toolsForRequest,
-      historyMessages: getLast5Exchanges(jid),
+      historyMessages,
     });
     const textForSend = isTelegramChatId(jid) ? textToSend.replace(/^\[CowCode\]\s*/i, '').trim() : textToSend;
     let voiceBuffer = null;
