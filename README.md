@@ -15,6 +15,11 @@ It replies.
 
 # 🚀 Install (Do This First)
 
+> **Windows users:**  
+> Use **Git Bash** for all commands.  
+> If you don't have it, [download and install Git Bash here](https://gitforwindows.org/).  
+> Also, make sure [Node.js](https://nodejs.org/) is installed and available in your PATH.
+
 ## 1️⃣ One Command Install
 
 ```bash
@@ -35,6 +40,12 @@ It runs in the background.
 
 You can close the terminal.
 It keeps running.
+
+> **Windows users:**  
+> To see logs, run:  
+> ```bash
+> pm2 logs cowcode
+> ```
 
 <img width="1024" height="1024" alt="ChatGPT Image Feb 16, 2026, 11_19_56 AM" src="https://github.com/user-attachments/assets/7d245e10-8172-4956-bc29-aaba9e30aa10" />
 
@@ -288,3 +299,7 @@ Easy to install.
 Easy to update.
 
 cowCode keeps AI simple.
+
+Paths are relative to the workspace (`~/.cowcode/workspace/`) unless absolute.
+
+---

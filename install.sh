@@ -90,6 +90,12 @@ else
   export COWCODE_INSTALL_DIR="$INSTALL_DIR"
   if "$BIN_DIR/cowcode" moo start; then
     echo "  ► Bot is running in the background. You can close this terminal."
+    # Add pm2 logs message for Windows
+    case "$(uname -s)" in
+      MINGW*|MSYS*|CYGWIN*)
+        echo "  ► To see logs: pm2 logs cowcode"
+        ;;
+    esac
   else
     echo "  To start the bot later:  cowcode moo start"
   fi
@@ -110,3 +116,4 @@ elif [ "$ADDED_PATH" = 1 ] && [ -t 0 ]; then
   echo "  ► Starting a new shell so  cowcode  works in this terminal..."
   exec "${SHELL:-/bin/zsh}" -l
 fi
+

@@ -27,6 +27,42 @@ SERVICE_NAME="cowcode"
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 SERVICE_FILE="$SYSTEMD_USER_DIR/${SERVICE_NAME}.service"
 
+# Helper: check if pm2 exists, install if not
+ensure_pm2() {
+  if command -v pm2 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "pm2 not found. It is required to manage the cowCode daemon."
+
+  # Ensure npm is available
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "Error: npm is not installed or not in PATH."
+    echo "Please install pm2 manually with:"
+    echo "  npm install -g pm2"
+    exit 1
+  fi
+
+  # Check whether we are likely to have permission to install global packages
+  NPM_PREFIX="$(npm config get prefix 2>/dev/null || true)"
+  if [ -n "$NPM_PREFIX" ] && [ ! -w "$NPM_PREFIX" ] && [ "$(id -u)" -ne 0 ]; then
+    echo "Error: insufficient permissions to install global npm packages into:"
+    echo "  $NPM_PREFIX"
+    echo "Please run the following command with appropriate privileges (e.g. using sudo),"
+    echo "then re-run this script:"
+    echo "  npm install -g pm2"
+    exit 1
+  fi
+
+  echo "Attempting to install pm2 globally with:"
+  echo "  npm install -g pm2"
+  if ! npm install -g pm2; then
+    echo "Error: failed to install pm2. Please install it manually with:"
+    echo "  npm install -g pm2"
+    exit 1
+  fi
+}
+
 ensure_plist() {
   [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from cowCode install directory."; exit 1; }
   mkdir -p "$(dirname "$PLIST")"
@@ -87,7 +123,32 @@ EOF
   echo "Created $SERVICE_FILE"
 }
 
-case "$(uname -s)" in
+OS="$(uname -s 2>/dev/null || echo "$OS")"
+[ -z "$OS" ] && OS="$OSTYPE"
+
+case "$OS" in
+  MINGW*|MSYS*|CYGWIN*|Windows_NT)
+    ensure_pm2
+    case "$ACTION" in
+      start)
+        pm2 start "$COWCODE_INSTALL_DIR/index.js" --name cowcode
+        echo "Started with pm2. To see logs: pm2 logs cowcode"
+        ;;
+      stop)
+        pm2 stop cowcode
+        ;;
+      status)
+        pm2 status cowcode
+        ;;
+      restart)
+        pm2 restart cowcode
+        ;;
+      *)
+        echo "Usage: cowcode moo start|stop|status|restart"
+        ;;
+    esac
+    exit 0
+    ;;
   Darwin)
     case "$ACTION" in
       start)
@@ -155,7 +216,7 @@ case "$(uname -s)" in
     esac
     ;;
   *)
-    echo "Daemon is supported on macOS (launchd) and Linux (systemd). Your OS: $(uname -s)"
+    echo "Daemon is supported on macOS (launchd), Linux (systemd), and Windows (pm2). Your OS: $OS"
     exit 1
     ;;
 esac
