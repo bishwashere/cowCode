@@ -763,7 +763,9 @@ Do not use asterisks in replies.
               clearPendingApproval(ownerCfg.telegramUserId);
               await optsTelegramBot.sendMessage(chatId, 'Approved. Running the request in the group.').catch(() => addPendingTelegram(jidKey, 'Approved. Running the request in the group.'));
               await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-              runAgentWithSkills(sock, pending.groupJid, pending.userMessage, lastSentByJid, pending.groupJid, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice: false }).catch((err) => {
+              const approvedSender = pending.fromName || pending.fromUsername || 'A group member';
+              const approvedText = `Message from ${approvedSender} in the group:\n\n${pending.userMessage}`;
+              runAgentWithSkills(sock, pending.groupJid, approvedText, lastSentByJid, pending.groupJid, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice: false }).catch((err) => {
                 console.error('Telegram agent error (approved request):', err.message);
                 optsTelegramBot.sendMessage(pending.groupJid, 'Moo — ' + toUserMessage(err)).catch(() => addPendingTelegram(pending.groupJid, 'Moo — ' + toUserMessage(err)));
               });
@@ -809,8 +811,10 @@ Do not use asterisks in replies.
           recordGroupRequest(rateKey);
         }
         console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
+        const senderName = inGroup && msg.from ? (msg.from.first_name || msg.from.username || 'A group member') : null;
+        const textForAgent = senderName ? `Message from ${senderName} in the group:\n\n${text}` : text;
         await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-        runAgentWithSkills(sock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice }).catch((err) => {
+        runAgentWithSkills(sock, jidKey, textForAgent, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice }).catch((err) => {
           console.error('Telegram agent error:', err.message);
           const errorText = 'Moo — ' + toUserMessage(err);
           optsTelegramBot.sendMessage(chatId, errorText).catch(() => addPendingTelegram(String(chatId), errorText));
@@ -1113,7 +1117,9 @@ Do not use asterisks in replies.
             clearPendingApproval(ownerCfg.telegramUserId);
             await telegramBot.sendMessage(chatId, 'Approved. Running the request in the group.').catch(() => addPendingTelegram(jidKey, 'Approved. Running the request in the group.'));
             await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-            runAgentWithSkills(telegramSock, pending.groupJid, pending.userMessage, lastSentByJid, pending.groupJid, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice: false }).catch((err) => {
+            const approvedSender = pending.fromName || pending.fromUsername || 'A group member';
+            const approvedText = `Message from ${approvedSender} in the group:\n\n${pending.userMessage}`;
+            runAgentWithSkills(telegramSock, pending.groupJid, approvedText, lastSentByJid, pending.groupJid, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice: false }).catch((err) => {
               console.error('Telegram agent error (approved request):', err.message);
               telegramBot.sendMessage(pending.groupJid, 'Moo — ' + toUserMessage(err)).catch(() => addPendingTelegram(pending.groupJid, 'Moo — ' + toUserMessage(err)));
             });
@@ -1159,8 +1165,10 @@ Do not use asterisks in replies.
         recordGroupRequest(rateKey);
       }
       console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
+      const senderName = inGroup && msg.from ? (msg.from.first_name || msg.from.username || 'A group member') : null;
+      const textForAgent = senderName ? `Message from ${senderName} in the group:\n\n${text}` : text;
       await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-      runAgentWithSkills(telegramSock, jidKey, text, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice }).catch((err) => {
+      runAgentWithSkills(telegramSock, jidKey, textForAgent, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice }).catch((err) => {
         console.error('Telegram agent error:', err.message);
         const errorText = 'Moo — ' + toUserMessage(err);
         telegramBot.sendMessage(chatId, errorText).catch(() => addPendingTelegram(String(chatId), errorText));
