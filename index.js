@@ -792,7 +792,8 @@ Do not use asterisks in replies.
           }
           recordGroupRequest(rateKey);
         }
-        const groupNonOwner = inGroup && !!ownerCfg.telegramUserId && !isOwner(msg.from?.id);
+        // Restrict skills for group members unless sender is the configured owner.
+        const groupNonOwner = inGroup && !isOwner(msg.from?.id);
         console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
         const senderName = inGroup && msg.from
           ? ([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || msg.from.username || 'A group member')
@@ -1113,7 +1114,8 @@ Do not use asterisks in replies.
         }
         recordGroupRequest(rateKey);
       }
-      const groupNonOwner = inGroup && !!ownerCfg.telegramUserId && !isOwner(msg.from?.id);
+      // Restrict skills for group members unless sender is the configured owner (so filter runs whenever in group and not owner).
+      const groupNonOwner = inGroup && !isOwner(msg.from?.id);
       console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
       const senderName = inGroup && msg.from
         ? ([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || msg.from.username || 'A group member')
