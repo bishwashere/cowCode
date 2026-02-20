@@ -1,6 +1,7 @@
 /**
  * Central executor: runs tool operations (add, delete, list, etc.) with LLM-provided args.
  * No logic in skill folders; tool schemas come from tools.json + config.
+ * When ctx.groupNonOwner is true (non-owner in a Telegram group), certain skills are not allowed.
  */
 
 import { executeCron } from '../lib/executors/cron.js';
@@ -15,6 +16,11 @@ import { executeEdit } from '../lib/executors/edit.js';
 import { executeApplyPatch } from '../lib/executors/apply-patch.js';
 import { executeCore } from '../lib/executors/core.js';
 import { executeSpeech } from '../lib/executors/speech.js';
+
+/** Skills that group members (non-owners) cannot use. Owner and private chats are not restricted. */
+const SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER = new Set([
+  'core', 'read', 'write', 'edit', 'apply-patch', 'browse', 'cron', 'gog',
+]);
 
 const EXECUTORS = {
   cron: executeCron,
@@ -39,6 +45,9 @@ const EXECUTORS = {
  * @returns {Promise<string>}
  */
 export async function executeSkill(skillId, ctx, args, toolName) {
+  if (ctx.groupNonOwner && SKILLS_NOT_ALLOWED_FOR_GROUP_NON_OWNER.has(skillId)) {
+    return JSON.stringify({ error: 'This skill is not allowed for group members.' });
+  }
   const run = EXECUTORS[skillId];
   if (!run) return JSON.stringify({ error: `Unknown skill: ${skillId}` });
   try {
