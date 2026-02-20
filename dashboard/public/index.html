@@ -469,15 +469,26 @@
     let selectedGroupId = 'default';
 
     async function fetchGroups() {
-      const r = await fetch(API + '/api/groups');
-      const d = await r.json();
-      const groups = d.groups || [];
-      const ul = document.getElementById('groups-list');
+      var r = await fetch(API + '/api/groups');
+      var d = await r.json();
+      var groups = d.groups || [];
+      if (d.error) console.error('[groups]', d.error);
+      var ul = document.getElementById('groups-list');
       ul.innerHTML =
         '<li class="' + (selectedGroupId === 'default' ? 'selected' : '') + '"><button type="button" class="link" data-id="default">Default settings</button></li>' +
         groups.map(function (g) {
           return '<li class="' + (selectedGroupId === g.id ? 'selected' : '') + '"><button type="button" class="link" data-id="' + escapeHtml(g.id) + '">' + escapeHtml(g.label) + '</button></li>';
         }).join('');
+      var oldHint = document.getElementById('groups-path-hint');
+      if (oldHint) oldHint.remove();
+      if (groups.length === 0 && d._path) {
+        var hint = document.createElement('p');
+        hint.id = 'groups-path-hint';
+        hint.className = 'skill-meta';
+        hint.style.marginTop = '0.5rem';
+        hint.textContent = 'No groups yet. Server reading: ' + d._path;
+        ul.parentNode.insertBefore(hint, ul.nextSibling);
+      }
       ul.querySelectorAll('button.link').forEach(function (btn) {
         btn.addEventListener('click', function () { selectGroup(btn.getAttribute('data-id')); });
       });

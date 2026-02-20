@@ -5,12 +5,16 @@
  * Serves on port 3847 by default (COWCODE_DASHBOARD_PORT).
  */
 
+import dotenv from 'dotenv';
 import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
-import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigPath, getWorkspaceDir } from '../lib/paths.js';
+import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigPath, getWorkspaceDir, getEnvPath } from '../lib/paths.js';
+
+// Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
+dotenv.config({ path: getEnvPath() });
 import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED } from '../skills/loader.js';
@@ -343,16 +347,17 @@ const GROUP_CHAT_LOG_DIR = 'group-chat-log';
 
 app.get('/api/groups', (_req, res) => {
   try {
-    const base = join(getWorkspaceDir(), GROUP_CHAT_LOG_DIR);
+    const workspaceDir = getWorkspaceDir();
+    const base = join(workspaceDir, GROUP_CHAT_LOG_DIR);
     if (!existsSync(base)) {
-      res.json({ groups: [] });
+      res.json({ groups: [], _path: base });
       return;
     }
     const entries = readdirSync(base, { withFileTypes: true });
     const groups = entries
-      .filter((d) => d.isDirectory())
-      .map((d) => ({ id: d.name, label: d.name }));
-    res.json({ groups });
+      .filter((d) => d.isDirectory() && d.name != null && String(d.name).trim() !== '')
+      .map((d) => ({ id: String(d.name), label: String(d.name) }));
+    res.json({ groups, _path: base });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
