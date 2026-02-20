@@ -34,18 +34,12 @@ import { addPending as addPendingTelegram, flushPending as flushPendingTelegram 
 import { getChannelsConfig } from './lib/channels-config.js';
 import { getSchedulingTimeContext } from './lib/timezone.js';
 import { getOwnerConfig, isOwner } from './lib/owner-config.js';
-import {
-  isTelegramGroup,
-  isCronIntent,
-  isScanIntent,
-  isOverRateLimit,
-  recordGroupRequest,
-  shouldGreetMember,
-  recordMemberSeen,
-} from './lib/group-guard.js';
+import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
 import { appendGroupExchange } from './lib/chat-log.js';
+import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
+import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
 import { toUserMessage } from './lib/user-error.js';
 import { getSpeechConfig, transcribe, synthesizeToBuffer } from './lib/speech-client.js';
@@ -609,18 +603,22 @@ Do not use asterisks in replies.
       pushExchange(jid, text, textForSend);
       const ts = Date.now();
       const exchange = { user: text, assistant: textForSend, timestampMs: ts, jid };
-      if (isTelegramGroupJid(jid)) {
-        try {
-          appendGroupExchange(getWorkspaceDir(), jid, exchange);
-        } catch (err) {
-          console.error('[group-chat-log] write failed:', err.message);
-        }
+      if (bioOpts.logExchange) {
+        bioOpts.logExchange(exchange);
       } else {
-        const memoryConfig = getMemoryConfig();
-        if (memoryConfig) {
-          indexChatExchange(memoryConfig, exchange).catch((err) =>
-            console.error('[memory] auto-index failed:', err.message)
-          );
+        if (isTelegramGroupJid(jid)) {
+          try {
+            appendGroupExchange(getWorkspaceDir(), jid, exchange);
+          } catch (err) {
+            console.error('[group-chat-log] write failed:', err.message);
+          }
+        } else {
+          const memoryConfig = getMemoryConfig();
+          if (memoryConfig) {
+            indexChatExchange(memoryConfig, exchange).catch((err) =>
+              console.error('[memory] auto-index failed:', err.message)
+            );
+          }
         }
       }
       console.log('[replied]', useTools ? '(agent + skills)' : '(chat)');
@@ -695,119 +693,38 @@ Do not use asterisks in replies.
       const pendingBioJids = new Set();
       const pendingBioConfirmJids = new Set();
       const MAX_TELEGRAM_REPLIED = 500;
+      const telegramCtx = {
+        bot: optsTelegramBot,
+        sock,
+        getChannelsConfig,
+        getSpeechConfig,
+        getUploadsDir,
+        transcribe,
+        flushPendingTelegram,
+        addPendingTelegram,
+        getOwnerConfig,
+        isOwner,
+        pendingBioConfirmJids,
+        pendingBioJids,
+        saveBioToConfig,
+        telegramRepliedIds,
+        MAX_TELEGRAM_REPLIED,
+        resetBrowseSession,
+        runPastDueOneShots,
+        runAgentWithSkills,
+        lastSentByJid,
+        ourSentMessageIds,
+        getMemoryConfig,
+        indexChatExchange,
+        getWorkspaceDir,
+        toUserMessage,
+      };
       optsTelegramBot.on('message', async (msg) => {
-        const chatId = msg.chat?.id;
-        let text = (msg.text || '').trim();
-        if (chatId == null) return;
-        let replyWithVoice = false;
-        if (!text && msg.photo && msg.photo.length > 0) {
-          try {
-            const photo = msg.photo[msg.photo.length - 1];
-            const file = await optsTelegramBot.getFile(photo.file_id);
-            const token = getChannelsConfig().telegram.botToken;
-            const downloadUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-            const res = await fetch(downloadUrl);
-            const buf = Buffer.from(await res.arrayBuffer());
-            const uploadsDir = getUploadsDir();
-            if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-            const imagePath = join(uploadsDir, `tg-${chatId}-${msg.message_id}.jpg`);
-            writeFileSync(imagePath, buf);
-            const caption = (msg.caption || '').trim();
-            text = `User sent an image. Image file: ${imagePath}. ${caption ? 'Caption: ' + caption : "What's in this image?"}`;
-          } catch (err) {
-            console.error('[telegram] image download failed:', err.message);
-            return;
-          }
+        if (isTelegramGroup(msg.chat)) {
+          await handleTelegramGroupMessage(msg, telegramCtx);
+        } else {
+          await handleTelegramPrivateMessage(msg, telegramCtx);
         }
-        if (!text && msg.voice) {
-          try {
-            const speechConfig = getSpeechConfig();
-            if (speechConfig?.whisperApiKey) {
-              const file = await optsTelegramBot.getFile(msg.voice.file_id);
-              const token = getChannelsConfig().telegram.botToken;
-              const downloadUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-              const res = await fetch(downloadUrl);
-              const buf = Buffer.from(await res.arrayBuffer());
-              const uploadsDir = getUploadsDir();
-              if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-              const audioPath = join(uploadsDir, `tg-voice-${chatId}-${msg.message_id}.ogg`);
-              writeFileSync(audioPath, buf);
-              text = await transcribe(speechConfig.whisperApiKey, audioPath);
-              if (text && text.trim()) replyWithVoice = true;
-            }
-          } catch (err) {
-            console.error('[telegram] voice transcribe failed:', err.message);
-          }
-        }
-        if (!text) return;
-        if (msg.from?.is_bot) return;
-        if (text.startsWith('[CowCode]')) return;
-        await flushPendingTelegram(chatId, optsTelegramBot);
-        const jidKey = String(chatId);
-        if (pendingBioConfirmJids.has(jidKey)) {
-          pendingBioConfirmJids.delete(jidKey);
-          if (isYesReply(text)) {
-            await optsTelegramBot.sendMessage(chatId, BIO_PROMPT).catch(() => addPendingTelegram(jidKey, BIO_PROMPT));
-            pendingBioJids.add(jidKey);
-          } else {
-            await optsTelegramBot.sendMessage(chatId, "No problem. You can do it later from setup.").catch(() => addPendingTelegram(jidKey, "No problem. You can do it later from setup."));
-          }
-          return;
-        }
-        if (pendingBioJids.has(jidKey)) {
-          saveBioToConfig(text);
-          pendingBioJids.delete(jidKey);
-          await optsTelegramBot.sendMessage(chatId, "Thanks, I've saved that.").catch(() => addPendingTelegram(jidKey, "Thanks, I've saved that."));
-          return;
-        }
-        const msgKey = `tg:${chatId}:${msg.message_id}`;
-        if (telegramRepliedIds.has(msgKey)) return;
-        telegramRepliedIds.add(msgKey);
-        if (telegramRepliedIds.size > MAX_TELEGRAM_REPLIED) {
-          const first = telegramRepliedIds.values().next().value;
-          if (first) telegramRepliedIds.delete(first);
-        }
-        if (text.trim().toLowerCase() === '/browse-reset') {
-          await resetBrowseSession({ jid: jidKey });
-          const reply = 'Browser reset. Next browse will start fresh.';
-          await optsTelegramBot.sendMessage(chatId, reply).catch(() => addPendingTelegram(String(chatId), reply));
-          return;
-        }
-        // Group guard: only in groups (never in one-on-one). Owner = bot owner from config (not group admin/creator).
-        const inGroup = isTelegramGroup(msg.chat);
-        const ownerCfg = getOwnerConfig();
-        if (inGroup && ownerCfg.telegramUserId && !isOwner(msg.from?.id)) {
-          const rateKey = `${chatId}:${msg.from?.id ?? 'unknown'}`;
-          if (isOverRateLimit(rateKey)) {
-            await optsTelegramBot.sendMessage(chatId, 'Too many requests from this group. Please wait a minute or ask the bot owner.').catch(() => addPendingTelegram(jidKey, 'Too many requests from this group. Please wait a minute or ask the bot owner.'));
-            return;
-          }
-          if (isCronIntent(text)) {
-            await optsTelegramBot.sendMessage(chatId, 'Cron jobs are not allowed for group members.').catch(() => addPendingTelegram(jidKey, 'Cron jobs are not allowed for group members.'));
-            return;
-          }
-          if (isScanIntent(text)) {
-            await optsTelegramBot.sendMessage(chatId, 'Scanning is not allowed for group members.').catch(() => addPendingTelegram(jidKey, 'Scanning is not allowed for group members.'));
-            return;
-          }
-          recordGroupRequest(rateKey);
-        }
-        // In groups, core/restricted skills are not allowed for anyone (first line of defense; no owner exception for skills).
-        const groupNonOwner = inGroup;
-        console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
-        const senderName = inGroup && msg.from
-          ? ([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || msg.from.username || 'A group member')
-          : null;
-        const shouldGreet = inGroup && msg.from?.id != null && shouldGreetMember(String(chatId), msg.from.id);
-        if (inGroup && msg.from?.id != null) recordMemberSeen(String(chatId), msg.from.id);
-        const greetingHint = shouldGreet ? ' [Greet this person — they just started chatting or we haven\'t seen them in the last hour.]' : '';
-        const textForAgent = senderName ? `Message from ${senderName} in the group:${greetingHint}\n\n${text}` : text;
-        await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-        runAgentWithSkills(sock, jidKey, textForAgent, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice, groupNonOwner, groupSenderName: senderName || undefined }).catch((err) => {
-          console.error('Telegram agent error:', err.message);
-          const errorText = 'Moo — ' + toUserMessage(err);
-          optsTelegramBot.sendMessage(chatId, errorText).catch(() => addPendingTelegram(String(chatId), errorText));
-        });
       });
       return;
     }
@@ -1017,119 +934,38 @@ Do not use asterisks in replies.
   if (telegramSock && telegramBot) {
     const telegramRepliedIds = new Set();
     const MAX_TELEGRAM_REPLIED = 500;
+    const telegramCtx = {
+      bot: telegramBot,
+      sock: telegramSock,
+      getChannelsConfig,
+      getSpeechConfig,
+      getUploadsDir,
+      transcribe,
+      flushPendingTelegram,
+      addPendingTelegram,
+      getOwnerConfig,
+      isOwner,
+      pendingBioConfirmJids,
+      pendingBioJids,
+      saveBioToConfig,
+      telegramRepliedIds,
+      MAX_TELEGRAM_REPLIED,
+      resetBrowseSession,
+      runPastDueOneShots,
+      runAgentWithSkills,
+      lastSentByJid,
+      ourSentMessageIds,
+      getMemoryConfig,
+      indexChatExchange,
+      getWorkspaceDir,
+      toUserMessage,
+    };
     telegramBot.on('message', async (msg) => {
-      const chatId = msg.chat?.id;
-      let text = (msg.text || '').trim();
-      if (chatId == null) return;
-      let replyWithVoice = false;
-      if (!text && msg.photo && msg.photo.length > 0) {
-        try {
-          const photo = msg.photo[msg.photo.length - 1];
-          const file = await telegramBot.getFile(photo.file_id);
-          const token = getChannelsConfig().telegram.botToken;
-          const downloadUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-          const res = await fetch(downloadUrl);
-          const buf = Buffer.from(await res.arrayBuffer());
-          const uploadsDir = getUploadsDir();
-          if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-          const imagePath = join(uploadsDir, `tg-${chatId}-${msg.message_id}.jpg`);
-          writeFileSync(imagePath, buf);
-          const caption = (msg.caption || '').trim();
-          text = `User sent an image. Image file: ${imagePath}. ${caption ? 'Caption: ' + caption : "What's in this image?"}`;
-        } catch (err) {
-          console.error('[telegram] image download failed:', err.message);
-          return;
-        }
+      if (isTelegramGroup(msg.chat)) {
+        await handleTelegramGroupMessage(msg, telegramCtx);
+      } else {
+        await handleTelegramPrivateMessage(msg, telegramCtx);
       }
-      if (!text && msg.voice) {
-        try {
-          const speechConfig = getSpeechConfig();
-          if (speechConfig?.whisperApiKey) {
-            const file = await telegramBot.getFile(msg.voice.file_id);
-            const token = getChannelsConfig().telegram.botToken;
-            const downloadUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
-            const res = await fetch(downloadUrl);
-            const buf = Buffer.from(await res.arrayBuffer());
-            const uploadsDir = getUploadsDir();
-            if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-            const audioPath = join(uploadsDir, `tg-voice-${chatId}-${msg.message_id}.ogg`);
-            writeFileSync(audioPath, buf);
-            text = await transcribe(speechConfig.whisperApiKey, audioPath);
-            if (text && text.trim()) replyWithVoice = true;
-          }
-        } catch (err) {
-          console.error('[telegram] voice transcribe failed:', err.message);
-        }
-      }
-      if (!text) return;
-      if (msg.from?.is_bot) return;
-      if (text.startsWith('[CowCode]')) return;
-      await flushPendingTelegram(chatId, telegramBot);
-      const jidKey = String(chatId);
-      if (pendingBioConfirmJids.has(jidKey)) {
-        pendingBioConfirmJids.delete(jidKey);
-        if (isYesReply(text)) {
-          await telegramBot.sendMessage(chatId, BIO_PROMPT).catch(() => addPendingTelegram(jidKey, BIO_PROMPT));
-          pendingBioJids.add(jidKey);
-        } else {
-          await telegramBot.sendMessage(chatId, "No problem. You can do it later from setup.").catch(() => addPendingTelegram(jidKey, "No problem. You can do it later from setup."));
-        }
-        return;
-      }
-      if (pendingBioJids.has(jidKey)) {
-        saveBioToConfig(text);
-        pendingBioJids.delete(jidKey);
-        await telegramBot.sendMessage(chatId, "Thanks, I've saved that.").catch(() => addPendingTelegram(jidKey, "Thanks, I've saved that."));
-        return;
-      }
-      const msgKey = `tg:${chatId}:${msg.message_id}`;
-      if (telegramRepliedIds.has(msgKey)) return;
-      telegramRepliedIds.add(msgKey);
-      if (telegramRepliedIds.size > MAX_TELEGRAM_REPLIED) {
-        const first = telegramRepliedIds.values().next().value;
-        if (first) telegramRepliedIds.delete(first);
-      }
-      if (text.trim().toLowerCase() === '/browse-reset') {
-        await resetBrowseSession({ jid: jidKey });
-        const reply = 'Browser reset. Next browse will start fresh.';
-        await telegramBot.sendMessage(chatId, reply).catch(() => addPendingTelegram(String(chatId), reply));
-        return;
-      }
-      // Group guard: only in groups (never in one-on-one). Owner = bot owner from config (not group admin/creator).
-      const inGroup = isTelegramGroup(msg.chat);
-      const ownerCfg = getOwnerConfig();
-      if (inGroup && ownerCfg.telegramUserId && !isOwner(msg.from?.id)) {
-        const rateKey = `${chatId}:${msg.from?.id ?? 'unknown'}`;
-        if (isOverRateLimit(rateKey)) {
-          await telegramBot.sendMessage(chatId, 'Too many requests from this group. Please wait a minute or ask the bot owner.').catch(() => addPendingTelegram(jidKey, 'Too many requests from this group. Please wait a minute or ask the bot owner.'));
-          return;
-        }
-        if (isCronIntent(text)) {
-          await telegramBot.sendMessage(chatId, 'Cron jobs are not allowed for group members.').catch(() => addPendingTelegram(jidKey, 'Cron jobs are not allowed for group members.'));
-          return;
-        }
-        if (isScanIntent(text)) {
-          await telegramBot.sendMessage(chatId, 'Scanning is not allowed for group members.').catch(() => addPendingTelegram(jidKey, 'Scanning is not allowed for group members.'));
-          return;
-        }
-        recordGroupRequest(rateKey);
-      }
-      // In groups, core/restricted skills are not allowed for anyone (first line of defense; no owner exception for skills).
-      const groupNonOwner = inGroup;
-      console.log('[telegram]', String(chatId), text.slice(0, 60) + (text.length > 60 ? '…' : ''));
-      const senderName = inGroup && msg.from
-        ? ([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || msg.from.username || 'A group member')
-        : null;
-      const shouldGreet = inGroup && msg.from?.id != null && shouldGreetMember(String(chatId), msg.from.id);
-      if (inGroup && msg.from?.id != null) recordMemberSeen(String(chatId), msg.from.id);
-      const greetingHint = shouldGreet ? ' [Greet this person — they just started chatting or we haven\'t seen them in the last hour.]' : '';
-      const textForAgent = senderName ? `Message from ${senderName} in the group:${greetingHint}\n\n${text}` : text;
-      await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-      runAgentWithSkills(telegramSock, jidKey, textForAgent, lastSentByJid, jidKey, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, replyWithVoice, groupNonOwner, groupSenderName: senderName || undefined }).catch((err) => {
-        console.error('Telegram agent error:', err.message);
-        const errorText = 'Moo — ' + toUserMessage(err);
-        telegramBot.sendMessage(chatId, errorText).catch(() => addPendingTelegram(String(chatId), errorText));
-      });
     });
   }
   }
