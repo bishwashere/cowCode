@@ -30,6 +30,7 @@ import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
 import { getSkillsEnabled, getSkillContext, DEFAULT_ENABLED } from './skills/loader.js';
 import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid } from './lib/telegram.js';
+import { isWhatsAppGroupJid } from './lib/whatsapp.js';
 import { addPending as addPendingTelegram, flushPending as flushPendingTelegram } from './lib/pending-telegram.js';
 import { getChannelsConfig } from './lib/channels-config.js';
 import { getSchedulingTimeContext } from './lib/timezone.js';
@@ -604,7 +605,8 @@ Do not use asterisks in replies.
           };
         })()
       : { toolsForRequest: toolsToUse, systemPromptOpts: { groupSenderName: bioOpts.groupSenderName } };
-    const historyMessages = isTelegramGroupJid(jid)
+    const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
+    const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
       : getLast5Exchanges(jid);
     const { textToSend } = await runAgentTurn({
@@ -647,7 +649,7 @@ Do not use asterisks in replies.
         if (bioOpts.logExchange) {
           bioOpts.logExchange(exchange);
         } else {
-          if (isTelegramGroupJid(jid)) {
+          if (isGroupJid) {
             try {
               appendGroupExchange(getWorkspaceDir(), jid, exchange);
             } catch (err) {
@@ -836,6 +838,66 @@ Do not use asterisks in replies.
 
       selfJid = selfJid ?? sock.user?.id;
       const jid = m.key.remoteJid;
+
+      // WhatsApp group: respond only when not from us; use group selective-reply (mention or gap/missing info).
+      if (isWhatsAppGroupJid(jid)) {
+        if (m.key.fromMe) continue;
+        const content = extractMessageContent(m.message);
+        let userText = (content?.conversation || content?.extendedTextMessage?.text || '').trim();
+        if (!userText && content?.imageMessage) {
+          try {
+            const buf = await downloadMediaMessage(m, 'buffer', {});
+            const uploadsDir = getUploadsDir();
+            if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+            const msgId = m.key?.id || Date.now();
+            const imagePath = join(uploadsDir, `wa-group-${msgId}.jpg`);
+            writeFileSync(imagePath, buf);
+            const caption = (content.imageMessage.caption || '').trim();
+            userText = `User sent an image. Image file: ${imagePath}. ${caption ? 'Caption: ' + caption : "What's in this image?"}`;
+          } catch (err) {
+            console.error('[image] group download failed:', err.message);
+            continue;
+          }
+        }
+        if (!userText) continue;
+        if (userText.startsWith('[CowCode]')) continue;
+        const msgKey = m.key.id ? `${jid}:${m.key.id}` : null;
+        if (msgKey && repliedIds.has(msgKey)) continue;
+        if (msgKey) {
+          repliedIds.add(msgKey);
+          if (repliedIds.size > MAX_REPLIED_IDS) {
+            const first = repliedIds.values().next().value;
+            if (first) repliedIds.delete(first);
+          }
+        }
+        const participant = m.key.participant || '';
+        const senderName = (m.pushName && String(m.pushName).trim()) || (participant ? participant.split('@')[0] || 'A group member' : 'A group member');
+        const mentionedJids = content?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        const groupMentioned = selfJid && Array.isArray(mentionedJids) && mentionedJids.some((id) => id && areJidsSameUser(id, selfJid));
+        const textForAgent = `Message from ${senderName} in the group:\n\n${userText}`;
+        const workspaceDir = getWorkspaceDir();
+        const logExchange = (exchange) => {
+          try {
+            appendGroupExchange(workspaceDir, jid, exchange);
+          } catch (err) {
+            console.error('[group-chat-log] write failed:', err.message);
+          }
+        };
+        console.log('[whatsapp-group]', String(jid), userText.slice(0, 50) + (userText.length > 50 ? '…' : ''));
+        await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
+        runAgentWithSkills(sock, jid, textForAgent, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, {
+          groupNonOwner: true,
+          groupSenderName: senderName,
+          groupJid: jid,
+          groupMentioned: !!groupMentioned,
+          logExchange,
+        }).catch((err) => {
+          console.error('WhatsApp group agent error:', err.message);
+          const errorText = '[CowCode] Moo — ' + toUserMessage(err);
+          sock.sendMessage(jid, { text: errorText }).catch(() => pendingReplies.push({ jid, text: errorText }));
+        });
+        continue;
+      }
 
       // Only respond in self-chat (saved messages): from us and chat is with ourselves. Ignore all other chats.
       if (!m.key.fromMe) continue;
