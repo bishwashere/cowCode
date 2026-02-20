@@ -4,7 +4,7 @@
  * Usage: cowcode auth | cowcode moo start|stop|status|restart | cowcode update [--force]
  */
 
-import { spawn, spawnSync } from 'child_process';
+import { spawn, spawnSync, execSync } from 'child_process';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, writeFileSync, unlinkSync } from 'fs';
@@ -39,28 +39,46 @@ if (sub === 'moo') {
   });
   child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'dashboard') {
-  const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
-  if (!existsSync(serverPath)) {
-    console.error('cowCode: dashboard not found. Re-run the installer or run from repo.');
-    process.exit(1);
-  }
-  const port = process.env.COWCODE_DASHBOARD_PORT || '3847';
-  const host = process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
-  const url = `http://${host}:${port}`;
-  const child = spawn(process.execPath, [serverPath], {
-    stdio: 'ignore',
-    detached: true,
-    env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
-    cwd: INSTALL_DIR,
-  });
-  child.unref();
-  console.log('Dashboard starting in background.');
-  console.log('URL:', url);
-  setTimeout(() => {
-    const openCmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-    spawn(openCmd, [url], { stdio: 'ignore' }).unref();
-  }, 800);
-  process.exit(0);
+  (async () => {
+    const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
+    if (!existsSync(serverPath)) {
+      console.error('cowCode: dashboard not found. Re-run the installer or run from repo.');
+      process.exit(1);
+    }
+    const port = process.env.COWCODE_DASHBOARD_PORT || '3847';
+    const host = process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
+    const url = `http://${host}:${port}`;
+    try {
+      const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
+      const pids = out.trim().split(/\s+/).filter(Boolean);
+      if (pids.length) {
+        for (const pid of pids) {
+          try {
+            process.kill(Number(pid), 'SIGTERM');
+          } catch (_) {}
+        }
+        const list = pids.length === 1 ? `PID ${pids[0]}` : `PIDs ${pids.join(', ')}`;
+        console.log('Stopped previous dashboard (' + list + ').');
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    } catch (_) {
+      // No process on port (or lsof not available, e.g. Windows)
+    }
+    const child = spawn(process.execPath, [serverPath], {
+      stdio: 'ignore',
+      detached: true,
+      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      cwd: INSTALL_DIR,
+    });
+    child.unref();
+    console.log('Started dashboard at', url);
+    console.log('(Refresh the page if you had it open.)');
+    setTimeout(() => {
+      const openCmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+      spawn(openCmd, [url], { stdio: 'ignore' }).unref();
+    }, 800);
+    process.exit(0);
+  })();
 } else if (sub === 'auth' || (args.length === 1 && args[0] === '--auth-only')) {
   const authArgs = args[0] === '--auth-only' ? args : ['--auth-only', ...args.slice(1)];
   const child = spawn(process.execPath, [join(INSTALL_DIR, 'index.js'), ...authArgs], {

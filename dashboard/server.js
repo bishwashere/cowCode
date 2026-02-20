@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigPath, getWorkspaceDir, getEnvPath } from '../lib/paths.js';
 
@@ -434,6 +434,20 @@ app.get('/', (_req, res) => {
   res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
+async function releasePort(port) {
+  try {
+    const out = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
+    const pids = out.trim().split(/\s+/).filter(Boolean);
+    for (const pid of pids) {
+      try {
+        process.kill(Number(pid), 'SIGTERM');
+      } catch (_) {}
+    }
+    if (pids.length) await new Promise((r) => setTimeout(r, 400));
+  } catch (_) {}
+}
+
+await releasePort(PORT);
 const server = app.listen(PORT, HOST, () => {
   console.log('');
   console.log('  cowCode Dashboard');

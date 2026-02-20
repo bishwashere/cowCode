@@ -272,21 +272,23 @@
 
   <script>
     const API = '';
+    var validPages = ['status', 'crons', 'skills', 'groups', 'llm', 'config'];
     function setPage(name) {
+      if (!name || !validPages.includes(name)) name = 'status';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-      const page = document.getElementById('page-' + name);
-      const link = document.querySelector('nav a[data-page="' + name + '"]');
+      var page = document.getElementById('page-' + name);
+      var link = document.querySelector('nav a[data-page="' + name + '"]');
       if (page) page.classList.add('active');
       if (link) link.classList.add('active');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
-      if (name === 'groups') { fetchGroups(); }
+      if (name === 'groups') fetchGroups();
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
     }
-    document.querySelectorAll('nav a[data-page]').forEach(a => {
-      a.addEventListener('click', e => {
+    document.querySelectorAll('nav a[data-page]').forEach(function (a) {
+      a.addEventListener('click', function (e) {
         e.preventDefault();
         setPage(a.dataset.page);
       });
@@ -469,30 +471,37 @@
     let selectedGroupId = 'default';
 
     async function fetchGroups() {
-      var ul = document.getElementById('groups-list');
-      var oldHint = document.getElementById('groups-path-hint');
-      if (oldHint) oldHint.remove();
-      var r = await fetch(API + '/api/groups');
-      var d = await r.json().catch(function () { return {}; });
-      var groups = d.groups || [];
-      if (d.error) console.error('[groups]', d.error);
-      ul.innerHTML =
-        '<li class="' + (selectedGroupId === 'default' ? 'selected' : '') + '"><button type="button" class="link" data-id="default">Default settings</button></li>' +
-        groups.map(function (g) {
-          return '<li class="' + (selectedGroupId === g.id ? 'selected' : '') + '"><button type="button" class="link" data-id="' + escapeHtml(g.id) + '">' + escapeHtml(g.label) + '</button></li>';
-        }).join('');
-      if (groups.length === 0 && (d._path || d.error)) {
-        var hint = document.createElement('p');
-        hint.id = 'groups-path-hint';
-        hint.className = 'skill-meta';
-        hint.style.marginTop = '0.5rem';
-        hint.textContent = d.error ? ('Error: ' + d.error + (d._path ? ' (path: ' + d._path + ')') : '') : ('No groups yet. Server reading: ' + d._path);
-        ul.parentNode.insertBefore(hint, ul.nextSibling);
+      try {
+        var ul = document.getElementById('groups-list');
+        if (!ul) return;
+        var oldHint = document.getElementById('groups-path-hint');
+        if (oldHint) oldHint.remove();
+        var r = await fetch(API + '/api/groups');
+        var d = await r.json().catch(function () { return {}; });
+        var groups = Array.isArray(d.groups) ? d.groups : [];
+        if (d.error) console.error('[groups]', d.error);
+        ul.innerHTML =
+          '<li class="' + (selectedGroupId === 'default' ? 'selected' : '') + '"><button type="button" class="link" data-id="default">Default settings</button></li>' +
+          groups.map(function (g) {
+            return '<li class="' + (selectedGroupId === (g && g.id) ? 'selected' : '') + '"><button type="button" class="link" data-id="' + escapeHtml(String((g && g.id) || '')) + '">' + escapeHtml(String((g && g.label) || (g && g.id) || '')) + '</button></li>';
+          }).join('');
+        if (groups.length === 0 && (d._path || d.error) && ul.parentNode) {
+          var hint = document.createElement('p');
+          hint.id = 'groups-path-hint';
+          hint.className = 'skill-meta';
+          hint.style.marginTop = '0.5rem';
+          hint.textContent = d.error ? ('Error: ' + d.error + (d._path ? ' (path: ' + d._path + ')' : '')) : ('No groups yet. Server reading: ' + (d._path || ''));
+          ul.parentNode.insertBefore(hint, ul.nextSibling);
+        }
+        ul.querySelectorAll('button.link').forEach(function (btn) {
+          btn.addEventListener('click', function () { selectGroup(btn.getAttribute('data-id')); });
+        });
+        selectGroup(selectedGroupId);
+      } catch (e) {
+        console.error('[groups]', e);
+        var ul = document.getElementById('groups-list');
+        if (ul) ul.innerHTML = '<li><button type="button" class="link" data-id="default">Default settings</button></li><li class="skill-meta">Error loading groups.</li>';
       }
-      ul.querySelectorAll('button.link').forEach(function (btn) {
-        btn.addEventListener('click', function () { selectGroup(btn.getAttribute('data-id')); });
-      });
-      selectGroup(selectedGroupId);
     }
 
     function selectGroup(id) {
