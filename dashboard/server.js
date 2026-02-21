@@ -11,7 +11,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
-import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigPath, getWorkspaceDir, getEnvPath } from '../lib/paths.js';
+import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigDir, getGroupConfigPath, getWorkspaceDir, getEnvPath } from '../lib/paths.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
 dotenv.config({ path: getEnvPath() });
@@ -581,6 +581,57 @@ app.patch('/api/workspace-md/:key', (req, res) => {
     const dir = join(path, '..');
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(path, content, 'utf8');
+    res.json({ id: key, ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Per-group identity files (SOUL.md, WhoAmI.md, MyHuman.md, MEMORY.md) ----
+
+const GROUP_IDENTITY_FILES = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'MEMORY.md'];
+const GROUP_IDENTITY_LABELS = { 'SOUL.md': 'Soul', 'WhoAmI.md': 'Who am I', 'MyHuman.md': 'My human', 'MEMORY.md': 'Memory' };
+
+function isAllowedGroupMdKey(key) {
+  return GROUP_IDENTITY_FILES.includes(key);
+}
+
+app.get('/api/groups/:id/md', (req, res) => {
+  try {
+    const id = req.params.id;
+    ensureGroupConfigFor(id);
+    const groupDir = getGroupConfigDir(id);
+    const files = GROUP_IDENTITY_FILES.map((key) => {
+      const filePath = join(groupDir, key);
+      return { id: key, label: GROUP_IDENTITY_LABELS[key] || key, exists: existsSync(filePath) };
+    });
+    res.json({ files });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/groups/:id/md/:key', (req, res) => {
+  try {
+    const { id, key } = req.params;
+    if (!isAllowedGroupMdKey(key)) { res.status(400).json({ error: 'Invalid file key' }); return; }
+    ensureGroupConfigFor(id);
+    const filePath = join(getGroupConfigDir(id), key);
+    const content = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
+    res.json({ id: key, label: GROUP_IDENTITY_LABELS[key] || key, content });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/groups/:id/md/:key', (req, res) => {
+  try {
+    const { id, key } = req.params;
+    if (!isAllowedGroupMdKey(key)) { res.status(400).json({ error: 'Invalid file key' }); return; }
+    ensureGroupConfigFor(id);
+    const filePath = join(getGroupConfigDir(id), key);
+    const content = typeof req.body?.content === 'string' ? req.body.content : '';
+    writeFileSync(filePath, content, 'utf8');
     res.json({ id: key, ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

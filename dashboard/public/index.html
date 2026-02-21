@@ -282,6 +282,7 @@
           <p class="skill-meta" id="groups-detail-meta" style="margin:0 0 0.75rem 0;"></p>
           <div id="groups-detail-sub-nav" class="group-sub-nav" style="display:none;">
             <button type="button" data-group-tab="skills" class="active">Skills</button>
+            <button type="button" data-group-tab="soul">Soul</button>
             <button type="button" data-group-tab="llm">LLM</button>
             <button type="button" data-group-tab="history">History</button>
           </div>
@@ -303,6 +304,18 @@
           <div id="groups-detail-history" class="group-sub-panel">
             <div id="history-stats" class="history-stats"></div>
             <div id="history-log-files" class="history-log-files"></div>
+          </div>
+          <div id="groups-detail-soul" class="group-sub-panel">
+            <p class="skill-meta" style="margin:0 0 0.75rem 0;">Click a file to view or edit. Each group has its own copy — changes only affect this group.</p>
+            <div id="group-soul-files" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;"></div>
+            <div id="group-soul-editor" style="display:none;">
+              <div style="font-size:0.8rem; color:var(--muted); margin-bottom:0.4rem;" id="group-soul-file-label"></div>
+              <textarea id="group-soul-textarea" spellcheck="false" style="width:100%; min-height:16rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.75rem; border-radius:6px; font-family:inherit; font-size:0.9rem; resize:vertical; display:block; margin-bottom:0.75rem;"></textarea>
+              <div>
+                <button id="group-soul-save">Save</button>
+                <span id="group-soul-saved" style="margin-left:0.75rem; color:var(--green); font-size:0.85rem; display:none;">Saved.</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -572,9 +585,15 @@
         b.classList.toggle('active', b.getAttribute('data-group-tab') === tab);
       });
       document.querySelectorAll('#groups-detail-content .group-sub-panel').forEach(function (p) {
-        p.classList.toggle('active', (p.id === 'groups-detail-skills' && tab === 'skills') || (p.id === 'groups-detail-llm' && tab === 'llm') || (p.id === 'groups-detail-history' && tab === 'history'));
+        p.classList.toggle('active',
+          (p.id === 'groups-detail-skills' && tab === 'skills') ||
+          (p.id === 'groups-detail-llm' && tab === 'llm') ||
+          (p.id === 'groups-detail-history' && tab === 'history') ||
+          (p.id === 'groups-detail-soul' && tab === 'soul')
+        );
       });
       if (tab === 'history') loadGroupHistory(selectedGroupId);
+      if (tab === 'soul') loadGroupSoul(selectedGroupId);
     }
     function selectGroup(id) {
       selectedGroupId = id;
@@ -746,6 +765,63 @@
       });
       var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ llm: { maxTokens: maxTokens, models: models } }) });
       if (r.ok) { document.getElementById('group-llm-saved').style.display = 'inline'; setTimeout(function () { document.getElementById('group-llm-saved').style.display = 'none'; }, 2000); }
+    });
+
+    var selectedGroupSoulFileId = null;
+
+    async function loadGroupSoul(groupId) {
+      var filesEl = document.getElementById('group-soul-files');
+      var editorEl = document.getElementById('group-soul-editor');
+      filesEl.innerHTML = '';
+      editorEl.style.display = 'none';
+      selectedGroupSoulFileId = null;
+      try {
+        var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/md');
+        var d = await r.json();
+        var files = d.files || [];
+        filesEl.innerHTML = files.map(function (f) {
+          return '<button type="button" class="group-soul-file-btn" data-id="' + escapeHtml(f.id) + '" style="background:var(--card); border:1px solid var(--border); color:var(--muted); font:inherit; font-size:0.85rem; padding:0.35rem 0.75rem; border-radius:4px; cursor:pointer; margin-top:0;">' + escapeHtml(f.label) + '</button>';
+        }).join('');
+        filesEl.querySelectorAll('.group-soul-file-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () { selectGroupSoulFile(groupId, btn.getAttribute('data-id')); });
+        });
+        if (files.length > 0) selectGroupSoulFile(groupId, files[0].id);
+      } catch (e) {
+        filesEl.innerHTML = '<span class="skill-meta">Error loading files.</span>';
+      }
+    }
+
+    async function selectGroupSoulFile(groupId, fileId) {
+      selectedGroupSoulFileId = fileId;
+      document.querySelectorAll('.group-soul-file-btn').forEach(function (btn) {
+        var active = btn.getAttribute('data-id') === fileId;
+        btn.style.color = active ? 'var(--accent)' : 'var(--muted)';
+        btn.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+      });
+      document.getElementById('group-soul-file-label').textContent = 'File: ' + fileId + ' — saved to this group\'s config directory only.';
+      document.getElementById('group-soul-editor').style.display = 'block';
+      document.getElementById('group-soul-textarea').value = '';
+      try {
+        var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/md/' + encodeURIComponent(fileId));
+        var d = await r.json();
+        document.getElementById('group-soul-textarea').value = d.content || '';
+      } catch (e) {
+        document.getElementById('group-soul-textarea').value = '';
+      }
+    }
+
+    document.getElementById('group-soul-save').addEventListener('click', async function () {
+      if (!selectedGroupSoulFileId) return;
+      var content = document.getElementById('group-soul-textarea').value;
+      var r = await fetch(
+        API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/md/' + encodeURIComponent(selectedGroupSoulFileId),
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) }
+      );
+      if (r.ok) {
+        var savedEl = document.getElementById('group-soul-saved');
+        savedEl.style.display = 'inline';
+        setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
+      }
     });
 
     async function fetchConfig() {
