@@ -6,10 +6,11 @@ Semantic search over your **notes** (`MEMORY.md`, `memory/*.md`) and **chat hist
 
 **Auto-indexing** — Every message you send gets embedded and added to the index. No manual "moo index" or sync needed. File-based notes (MEMORY.md, memory/*.md) are synced when you run memory_search or on watch; chat is indexed as you talk.
 
-## Tools (pass `tool` in arguments: "memory_search" or "memory_get")
+## Tools (pass `tool` in arguments: "memory_search", "memory_get", or "memory_save")
 
 - **memory_search** — Set `tool: "memory_search"`, `query` (required). Optional: `maxResults`, `minScore`. Semantically search notes and chat history. Returns snippets with path and line range (paths may be `MEMORY.md`, `memory/2025-02-15.md`, or `chat-log/2025-02-16.jsonl`).
 - **memory_get** — Set `tool: "memory_get"`, `path` (required, from memory_search). Optional: `from`, `lines`. Read a snippet by path (including chat-log/*.jsonl for past conversations).
+- **memory_save** — Set `tool: "memory_save"`, `text` (required): the note to save. Optional: `file` (default: `MEMORY.md`; use `memory/notes.md` or any `.md` path inside the workspace). Appends the note with today's date prefix and immediately re-indexes so it is searchable at once. Use when the user says "remember that…", "note this down", "save this for later", "add to my notes", etc.
 
 ## Config
 

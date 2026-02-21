@@ -165,6 +165,33 @@
     .groups-detail-body .detail-label { font-size: 0.8rem; color: var(--muted); }
     .groups-detail-body .detail-value { font-size: 0.9rem; word-break: break-all; }
     .groups-detail-body .log-files { font-size: 0.85rem; max-height: 12rem; overflow-y: auto; }
+    .group-sub-nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    .group-sub-nav button { background: none; border: none; font: inherit; color: var(--muted); cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 4px; }
+    .group-sub-nav button:hover { color: var(--text); }
+    .group-sub-nav button.active { color: var(--accent); font-weight: 500; }
+    .group-sub-panel { display: none; }
+    .group-sub-panel.active { display: block; }
+    .history-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+    .history-stat { font-size: 0.9rem; }
+    .history-stat .label { color: var(--muted); }
+    .history-log-files { font-size: 0.85rem; max-height: 14rem; overflow-y: auto; }
+    .history-log-files table { width: 100%; border-collapse: collapse; }
+    .history-log-files th, .history-log-files td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); }
+    .history-log-files th { color: var(--muted); font-weight: 500; }
+    .soul-tile-card { margin-top: 0.5rem; }
+    .soul-tile-link {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.25rem 0;
+    }
+    .soul-tile-link:hover { color: var(--accent); }
+    .soul-tile-icon { font-size: 1.1rem; color: var(--accent); }
+    .soul-tile-title { font-weight: 600; font-size: 1rem; }
+    .soul-tile-desc { font-size: 0.8rem; color: var(--muted); }
+    #soul-editor-textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.9rem; resize: vertical; }
   </style>
 </head>
 <body>
@@ -197,6 +224,33 @@
         <div class="overview-item"><span class="overview-label">Time format</span><span id="overview-time-format">—</span></div>
       </div>
     </div>
+    <div class="card soul-tile-card">
+      <a href="#soul" data-page="soul" class="soul-tile-link">
+        <span class="soul-tile-icon">◇</span>
+        <span class="soul-tile-title">Soul & identity</span>
+        <span class="soul-tile-desc">Edit SOUL, Who am I, My human, Memory</span>
+      </a>
+    </div>
+  </div>
+
+  <div id="page-soul" class="page">
+    <div class="groups-layout">
+      <div class="groups-sidebar card">
+        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Soul & identity</h2>
+        <p class="skill-meta" style="margin:0 0 0.75rem 0;">Click a file to view or edit. Changes are saved to your workspace.</p>
+        <ul id="soul-files-list" class="groups-ul"></ul>
+      </div>
+      <div class="groups-main">
+        <div id="soul-editor-card" class="groups-detail card">
+          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="soul-editor-title">Select a file</h2>
+          <p class="skill-meta" id="soul-editor-meta" style="margin:0 0 0.75rem 0;"></p>
+          <div id="soul-editor-area" style="display:none;">
+            <textarea id="soul-editor-textarea" class="skill-doc-inline skill-doc-textarea" spellcheck="false" style="display:block; width:100%; min-height:20rem; margin-bottom:0.75rem;"></textarea>
+            <div><button id="soul-editor-save">Save</button><span id="soul-editor-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="page-crons" class="page">
@@ -226,14 +280,17 @@
         <div id="groups-detail-content" class="groups-detail card">
           <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="groups-detail-title">Select a group</h2>
           <p class="skill-meta" id="groups-detail-meta" style="margin:0 0 0.75rem 0;"></p>
-          <div id="groups-detail-skills" style="display:none;">
-            <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">Skills</h3>
+          <div id="groups-detail-sub-nav" class="group-sub-nav" style="display:none;">
+            <button type="button" data-group-tab="skills" class="active">Skills</button>
+            <button type="button" data-group-tab="llm">LLM</button>
+            <button type="button" data-group-tab="history">History</button>
+          </div>
+          <div id="groups-detail-skills" class="group-sub-panel active">
             <p class="skill-meta" style="margin:0 0 0.5rem 0;">Enable or disable skills; click a skill to view its doc (SKILL.md).</p>
             <div id="group-skills-list"></div>
             <button id="group-skills-save" style="display:none;">Save skills</button>
           </div>
-          <div id="groups-detail-llm" style="display:none; margin-top:1.5rem;">
-            <h3 style="margin:0 0 0.5rem 0; font-size:0.95rem;">LLM</h3>
+          <div id="groups-detail-llm" class="group-sub-panel">
             <p class="skill-meta" style="margin:0 0 0.5rem 0;">Max tokens and models for this group. API keys from .env.</p>
             <div class="field" style="margin-top:0.5rem;">
               <label>Max tokens</label>
@@ -242,6 +299,10 @@
             <div id="group-llm-models" class="llm-models-grid"></div>
             <button id="group-llm-save">Save LLM</button>
             <span id="group-llm-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+          </div>
+          <div id="groups-detail-history" class="group-sub-panel">
+            <div id="history-stats" class="history-stats"></div>
+            <div id="history-log-files" class="history-log-files"></div>
           </div>
         </div>
       </div>
@@ -504,6 +565,17 @@
       }
     }
 
+    var selectedGroupTab = 'skills';
+    function setGroupTab(tab) {
+      selectedGroupTab = tab;
+      document.querySelectorAll('#groups-detail-sub-nav button[data-group-tab]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-group-tab') === tab);
+      });
+      document.querySelectorAll('#groups-detail-content .group-sub-panel').forEach(function (p) {
+        p.classList.toggle('active', (p.id === 'groups-detail-skills' && tab === 'skills') || (p.id === 'groups-detail-llm' && tab === 'llm') || (p.id === 'groups-detail-history' && tab === 'history'));
+      });
+      if (tab === 'history') loadGroupHistory(selectedGroupId);
+    }
     function selectGroup(id) {
       selectedGroupId = id;
       document.querySelectorAll('#groups-list li').forEach(function (li) {
@@ -512,11 +584,13 @@
       });
       var titleEl = document.getElementById('groups-detail-title');
       var metaEl = document.getElementById('groups-detail-meta');
+      var subNavEl = document.getElementById('groups-detail-sub-nav');
       var skillsEl = document.getElementById('groups-detail-skills');
       var llmEl = document.getElementById('groups-detail-llm');
+      var historyEl = document.getElementById('groups-detail-history');
       titleEl.textContent = id === 'default' ? 'Default group settings' : ('Group ' + id);
-      skillsEl.style.display = 'block';
-      llmEl.style.display = 'block';
+      subNavEl.style.display = id ? 'flex' : 'none';
+      setGroupTab(selectedGroupTab);
       loadGroupSkills(id);
       loadGroupConfig(id);
       if (id !== 'default') {
@@ -529,6 +603,57 @@
           .catch(function () { metaEl.textContent = ''; });
       } else {
         metaEl.textContent = 'Used as template for new groups. Stored in ~/.cowcode/group/.';
+      }
+    }
+    function timeAgo(isoStr) {
+      if (!isoStr) return '—';
+      var d = new Date(isoStr);
+      if (isNaN(d.getTime())) return '—';
+      var sec = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (sec < 60) return sec + 's ago';
+      if (sec < 3600) return Math.floor(sec / 60) + 'm ago';
+      if (sec < 86400) return Math.floor(sec / 3600) + 'h ago';
+      if (sec < 2592000) return Math.floor(sec / 86400) + 'd ago';
+      if (sec < 31536000) return Math.floor(sec / 2592000) + 'mo ago';
+      return Math.floor(sec / 31536000) + 'y ago';
+    }
+    async function loadGroupHistory(groupId) {
+      var statsEl = document.getElementById('history-stats');
+      var filesEl = document.getElementById('history-log-files');
+      if (groupId === 'default') {
+        statsEl.innerHTML = '<p class="skill-meta">Default settings have no chat log. Add the bot to a Telegram group and chat to see history here.</p>';
+        filesEl.innerHTML = '';
+        return;
+      }
+      try {
+        var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/history');
+        var d = await r.json();
+        if (d.message) {
+          statsEl.innerHTML = '<p class="skill-meta">' + escapeHtml(d.message) + '</p>';
+          filesEl.innerHTML = '';
+          return;
+        }
+        var first = d.firstActivity ? new Date(d.firstActivity).toLocaleString() : '—';
+        var last = d.lastActivity ? new Date(d.lastActivity).toLocaleString() : '—';
+        var ago = timeAgo(d.lastActivity);
+        statsEl.innerHTML =
+          '<div class="history-stat"><span class="label">First activity</span><br>' + escapeHtml(first) + '</div>' +
+          '<div class="history-stat"><span class="label">Last activity</span><br>' + escapeHtml(last) + '</div>' +
+          '<div class="history-stat"><span class="label">How long ago</span><br>' + escapeHtml(ago) + '</div>' +
+          '<div class="history-stat"><span class="label">Total exchanges</span><br>' + (typeof d.totalExchanges === 'number' ? d.totalExchanges : '—') + '</div>';
+        if (!d.logFiles || d.logFiles.length === 0) {
+          filesEl.innerHTML = '<p class="skill-meta">No log files yet.</p>';
+        } else {
+          filesEl.innerHTML = '<table><thead><tr><th>File</th><th>Last modified</th><th>Exchanges</th></tr></thead><tbody>' +
+            d.logFiles.map(function (f) {
+              var mtime = f.mtimeISO ? new Date(f.mtimeISO).toLocaleString() : '—';
+              var count = f.exchanges != null ? f.exchanges : (f.error ? '—' : '—');
+              return '<tr><td>' + escapeHtml(f.name) + '</td><td>' + escapeHtml(mtime) + '</td><td>' + escapeHtml(String(count)) + '</td></tr>';
+            }).join('') + '</tbody></table>';
+        }
+      } catch (e) {
+        statsEl.innerHTML = '<p class="skill-meta">Error loading history.</p>';
+        filesEl.innerHTML = '';
       }
     }
 
@@ -584,6 +709,9 @@
       var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/skills', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enabled }) });
       if (r.ok) { groupSkillsDirty = false; document.getElementById('group-skills-save').style.display = 'none'; }
     });
+    document.querySelectorAll('#groups-detail-sub-nav button[data-group-tab]').forEach(function (btn) {
+      btn.addEventListener('click', function () { setGroupTab(btn.getAttribute('data-group-tab')); });
+    });
 
     async function loadGroupConfig(groupId) {
       var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/config');
@@ -625,6 +753,66 @@
       const d = await r.json();
       document.getElementById('full-config').textContent = JSON.stringify(d, null, 2);
     }
+
+    var selectedSoulFileId = null;
+
+    async function fetchSoulFiles() {
+      try {
+        const r = await fetch(API + '/api/workspace-md');
+        const d = await r.json();
+        const files = d.files || [];
+        const ul = document.getElementById('soul-files-list');
+        ul.innerHTML = files.map(function (f) {
+          return '<li class="' + (selectedSoulFileId === f.id ? 'selected' : '') + '"><button type="button" class="link soul-file-btn" data-id="' + escapeHtml(f.id) + '">' + escapeHtml(f.label) + '</button></li>';
+        }).join('');
+        if (files.length === 0) ul.innerHTML = '<li class="empty">No workspace MD files.</li>';
+        ul.querySelectorAll('.soul-file-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () { selectSoulFile(btn.getAttribute('data-id')); });
+        });
+      } catch (e) {
+        console.error('[soul]', e);
+        document.getElementById('soul-files-list').innerHTML = '<li class="skill-meta">Error loading files.</li>';
+      }
+    }
+
+    async function selectSoulFile(id) {
+      selectedSoulFileId = id;
+      document.querySelectorAll('#soul-files-list li').forEach(function (li) {
+        var btn = li.querySelector('.soul-file-btn');
+        li.classList.toggle('selected', btn && btn.getAttribute('data-id') === id);
+      });
+      var titleEl = document.getElementById('soul-editor-title');
+      var metaEl = document.getElementById('soul-editor-meta');
+      var areaEl = document.getElementById('soul-editor-area');
+      var label = id;
+      if (id === 'SOUL.md') label = 'Soul';
+      else if (id === 'WhoAmI.md') label = 'Who am I';
+      else if (id === 'MyHuman.md') label = 'My human';
+      else if (id === 'MEMORY.md') label = 'Memory';
+      titleEl.textContent = label;
+      metaEl.textContent = 'File: ' + id;
+      areaEl.style.display = 'block';
+      try {
+        var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id));
+        if (!r.ok) throw new Error('Failed to load');
+        var d = await r.json();
+        document.getElementById('soul-editor-textarea').value = d.content || '';
+      } catch (e) {
+        document.getElementById('soul-editor-textarea').value = '';
+      }
+    }
+
+    document.getElementById('soul-editor-save').addEventListener('click', async function () {
+      var id = selectedSoulFileId;
+      if (!id) return;
+      var content = document.getElementById('soul-editor-textarea').value;
+      var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
+      if (r.ok) {
+        var savedEl = document.getElementById('soul-editor-saved');
+        savedEl.style.display = 'inline';
+        setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
+      }
+    });
 
     async function renderLlmForm() {
       const r = await fetch(API + '/api/config');

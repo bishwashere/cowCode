@@ -35,6 +35,7 @@ import { addPending as addPendingTelegram, flushPending as flushPendingTelegram 
 import { getChannelsConfig } from './lib/channels-config.js';
 import { getSchedulingTimeContext } from './lib/timezone.js';
 import { getOwnerConfig, isOwner } from './lib/owner-config.js';
+import { getGroupAddedBy, setGroupAddedBy } from './lib/telegram-group-added-by.js';
 import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
@@ -1074,9 +1075,29 @@ Do not use asterisks in replies.
       getWorkspaceDir,
       toUserMessage,
       getBotUsername: createGetBotUsername(telegramBot),
+      getGroupAddedBy,
     };
+    let cachedTelegramBotUserId = null;
+    async function getTelegramBotUserId() {
+      if (cachedTelegramBotUserId != null) return cachedTelegramBotUserId;
+      try {
+        const me = await telegramBot.getMe();
+        cachedTelegramBotUserId = me?.id ?? null;
+      } catch {
+        cachedTelegramBotUserId = null;
+      }
+      return cachedTelegramBotUserId;
+    }
     telegramBot.on('message', async (msg) => {
       if (isTelegramGroup(msg.chat)) {
+        const chatId = msg.chat?.id;
+        const newMembers = msg.new_chat_members;
+        if (chatId != null && Array.isArray(newMembers) && newMembers.length > 0 && msg.from?.id != null) {
+          const botUserId = await getTelegramBotUserId();
+          if (botUserId != null && newMembers.some((u) => u?.id === botUserId || (u?.is_bot && String(u?.id) === String(botUserId)))) {
+            setGroupAddedBy(chatId, msg.from.id);
+          }
+        }
         await handleTelegramGroupMessage(msg, telegramCtx);
       } else {
         await handleTelegramPrivateMessage(msg, telegramCtx);

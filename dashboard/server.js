@@ -10,7 +10,7 @@ import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigPath, getWorkspaceDir, getEnvPath } from '../lib/paths.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
@@ -401,6 +401,84 @@ app.get('/api/groups/:id', (req, res) => {
   }
 });
 
+app.get('/api/groups/:id/history', (req, res) => {
+  try {
+    const id = req.params.id;
+    if (id === 'default') {
+      return res.json({
+        id: 'default',
+        firstActivity: null,
+        lastActivity: null,
+        totalExchanges: 0,
+        logFiles: [],
+        message: 'Default settings have no chat log. History is for groups that have had activity.',
+      });
+    }
+    const groupDir = join(getWorkspaceDir(), GROUP_CHAT_LOG_DIR, id);
+    if (!existsSync(groupDir)) {
+      res.status(404).json({ error: 'Group not found' });
+      return;
+    }
+    const files = readdirSync(groupDir, { withFileTypes: true })
+      .filter((f) => f.isFile() && f.name.endsWith('.jsonl'))
+      .map((f) => f.name)
+      .sort();
+    const logFiles = [];
+    let totalExchanges = 0;
+    let firstTs = null;
+    let lastTs = null;
+    for (const name of files) {
+      const path = join(groupDir, name);
+      try {
+        const stat = statSync(path);
+        const content = readFileSync(path, 'utf8');
+        const lines = content.split('\n').filter((l) => l.trim());
+        const count = lines.length;
+        totalExchanges += count;
+        if (lines.length > 0) {
+          try {
+            const firstLine = JSON.parse(lines[0]);
+            const t = firstLine?.ts ?? firstLine?.timestampMs;
+            if (typeof t === 'number' && Number.isFinite(t)) {
+              if (firstTs == null || t < firstTs) firstTs = t;
+            }
+          } catch (_) {}
+          try {
+            const lastLine = JSON.parse(lines[lines.length - 1]);
+            const t = lastLine?.ts ?? lastLine?.timestampMs;
+            if (typeof t === 'number' && Number.isFinite(t)) {
+              if (lastTs == null || t > lastTs) lastTs = t;
+            }
+          } catch (_) {}
+        }
+        logFiles.push({
+          name,
+          mtime: stat.mtimeMs,
+          mtimeISO: new Date(stat.mtimeMs).toISOString(),
+          exchanges: count,
+        });
+      } catch (e) {
+        logFiles.push({ name, error: String(e.message) });
+      }
+    }
+    if (firstTs == null && logFiles.length > 0 && logFiles[0].mtime) {
+      firstTs = logFiles[0].mtime;
+    }
+    if (lastTs == null && logFiles.length > 0 && logFiles[logFiles.length - 1].mtime) {
+      lastTs = logFiles[logFiles.length - 1].mtime;
+    }
+    res.json({
+      id,
+      firstActivity: firstTs != null ? new Date(firstTs).toISOString() : null,
+      lastActivity: lastTs != null ? new Date(lastTs).toISOString() : null,
+      totalExchanges,
+      logFiles,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/config', (_req, res) => {
   try {
     const config = loadConfig();
@@ -422,6 +500,88 @@ app.patch('/api/config', (req, res) => {
     }
     saveConfig(config);
     res.json(config);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Soul / workspace MD files (SOUL.md, WhoAmI.md, MyHuman.md, MEMORY.md, memory/*.md) ----
+
+const SOUL_FILE_IDS = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'MEMORY.md'];
+const SOUL_FILE_LABELS = { 'SOUL.md': 'Soul', 'WhoAmI.md': 'Who am I', 'MyHuman.md': 'My human', 'MEMORY.md': 'Memory' };
+
+function isAllowedWorkspaceMdKey(key) {
+  if (SOUL_FILE_IDS.includes(key)) return true;
+  if (key.startsWith('memory/') && key.endsWith('.md')) {
+    const name = key.slice(7, -3);
+    return /^[a-zA-Z0-9_.-]+$/.test(name);
+  }
+  return false;
+}
+
+function getWorkspaceMdPath(key) {
+  const workspaceDir = getWorkspaceDir();
+  return join(workspaceDir, key);
+}
+
+app.get('/api/workspace-md', (_req, res) => {
+  try {
+    const workspaceDir = getWorkspaceDir();
+    const list = [];
+    for (const id of SOUL_FILE_IDS) {
+      const path = join(workspaceDir, id);
+      const exists = existsSync(path) && statSync(path).isFile();
+      list.push({ id, label: SOUL_FILE_LABELS[id] || id, exists });
+    }
+    const memoryDir = join(workspaceDir, 'memory');
+    if (existsSync(memoryDir) && statSync(memoryDir).isDirectory()) {
+      const names = readdirSync(memoryDir);
+      for (const name of names) {
+        if (!name.endsWith('.md')) continue;
+        const key = `memory/${name}`;
+        if (!/^[a-zA-Z0-9_.-]+$/.test(name.replace(/\.md$/, ''))) continue;
+        const full = join(memoryDir, name);
+        try {
+          if (statSync(full).isFile()) list.push({ id: key, label: `memory/${name}`, exists: true });
+        } catch (_) {}
+      }
+    }
+    list.sort((a, b) => (a.id === b.id ? 0 : a.id < b.id ? -1 : 1));
+    res.json({ files: list });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/workspace-md/:key', (req, res) => {
+  try {
+    const key = req.params.key;
+    if (!isAllowedWorkspaceMdKey(key)) {
+      res.status(400).json({ error: 'Invalid file key' });
+      return;
+    }
+    const path = getWorkspaceMdPath(key);
+    const content = existsSync(path) ? readFileSync(path, 'utf8') : '';
+    const label = SOUL_FILE_LABELS[key] || key;
+    res.json({ id: key, label, content });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/workspace-md/:key', (req, res) => {
+  try {
+    const key = req.params.key;
+    if (!isAllowedWorkspaceMdKey(key)) {
+      res.status(400).json({ error: 'Invalid file key' });
+      return;
+    }
+    const path = getWorkspaceMdPath(key);
+    const content = typeof req.body?.content === 'string' ? req.body.content : '';
+    const dir = join(path, '..');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(path, content, 'utf8');
+    res.json({ id: key, ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
