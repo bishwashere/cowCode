@@ -115,14 +115,16 @@ function createTempStateDir() {
 }
 
 /**
- * Run the main app in --test mode with one message; return the reply text and stderr.
+ * Run the main app in --test mode with one or two messages. With two messages, both run in the same process
+ * so the memory index is shared (second message can recall the first).
  * @param {string} userMessage
- * @param {{ stateDir?: string }} [opts]
+ * @param {{ stateDir?: string, secondMessage?: string }} [opts]
  * @returns {Promise<{ reply: string, stderr: string }>}
  */
 function runE2E(userMessage, opts = {}) {
   const env = { ...process.env };
   if (opts.stateDir) env.COWCODE_STATE_DIR = opts.stateDir;
+  if (opts.secondMessage) env.TEST_MESSAGE_2 = opts.secondMessage;
   return new Promise((resolve, reject) => {
     const child = spawn('node', [join(INSTALL_ROOT, 'index.js'), '--test', userMessage], {
       cwd: INSTALL_ROOT,
@@ -223,38 +225,14 @@ async function main() {
     {
       name: 'memory: recall (store phrase → ask what I asked you to remember)',
       run: async () => {
-        const { stateDir, workspaceDir } = createTempStateDir();
-        const run1 = await runE2E(storePhraseMessage, { stateDir });
-        const reply1 = run1.reply;
-        assert(reply1 && reply1.length > 0, 'Expected non-empty first reply');
-        const logAfterFirst = getLatestChatLog(workspaceDir);
-        assert(logAfterFirst && logAfterFirst.lines.length >= 1, 'First run must write chat log before second run');
-        const prevState = process.env.COWCODE_STATE_DIR;
-        process.env.COWCODE_STATE_DIR = stateDir;
-        try {
-          dotenv.config({ path: getEnvPath() });
-          const { getMemoryConfig } = await import('../../lib/memory-config.js');
-          const { getMemoryIndex } = await import('../../lib/memory-index.js');
-          const memConfig = getMemoryConfig();
-          if (memConfig) {
-            const index = getMemoryIndex(memConfig);
-            const results = await index.search(storePhraseMessage.slice(0, 80));
-            if (!results || results.length === 0) {
-              throw new Error('Memory index empty after first run. First run stderr (last 400): ' + (run1.stderr || '').slice(-400));
-            }
-          }
-        } finally {
-          if (prevState !== undefined) process.env.COWCODE_STATE_DIR = prevState;
-          else delete process.env.COWCODE_STATE_DIR;
-        }
-        await new Promise((r) => setTimeout(r, 500));
-        const run2 = await runE2E(recallQuery, { stateDir });
-        const reply2 = run2.reply;
-        assert(reply2 && reply2.length > 0, 'Expected non-empty second reply');
+        const { stateDir } = createTempStateDir();
+        const run = await runE2E(storePhraseMessage, { stateDir, secondMessage: recallQuery });
+        const reply2 = run.reply;
+        assert(reply2 && reply2.length > 0, 'Expected non-empty reply to recall question');
         const { pass, reason } = await judgeRecall(storePhraseMessage, recallQuery, reply2, stateDir);
         const replyContainsPhrase = reply2 && reply2.includes(STORED_PHRASE);
         if (!pass && !replyContainsPhrase) {
-          const stderrHint = run2.stderr ? ` Second run stderr (last 300): ${run2.stderr.slice(-300)}` : '';
+          const stderrHint = run.stderr ? ` Stderr (last 300): ${run.stderr.slice(-300)}` : '';
           throw new Error(`Memory recall failed: LLM judge said the bot did not answer the user's question. Judge: ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply2 || '').slice(0, 400)}.${stderrHint}`);
         }
       },

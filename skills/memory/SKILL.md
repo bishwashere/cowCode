@@ -1,21 +1,21 @@
 ---
 id: memory
 name: Memory
-description: Semantic search and save over notes (MEMORY.md, memory/*.md) and chat history. Chat is baked in—every message auto-indexed; 'Remember what we said yesterday?' pulls from logs. No manual moo index. Tools: memory_search, memory_get, memory_save. See SKILL.md.
+description: Semantic search and save over notes (MEMORY.md, memory/*.md). Search log (chat history) is a built-in feature—call it only when the user explicitly mentions past conversations, yesterday, or logs. Tools: memory_search, memory_get, memory_save. See SKILL.md.
 ---
 
 # Memory
 
-Semantic search over your **notes** (`MEMORY.md`, `memory/*.md`) and **chat history** (every conversation is automatically indexed). "Remember what we said yesterday?" pulls from logs—no manual step.
+Semantic search over your **notes** (`MEMORY.md`, `memory/*.md`) and optional **search log** (chat history). Use memory_search for notes whenever relevant.
 
-**Chat history baked in** — Not just files. Conversations are stored in `workspace/chat-log/YYYY-MM-DD.jsonl` and embedded so memory_search finds them. Use memory_search for queries like "what did we decide about X?", "what did I ask yesterday?", "remember when we talked about Y?"
+**Search log (built-in)** — Chat is stored in `workspace/chat-log/YYYY-MM-DD.jsonl` and can be searched. **Only use memory_search to search chat history when the user explicitly asks**, e.g. "what did we talk about yesterday?", "search my logs", "last time we chatted", "what did I ask you before?", "our previous conversation". Do not search logs for general queries; only when the user clearly mentions past conversations, yesterday, or logs.
 
-**Auto-indexing** — Every message you send gets embedded and added to the index. No manual "moo index" or sync needed. File-based notes (MEMORY.md, memory/*.md) are synced when you run memory_search or on watch; chat is indexed as you talk.
+**Auto-indexing** — Notes (MEMORY.md, memory/*.md) and chat-log files are synced when you run memory_search. No manual "moo index" needed.
 
 ## Tools (pass `tool` in arguments: "memory_search", "memory_get", or "memory_save")
 
-- **memory_search** — Set `tool: "memory_search"`, `query` (required). Optional: `maxResults`, `minScore`. Semantically search notes and chat history. Returns snippets with path and line range (paths may be `MEMORY.md`, `memory/2025-02-15.md`, or `chat-log/2025-02-16.jsonl`).
-- **memory_get** — Set `tool: "memory_get"`, `path` (required, from memory_search). Optional: `from`, `lines`. Read a snippet by path (including chat-log/*.jsonl for past conversations).
+- **memory_search** — Set `tool: "memory_search"`, `query` (required). Optional: `maxResults`, `minScore`. Searches notes; if the user explicitly asked about past chats/yesterday/logs, the same search also includes chat history (`chat-log/YYYY-MM-DD.jsonl`). Returns snippets with path and line range (paths may be `MEMORY.md`, `memory/2025-02-15.md`, or `chat-log/2025-02-16.jsonl`). Only search chat when the user explicitly mentions it.
+- **memory_get** — Set `tool: "memory_get"`, `path` (required, from memory_search). Optional: `from`, `lines`. Read a snippet by path (including chat-log/*.jsonl when the user explicitly asked about past conversations).
 - **memory_save** — Set `tool: "memory_save"`, `text` (required): the note to save. Optional: `file` (default: `MEMORY.md`; use `memory/notes.md` or any `.md` path inside the workspace). Appends the note with today's date prefix and immediately re-indexes so it is searchable at once. Use when the user says "remember that…", "note this down", "save this for later", "add to my notes", etc.
 
 ## Config

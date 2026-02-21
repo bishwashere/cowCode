@@ -774,20 +774,23 @@ async function main() {
   // E2E tests capture stdout and parse E2E_REPLY_START...E2E_REPLY_END to assert on the reply.
   if (process.argv.includes('--test')) {
     const testIdx = process.argv.indexOf('--test');
-    const testMsg = process.argv[testIdx + 1] || process.env.TEST_MESSAGE || 'Send me hello in 1 minute';
+    const testMsg1 = process.argv[testIdx + 1] || process.env.TEST_MESSAGE || 'Send me hello in 1 minute';
+    const testMsg2 = process.env.TEST_MESSAGE_2;
     const lastSent = new Map();
     const sentIds = { current: new Set() };
-    console.log('[test] Running main code path with message:', testMsg.slice(0, 60));
-    try {
-      await runAgentWithSkills(sock, 'test@s.whatsapp.net', testMsg, lastSent, 'test@s.whatsapp.net', sentIds);
-    } catch (err) {
-      lastSent.set('test@s.whatsapp.net', 'Moo — ' + (err && err.message ? err.message : String(err)));
-    }
-    const reply = lastSent.get('test@s.whatsapp.net');
-    if (reply != null) {
-      console.log('E2E_REPLY_START');
-      process.stdout.write(reply + '\n'); // full reply for E2E (no log redaction)
-      console.log('E2E_REPLY_END');
+    for (const [i, testMsg] of [testMsg1, testMsg2].filter(Boolean).entries()) {
+      console.log('[test] Running main code path with message', i + 1 + ':', testMsg.slice(0, 60));
+      try {
+        await runAgentWithSkills(sock, 'test@s.whatsapp.net', testMsg, lastSent, 'test@s.whatsapp.net', sentIds);
+      } catch (err) {
+        lastSent.set('test@s.whatsapp.net', 'Moo — ' + (err && err.message ? err.message : String(err)));
+      }
+      const reply = lastSent.get('test@s.whatsapp.net');
+      if (reply != null && (testMsg2 ? (i === 1) : true)) {
+        console.log('E2E_REPLY_START');
+        process.stdout.write(reply + '\n');
+        console.log('E2E_REPLY_END');
+      }
     }
     console.log('[test] Done. Check cron/jobs.json.');
     process.exit(0);
