@@ -1,16 +1,21 @@
 /**
  * E2E tests: news/headlines and browser search through the main chatting interface.
- * Sends user message → intent → LLM + browser tool → reply. Asserts on actual output.
+ * See scripts/test/E2E.md for what we test (project skill, not API/token).
+ *
+ * Flow: user message → main app LLM → browser skill → reply → separate LLM judge: did the user get what they wanted?
  * Expect delay per test (AI + tool calls). Timeout per run: 2 minutes.
  */
 
 import { spawn } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { homedir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
+const DEFAULT_STATE_DIR = process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode');
 
 const E2E_REPLY_MARKER_START = 'E2E_REPLY_START';
 const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
@@ -41,12 +46,12 @@ const BROWSER_SPECIFIC_QUERIES = [
   "weather forecast for Camp Hill, Pennsylvania tomorrow",
 ];
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
 /**
  * Run the main app in --test mode with one message; return the reply text.
+ * @param {string} userMessage
+ * @returns {Promise<string>} Reply text (what would be sent to the user).
+ */
+function runE2E(userMessage) {
  * @param {string} userMessage
  * @returns {Promise<string>} Reply text (what would be sent to the user).
  */
@@ -101,38 +106,24 @@ async function main() {
       name: `news: "${query}"`,
       run: async () => {
         const reply = await runE2E(query);
-        const hasNumberedList = /\d+[\.\)]\s+\S+/.test(reply);
-        const bulletChar = /[-*•\u2013\u2014]/;
-        const hasBulletList = new RegExp(`^\\s*${bulletChar.source}\\s+`, 'm').test(reply) || new RegExp(`\\s${bulletChar.source}\\s+\\S+`).test(reply);
-        const hasTopNewsBlock = reply.includes('Top news') && reply.includes('1.');
-        const hasHeadlinesWord = /\bheadlines?\b/i.test(reply);
-        const hasNewsWord = /\bnews\b/i.test(reply);
-        const hasStoriesOrBreaking = /\b(?:top )?stories?\b|storylines?\b|breaking\b|current events\b/i.test(reply);
-        const hasNewsContext = /\bcurrent\s+top\b|latest\s+top\b|places to (?:see|get).*(?:news|headli)|snapshot|major themes\b/i.test(reply);
-        const hasLatest = /\blatest\b/i.test(reply);
-        const newsLike = hasHeadlinesWord || hasNewsWord || hasStoriesOrBreaking || hasNewsContext || hasLatest;
-        const substantive = reply.length > 50;
-        const hasListLike = hasNumberedList || hasBulletList;
-        const anySubstantiveNewsReply = reply.length > 100;
-        const longEnoughReply = reply.length > 50;
-        assert(
-          hasTopNewsBlock || (newsLike && substantive) || (hasListLike && longEnoughReply) || anySubstantiveNewsReply || longEnoughReply,
-          `Expected reply to contain headlines/list for "${query}". Got (first 300 chars): ${reply.slice(0, 300)}`
-        );
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
+        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
       },
     })),
     ...NON_NEWS_QUERIES.map((query) => ({
       name: `non-news: "${query}"`,
       run: async () => {
         const reply = await runE2E(query);
-        assert(!reply.includes('Top news / headlines\n\n1.') || reply.length < 400, `Non-news query "${query}" returned RSS-only reply`);
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
+        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
       },
     })),
     ...BROWSER_SPECIFIC_QUERIES.map((query) => ({
       name: `browser: "${query}"`,
       run: async () => {
         const reply = await runE2E(query);
-        assert(reply.trim().length > 50, `Expected substantive browser reply for "${query}". Got (first 300 chars): ${reply.slice(0, 300)}`);
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
+        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
       },
     })),
   ];

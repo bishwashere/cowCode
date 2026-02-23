@@ -1,22 +1,11 @@
 /**
  * E2E tests for cron (list / add / manage) through the main chatting interface.
- * Sends user message → intent → LLM + cron tool → reply. Expect delay per test (AI + tool calls).
+ * See scripts/test/E2E.md for what we test (project skill, not API/token).
  *
- * We assert:
- * - Reply text looks like list / add confirmation / remove.
- * - For a single "add" message, the cron store has exactly one job (catches duplicate-add bugs).
- * We do NOT wait for one-shot delivery (would require keeping process alive and capturing sent messages).
+ * Flow: user message → main app LLM → cron skill → reply → separate LLM judge: did the user get what they wanted?
  *
- * "One-shot when Telegram-only" tests that scheduleOneShot() actually schedules when startCron was
- * called with only telegramBot (no WhatsApp sock). Without this, one-shot reminders from Telegram
- * would be stored but never scheduled, so the message would never be sent.
- *
- * Why the "execute" test didn't catch the runner stdout bug: the test uses its own runJobOnce()
- * which parses the *last line* of run-job stdout. The production cron/runner.js used to parse
- * the *entire* stdout as JSON, so when run-job's child logged to stdout (e.g. [agent] run_skill),
- * the runner failed to parse and never sent the reply. The test passed because runJobOnce() had
- * correct last-line parsing from the start. The test "Runner parses multi-line stdout" below
- * guards the same contract so a regression in runner.js would be caught.
+ * Skill-facing tests (add, list, manage, recurring) use the LLM judge. Internal contract tests
+ * (exact job count, run-job stdout, one-shot when Telegram-only, channel send) keep code assertions.
  */
 
 import { spawn } from 'child_process';
@@ -25,6 +14,7 @@ import { join, dirname, resolve } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { homedir, tmpdir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
+import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -76,41 +66,6 @@ const REMINDER_MANAGE_QUERIES = [
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
-}
-
-/** Test queries are in English; reply must be in English (not e.g. Spanish). Fails if reply appears to be in another language. */
-function assertReplyInSameLanguageAsQuery(query, reply) {
-  const spanishIndicators = [
-    'No tienes',
-    'recordatorios programados',
-    'ningún recordatorio',
-    'Puedes crear',
-    'si lo deseas',
-    'Usa "add"',
-    'para crear uno',
-    'eliminar un recordatorio',
-    'déjame saber',
-    'te daré los pasos',
-    'No hay recordatorios',
-    'He programado',
-    'Tu recordatorio',
-    'está programado',
-    'Te recordé',
-    '¿Cómo puedo',
-    'mañana a las',
-    'para "llamar',
-    'bebas agua',
-    'revisar el código',
-    'trabajos programados',
-    'un recordatorio diario',
-    'la opción de "add"',
-  ];
-  const lower = (reply || '').toLowerCase();
-  const found = spanishIndicators.filter((phrase) => lower.includes(phrase.toLowerCase()));
-  assert(
-    found.length === 0,
-    `Reply must be in same language as user (query is English). Reply appears to be in Spanish (found: ${found.join(', ')}). Reply (first 200 chars): ${(reply || '').slice(0, 200)}`
-  );
 }
 
 /**
@@ -324,9 +279,8 @@ async function main() {
       name: `cron add: "${query}"`,
       run: async () => {
         const reply = await runE2E(query);
-        assertReplyInSameLanguageAsQuery(query, reply);
-        const looksLikeConfirmation = /scheduled|set|added|reminder|in \d+ minute|at \d+:|will send|will remind/i.test(reply) || reply.length > 20;
-        assert(looksLikeConfirmation, `Expected cron add confirmation for "${query}". Got (first 300 chars): ${reply.slice(0, 300)}`);
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
+        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
       },
     })),
     {
@@ -334,24 +288,20 @@ async function main() {
       run: async () => {
         const { stateDir, storePath } = createTempStateDir();
         const reply = await runE2E(singleAddQuery, { stateDir });
-        assertReplyInSameLanguageAsQuery(singleAddQuery, reply);
-        const looksLikeConfirmation = /scheduled|set|added|reminder|in \d+ minute|will send|will remind|timer|done/i.test(reply) || reply.length > 15;
-        assert(looksLikeConfirmation, `Expected add confirmation. Got: ${reply.slice(0, 300)}`);
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(singleAddQuery, reply, stateDir, { skillHint: 'cron' });
+        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
         const { jobs } = loadStore(storePath);
         assert(jobs.length === 1, `One "add" message must create exactly one job; got ${jobs.length}. Duplicate-add bug.`);
         const atTimes = jobs.filter((j) => j.schedule?.kind === 'at' && j.schedule?.at).map((j) => j.schedule.at);
         assert(new Set(atTimes).size === atTimes.length, `All one-shot jobs must have unique "at" times; got duplicates.`);
       },
     },
-    // List after adds so we have reminders to list (or a meaningful empty state after setup).
     ...CRON_LIST_QUERIES.map((query) => ({
       name: `cron list: "${query}"`,
       run: async () => {
         const reply = await runE2E(query);
-        assertReplyInSameLanguageAsQuery(query, reply);
-        const lower = (reply || '').toLowerCase();
-        const looksLikeList = lower.includes("don't have any") || lower.includes('scheduled') || lower.includes('reminder') || lower.includes('id=') || reply.includes('No ') || reply.includes('no ') || lower.includes('job');
-        assert(looksLikeList && reply.length > 10, `Expected cron list-style reply for "${query}". Got (first 300 chars): ${reply.slice(0, 300)}`);
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
+        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
       },
     })),
     ...CRON_RECURRING_ADD_QUERIES.map(({ query, expectedExpr }) => ({
@@ -359,9 +309,8 @@ async function main() {
       run: async () => {
         const { stateDir, storePath } = createTempStateDir();
         const reply = await runE2E(query, { stateDir });
-        assertReplyInSameLanguageAsQuery(query, reply);
-        const looksLikeConfirmation = /scheduled|set|added|reminder|every|daily|will send|will remind/i.test(reply) || reply.length > 20;
-        assert(looksLikeConfirmation, `Expected recurring add confirmation for "${query}". Got (first 300 chars): ${reply.slice(0, 300)}`);
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'cron' });
+        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
         const { jobs } = loadStore(storePath);
         const cronJobs = jobs.filter((j) => j.schedule?.kind === 'cron' && j.schedule?.expr);
         assert(cronJobs.length >= 1, `Expected at least one cron (recurring) job for "${query}"; got ${jobs.length} jobs, cron: ${cronJobs.length}.`);
@@ -428,10 +377,8 @@ async function main() {
       name: `cron manage: "${query}"`,
       run: async () => {
         const reply = await runE2E(query);
-        assertReplyInSameLanguageAsQuery(query, reply);
-        const listStyle = reply.includes("don't have any") || reply.includes('scheduled') || reply.includes('reminder') || reply.includes('id=') || reply.includes('No ') || reply.includes('no ') || (reply.includes('list') && (reply.includes('cron') || reply.includes('tool') || reply.includes('answered')));
-        const removeStyle = /removed|not found|delete|remove|job \d|by id|one at a time/i.test(reply);
-        assert((listStyle || removeStyle) && reply.length > 5, `Expected cron list/remove-style reply for "${query}". Got (first 300 chars): ${reply.slice(0, 300)}`);
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
+        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
       },
     })),
   ];

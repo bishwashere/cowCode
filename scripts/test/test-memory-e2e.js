@@ -1,5 +1,9 @@
 /**
  * E2E tests for memory: chat log is written, and memory recall works.
+ * See scripts/test/E2E.md for what we test (project skill, not API/token).
+ *
+ * Flow: user message → main app LLM → memory skill → reply → separate LLM judge: did the user get what they wanted?
+ *
  * 1. Chat log written — one message → assert workspace/chat-log/YYYY-MM-DD.jsonl contains the exchange.
  * 2. Memory recall — store a phrase, ask "what did we talk about yesterday?", then use an LLM judge to decide
  *    whether the bot answered the user's question (no regex or pattern matching).
