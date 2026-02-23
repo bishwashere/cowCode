@@ -8,7 +8,7 @@ description: Control and query Home Assistant. Uses HA_URL and HA_TOKEN from env
 
 Control and query your **Home Assistant** instance over the REST API. Use when the user asks to turn lights on/off, check device states, run automations, or control any Home Assistant entity.
 
-**Config:** Set environment variables **HA_URL** (e.g. `https://homeassistant.local:8123`) and **HA_TOKEN** (long-lived access token). Add `"home-assistant"` to `skills.enabled` in config.
+**Config:** Set **HA_TOKEN** in the environment (e.g. in `~/.cowcode/.env` via `cowcode skills install home-assistant`). **HA_URL** is optional and defaults to `http://localhost:8123`; set it only if your Home Assistant is at a different URL. Add `"home-assistant"` to `skills.enabled` in config.
 
 ## Commands (use `command` or `arguments.action`)
 

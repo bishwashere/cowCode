@@ -17,6 +17,7 @@ touch "$STATE_DIR/daemon.log" "$STATE_DIR/daemon.err" 2>/dev/null || true
 NODE="$(command -v node 2>/dev/null || true)"
 [ -z "$NODE" ] && NODE="node"
 INDEX_JS="$INSTALL_DIR/index.js"
+RUN_WITH_ENV="$INSTALL_DIR/scripts/run-with-env.sh"
 
 # macOS launchd
 LAUNCHD_LABEL="ai.cowcode.bot"
@@ -65,6 +66,7 @@ ensure_pm2() {
 
 ensure_plist() {
   [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from cowCode install directory."; exit 1; }
+  [ -f "$RUN_WITH_ENV" ] || { echo "Missing $RUN_WITH_ENV. Run from cowCode install directory."; exit 1; }
   mkdir -p "$(dirname "$PLIST")"
   cat > "$PLIST" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -75,8 +77,8 @@ ensure_plist() {
   <string>${LAUNCHD_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${NODE}</string>
-    <string>${INDEX_JS}</string>
+    <string>/bin/bash</string>
+    <string>${RUN_WITH_ENV}</string>
   </array>
   <key>WorkingDirectory</key>
   <string>${STATE_DIR}</string>
@@ -103,6 +105,7 @@ EOF
 
 ensure_systemd_unit() {
   [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from cowCode install directory."; exit 1; }
+  [ -f "$RUN_WITH_ENV" ] || { echo "Missing $RUN_WITH_ENV. Run from cowCode install directory."; exit 1; }
   mkdir -p "$SYSTEMD_USER_DIR"
   cat > "$SERVICE_FILE" << EOF
 [Unit]
@@ -112,7 +115,7 @@ After=network.target
 [Service]
 Type=simple
 Environment="COWCODE_STATE_DIR=${STATE_DIR}" "COWCODE_INSTALL_DIR=${INSTALL_DIR}"
-ExecStart=${NODE} ${INDEX_JS}
+ExecStart=/bin/bash ${RUN_WITH_ENV}
 WorkingDirectory=${STATE_DIR}
 Restart=always
 RestartSec=5
@@ -152,9 +155,7 @@ case "$OS" in
   Darwin)
     case "$ACTION" in
       start)
-        if [ ! -f "$PLIST" ]; then
-          ensure_plist
-        fi
+        ensure_plist
         touch "$STATE_DIR/daemon.log" "$STATE_DIR/daemon.err" 2>/dev/null || true
         if launchctl list 2>/dev/null | grep -q "$LAUNCHD_LABEL"; then
           echo "Daemon is already running. Logs: $STATE_DIR/daemon.log"
@@ -182,7 +183,7 @@ case "$OS" in
       restart)
         launchctl unload "$PLIST" 2>/dev/null || true
         sleep 1
-        [ -f "$PLIST" ] || ensure_plist
+        ensure_plist
         launchctl load "$PLIST"
         echo "Daemon restarted."
         ;;
@@ -192,9 +193,7 @@ case "$OS" in
   Linux*)
     case "$ACTION" in
       start)
-        if [ ! -f "$SERVICE_FILE" ]; then
-          ensure_systemd_unit
-        fi
+        ensure_systemd_unit
         systemctl --user daemon-reload 2>/dev/null || true
         systemctl --user enable --now "$SERVICE_NAME" 2>/dev/null || systemctl --user start "$SERVICE_NAME"
         echo "Daemon started. Logs: journalctl --user -u $SERVICE_NAME -f"
@@ -207,7 +206,7 @@ case "$OS" in
         systemctl --user status "$SERVICE_NAME" 2>/dev/null || echo "Daemon is not running."
         ;;
       restart)
-        [ -f "$SERVICE_FILE" ] || ensure_systemd_unit
+        ensure_systemd_unit
         systemctl --user daemon-reload 2>/dev/null || true
         systemctl --user restart "$SERVICE_NAME"
         echo "Daemon restarted."
