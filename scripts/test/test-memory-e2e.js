@@ -7,10 +7,12 @@
  * 1. Chat log written — one message → assert workspace/chat-log/YYYY-MM-DD.jsonl contains the exchange.
  * 2. Memory recall — store a phrase, ask "what did we talk about yesterday?", then use an LLM judge to decide
  *    whether the bot answered the user's question (no regex or pattern matching).
+ * 3. Filesystem index — use real app state (~/.cowcode). Create test dir in workspace, run index CLI, then main app
+ *    with a user message asking for file-related memory; assert reply contains indexed file/dir names. Uses ~/.cowcode/memory/index.db.
  */
 
-import { spawn } from 'child_process';
-import { readFileSync, mkdirSync, writeFileSync, existsSync, copyFileSync, readdirSync } from 'fs';
+import { spawn, spawnSync } from 'child_process';
+import { readFileSync, mkdirSync, writeFileSync, existsSync, copyFileSync, readdirSync, statSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
@@ -113,7 +115,14 @@ function createTempStateDir() {
   writeFileSync(join(stateDir, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
 
   if (existsSync(join(DEFAULT_STATE_DIR, '.env'))) {
-    copyFileSync(join(DEFAULT_STATE_DIR, '.env'), join(stateDir, '.env'));
+    let envContent = readFileSync(join(DEFAULT_STATE_DIR, '.env'), 'utf8');
+    envContent = envContent
+      .split('\n')
+      .filter((line) => !/^\s*COWCODE_STATE_DIR\s*=/.test(line))
+      .join('\n');
+    writeFileSync(join(stateDir, '.env'), envContent.trimEnd() + '\nCOWCODE_STATE_DIR=' + stateDir + '\n', 'utf8');
+  } else {
+    writeFileSync(join(stateDir, '.env'), 'COWCODE_STATE_DIR=' + stateDir + '\n', 'utf8');
   }
   return { stateDir, workspaceDir };
 }
@@ -238,6 +247,59 @@ async function main() {
         if (!pass && !replyContainsPhrase) {
           const stderrHint = run.stderr ? ` Stderr (last 300): ${run.stderr.slice(-300)}` : '';
           throw new Error(`Memory recall failed: LLM judge said the bot did not answer the user's question. Judge: ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply2 || '').slice(0, 400)}.${stderrHint}`);
+        }
+      },
+    },
+    {
+      name: 'memory: filesystem index — query file-related memory and get filesystem results',
+      run: async () => {
+        const stateDir = DEFAULT_STATE_DIR;
+        const workspaceDir = join(stateDir, 'workspace');
+        const testDir = join(workspaceDir, 'e2e-fs-test');
+        const subDir = join(testDir, 'subdir');
+        mkdirSync(subDir, { recursive: true });
+        writeFileSync(join(testDir, 'foo.txt'), 'e2e test file', 'utf8');
+        writeFileSync(join(subDir, 'bar.js'), '// e2e', 'utf8');
+
+        const indexScript = join(INSTALL_ROOT, 'scripts', 'index-cli.js');
+        assert(existsSync(indexScript), 'scripts/index-cli.js not found');
+        const indexResult = spawnSync(
+          process.execPath,
+          [indexScript, 'index', '--source', 'filesystem', '--root', workspaceDir, '--limit', '25'],
+          {
+            cwd: INSTALL_ROOT,
+            env: { ...process.env, COWCODE_STATE_DIR: stateDir },
+            encoding: 'utf8',
+            timeout: 60000,
+          }
+        );
+        if (indexResult.status !== 0) {
+          const err = (indexResult.stderr || indexResult.stdout || '').slice(-500);
+          throw new Error(`Index CLI failed (exit ${indexResult.status}): ${err}`);
+        }
+
+        const indexDbPath = join(stateDir, 'memory', 'index.db');
+        assert(existsSync(indexDbPath), 'Index DB not found at ' + indexDbPath + '. Index CLI stdout: ' + (indexResult.stdout || '').slice(-400));
+        console.log('[filesystem test] stateDir:', stateDir, 'index.db size:', statSync(indexDbPath).size);
+        const userMessage = 'Search my memory for directory contents or list of files and folders, then tell me what files or directories you find.';
+        const { reply } = await runE2E(userMessage, { stateDir });
+
+        console.log('\n--- memory: filesystem index test (E2E) ---');
+        console.log('Input (user message):', userMessage);
+        console.log('Output (bot reply):', reply ? reply.slice(0, 500) + (reply.length > 500 ? '…' : '') : '(empty)');
+        console.log('---\n');
+
+        assert(reply && reply.length > 0, 'Expected non-empty reply');
+        const hasIndexedContent =
+          reply.includes('e2e-fs-test') ||
+          reply.includes('foo.txt') ||
+          reply.includes('subdir') ||
+          reply.includes('bar.js');
+        if (!hasIndexedContent) {
+          throw new Error(
+            'Expected reply to include file/dir names from the indexed workspace (e2e-fs-test, foo.txt, subdir, bar.js). Reply (first 500 chars): ' +
+              reply.slice(0, 500)
+          );
         }
       },
     },
