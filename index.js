@@ -43,7 +43,7 @@ import { getGroupAddedBy, setGroupAddedBy } from './lib/telegram-group-added-by.
 import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
-import { appendGroupExchange, readLastGroupExchanges } from './lib/chat-log.js';
+import { appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
 import { ensureGroupConfigFor, readGroupMd } from './lib/group-config.js';
@@ -383,7 +383,7 @@ async function main() {
 
   const MAX_REPLIED_IDS = 500;
   const MAX_OUR_SENT_IDS = 200;
-  const MAX_CHAT_HISTORY_EXCHANGES = 5;
+  const MAX_CHAT_HISTORY_EXCHANGES = Math.max(1, Math.floor(Number(config.chatHistoryExchanges)) || 5);
 
   /** Pending WhatsApp replies when send failed (e.g. disconnected); flushed when connection reopens. */
   const pendingReplies = [];
@@ -686,9 +686,10 @@ async function main() {
         }
       : { groupSenderName: bioOpts.groupSenderName };
     const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
+    const inMemoryHistory = getLast5Exchanges(jid);
     const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
-      : getLast5Exchanges(jid);
+      : (inMemoryHistory.length > 0 ? inMemoryHistory : readLastPrivateExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES));
     const { textToSend, voiceReplyText } = await runAgentTurn({
       userText: text,
       ctx,
