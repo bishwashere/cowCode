@@ -746,7 +746,7 @@ async function main() {
             }
           }
         }
-        console.log('[replied]', useTools ? '(agent + skills)' : '(chat)');
+        console.log('[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');
         const alreadySentBioPrompt = bioOpts.bioPromptSentJids?.has(jid);
         if (bioOpts.pendingBioConfirmJids != null && !isBioSet() && !alreadySentBioPrompt) {
           try {
