@@ -66,8 +66,14 @@ ensure_pm2() {
 
 ensure_plist() {
   [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from cowCode install directory."; exit 1; }
-  [ -f "$RUN_WITH_ENV" ] || { echo "Missing $RUN_WITH_ENV. Run from cowCode install directory."; exit 1; }
   mkdir -p "$(dirname "$PLIST")"
+  if [ -f "$RUN_WITH_ENV" ]; then
+    RUN_CMD="/bin/bash"
+    RUN_ARG="$RUN_WITH_ENV"
+  else
+    RUN_CMD="$NODE"
+    RUN_ARG="$INDEX_JS"
+  fi
   cat > "$PLIST" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -77,8 +83,8 @@ ensure_plist() {
   <string>${LAUNCHD_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>${RUN_WITH_ENV}</string>
+    <string>${RUN_CMD}</string>
+    <string>${RUN_ARG}</string>
   </array>
   <key>WorkingDirectory</key>
   <string>${STATE_DIR}</string>
@@ -105,8 +111,12 @@ EOF
 
 ensure_systemd_unit() {
   [ -f "$INDEX_JS" ] || { echo "Missing $INDEX_JS. Run from cowCode install directory."; exit 1; }
-  [ -f "$RUN_WITH_ENV" ] || { echo "Missing $RUN_WITH_ENV. Run from cowCode install directory."; exit 1; }
   mkdir -p "$SYSTEMD_USER_DIR"
+  if [ -f "$RUN_WITH_ENV" ]; then
+    EXEC_START="/bin/bash ${RUN_WITH_ENV}"
+  else
+    EXEC_START="${NODE} ${INDEX_JS}"
+  fi
   cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=cowCode WhatsApp bot
@@ -115,7 +125,7 @@ After=network.target
 [Service]
 Type=simple
 Environment="COWCODE_STATE_DIR=${STATE_DIR}" "COWCODE_INSTALL_DIR=${INSTALL_DIR}"
-ExecStart=/bin/bash ${RUN_WITH_ENV}
+ExecStart=${EXEC_START}
 WorkingDirectory=${STATE_DIR}
 Restart=always
 RestartSec=5

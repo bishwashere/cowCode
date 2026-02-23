@@ -11,7 +11,9 @@ export COWCODE_INSTALL_DIR="$INSTALL_DIR"
 
 if [ -f "$STATE_DIR/.env" ]; then
   set -a
-  . "$STATE_DIR/.env"
+  set +e
+  . "$STATE_DIR/.env" 2>/dev/null
+  set -e
   set +a
 fi
 
