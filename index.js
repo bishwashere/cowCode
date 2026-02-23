@@ -8,6 +8,9 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
 
+// Log to daemon.log so "tail -f" shows when the process actually started (after cowcode moo start/restart)
+console.log(`[${new Date().toISOString().replace(/\.\d{3}Z$/, '')}] cowCode daemon started`);
+
 import * as Baileys from '@whiskeysockets/baileys';
 
 const makeWASocket =

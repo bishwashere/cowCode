@@ -182,6 +182,7 @@ case "$OS" in
           if launchctl load "$PLIST"; then
             echo "Daemon started. Logs: $STATE_DIR/daemon.log"
             daemon_log
+            echo "  (tail the log to see 'cowCode daemon started' when the bot is up)"
           else
             echo "Daemon failed to start. Check the error above."
             exit 1
@@ -208,6 +209,7 @@ case "$OS" in
         launchctl load "$PLIST"
         echo "Daemon restarted."
         daemon_log
+        echo "  (tail $STATE_DIR/daemon.log to see 'cowCode daemon started' when the bot is up)"
         ;;
       *) echo "Usage: cowcode moo start|stop|status|restart"; exit 1 ;;
     esac
