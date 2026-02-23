@@ -200,7 +200,7 @@ if (sub === 'moo') {
   console.log('Usage: cowcode moo start | stop | status | restart');
   console.log('       cowcode logs');
   console.log('       cowcode dashboard');
-  console.log('       cowcode index [--source memory] [--source filesystem] [--root <path>] [--limit N]');
+  console.log('       cowcode index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');
   console.log('       cowcode auth [options]');
   console.log('       cowcode skills install <skill-id>');
   console.log('       cowcode update [--force]');
