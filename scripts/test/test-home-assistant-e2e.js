@@ -2,12 +2,12 @@
  * E2E test for the Home Assistant skill: validates that our skill is accurate.
  * See scripts/test/E2E.md for what we test (project skill, not API/token).
  *
- * Flow: user message → main app LLM → home-assistant skill (env load, real fetch) → reply
+ * Flow: user message → main app LLM → home-assistant skill (CLI layer: ha-cli.js, env load, real fetch) → reply
  *       → separate LLM judge: did the user get what they wanted?
  *
  * - LLM chooses the home-assistant skill for "list my lights" / "what lights do I have"
- * - Skill loads HA_URL/HA_TOKEN from env (state dir .env)
- * - Skill performs the real HA API call and returns the list to the user
+ * - Skill runs via the HA CLI (skills/home-assistant/ha-cli.js); CLI loads HA_URL/HA_TOKEN from state dir .env
+ * - CLI performs the real HA API call and returns the list to the user
  * No mocks: uses your real config and real Home Assistant. If HA is not configured or unreachable, the test fails.
  *
  * Prerequisites: home-assistant in skills.enabled, HA_URL/HA_TOKEN in ~/.cowcode/.env, HA reachable.

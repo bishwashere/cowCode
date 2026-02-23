@@ -1,32 +1,60 @@
 ---
 id: home-assistant
 name: Home Assistant
-description: Control and query Home Assistant. Uses HA_URL and HA_TOKEN from environment. Actions: list_states, get_state, call_service. See SKILL.md.
+description: Control and query Home Assistant via simple commands. Uses HA_URL and HA_TOKEN from ~/.cowcode/.env. Use command: "list lights", "search kitchen", "on light.xyz", "list automations", etc. See SKILL.md.
 ---
 
 # Home Assistant
 
-Control and query your **Home Assistant** instance over the REST API. Use when the user asks to turn lights on/off, check device states, run automations, or control any Home Assistant entity.
+Control and query your **Home Assistant** instance with simple commands. You do not need to say "entities", "domain", or "state"—use the command phrases below and the skill will run the right action.
 
-**Config:** Set **HA_TOKEN** in the environment (e.g. in `~/.cowcode/.env` via `cowcode skills install home-assistant`). **HA_URL** is optional and defaults to `http://localhost:8123`; set it only if your Home Assistant is at a different URL. Add `"home-assistant"` to `skills.enabled` in config.
+**Config:** Set **HA_TOKEN** in `~/.cowcode/.env` (e.g. via `cowcode skills install home-assistant`). **HA_URL** is optional and defaults to `http://localhost:8123`. Add `"home-assistant"` to `skills.enabled` in config.
 
-## Commands (use `command` or `arguments.action`)
+## How to use
 
-- **list_states** — List all entities (or filter by domain). Use when the user asks "what devices do I have?", "list my lights", "show entities". Optional: `arguments.domain` (e.g. `light`, `switch`, `sensor`) to filter.
-- **get_state** — Get one entity's state. Set `arguments.entity_id` (e.g. `light.living_room`). Use when the user asks "is the living room light on?", "what's the temperature in the office?".
-- **call_service** — Call a Home Assistant service. Set `arguments.domain`, `arguments.service`, and optionally `arguments.entity_id`, `arguments.service_data` (object). Examples: turn on a light (`domain: light`, `service: turn_on`, `entity_id: light.living_room`), toggle (`service: toggle`), run a script (`domain: script`, `service: turn_on`, `entity_id: script.notify_me`).
+Set **`arguments.command`** to one of the commands below. The user can speak naturally; you translate their intent into a single `command` string.
 
-## Examples
+## Commands (use `arguments.command`)
 
-| User says | Action | Arguments |
-|-----------|--------|-----------|
-| Turn on the living room light | call_service | domain: light, service: turn_on, entity_id: light.living_room |
-| Turn off bedroom light | call_service | domain: light, service: turn_off, entity_id: light.bedroom |
-| List all lights | list_states | domain: light |
-| Is the garage door open? | get_state | entity_id: cover.garage_door |
-| Run my "good night" script | call_service | domain: script, service: turn_on, entity_id: script.good_night |
+| Command | When to use | Example |
+|---------|-------------|---------|
+| `list lights` | List all lights | "What lights do I have?", "Show my lights" |
+| `list automation` | List all automations | "List my automations", "Show thermostat automations" |
+| `list switch` | List switches | "What switches are there?" |
+| `list` | List all entities | "List all devices" |
+| `search <word>` | Find entities by name | "Find kitchen lights" → `search kitchen` |
+| `state <entity_id>` | Get one entity's state | "Is the living room light on?" → `state light.living_room` |
+| `on <entity_id>` | Turn on a light/switch | "Turn on the living room light" → `on light.living_room` |
+| `on <entity_id> <0-255>` | Turn on with brightness | "Set kitchen light to 50%" → `on light.kitchen 128` |
+| `off <entity_id>` | Turn off | "Turn off the bedroom light" → `off light.bedroom` |
+| `toggle <entity_id>` | Toggle on/off | "Toggle the fan" → `toggle switch.fan` |
+| `scene <entity_id>` | Activate a scene | "Movie mode" → `scene scene.movie_night` |
+| `script <entity_id>` | Run a script | "Run good night script" → `script script.good_night` |
+| `automation <entity_id>` | Trigger an automation | "Run my morning automation" → `automation automation.morning` |
+| `climate <entity_id> <temp>` | Set thermostat temperature | "Set thermostat to 22" → `climate climate.thermostat 22` |
+| `help` | List all commands | When the user asks how to use Home Assistant |
+
+## User says → command (translate intent)
+
+| User says | Use command |
+|-----------|-------------|
+| List my lights / What lights do I have? | `list lights` |
+| Show my automations / Thermostat automations | `list automation` |
+| Find something (e.g. kitchen, thermostat) | `search kitchen` or `search thermostat` |
+| Turn on the living room light | `on light.living_room` |
+| Turn off the bedroom light | `off light.bedroom` |
+| Is the garage door open? | `state cover.garage_door` |
+| Run my "good night" script | `script script.good_night` |
+| Trigger morning automation | `automation automation.morning` |
+| Set temperature to 21 | `climate climate.thermostat 21` (use the correct thermostat entity_id from a prior list/search) |
+
+## Finding entity IDs
+
+If the user mentions a room or device by name and you don't know the entity_id:
+1. Use **`search <name>`** (e.g. `search living_room`) to get matching entities and their `entity_id`.
+2. Then use **`on`**, **`off`**, **`state`**, etc. with that `entity_id`.
 
 ## Notes
 
-- Entity IDs are usually `domain.name` (e.g. `light.living_room`, `switch.coffee_machine`). Use list_states first if the user is unsure of entity IDs.
-- For call_service, `service_data` can include any extra parameters (e.g. `brightness_pct`, `rgb_color`) as a JSON object.
+- Entity IDs are `domain.name` (e.g. `light.living_room`, `automation.morning`). Use `list` or `search` to discover them.
+- For raw API calls use: `call <domain> <service> [entity_id]` (advanced).
