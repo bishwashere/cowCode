@@ -36,19 +36,19 @@ const EXECUTORS = {
   me: executeMe,
 };
 
-/** Core skill (shell commands) is disabled for everyone — not available. */
+/** Core skill (shell commands) is disabled in group chats only; allowed in DMs and dashboard. */
 const CORE_SKILL_ID = 'core';
 
 /**
  * @param {string} skillId - cron | search | memory
- * @param {object} ctx - storePath, jid, workspaceDir, scheduleOneShot, startCron
+ * @param {object} ctx - storePath, jid, workspaceDir, scheduleOneShot, startCron, isGroup
  * @param {object} args - Parsed LLM tool arguments
  * @param {string} [toolName] - For multi-tool skills (e.g. memory_search, memory_get)
  * @returns {Promise<string>}
  */
 export async function executeSkill(skillId, ctx, args, toolName) {
-  if (skillId === CORE_SKILL_ID) {
-    return JSON.stringify({ error: 'The core skill is not available.' });
+  if (skillId === CORE_SKILL_ID && ctx?.isGroup) {
+    return JSON.stringify({ error: 'The core skill is not available in group chats.' });
   }
   const run = EXECUTORS[skillId];
   if (!run) return JSON.stringify({ error: `Unknown skill: ${skillId}` });

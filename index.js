@@ -662,6 +662,7 @@ async function main() {
     try {
       await sock.sendPresenceUpdate('composing', jid);
     } catch (_) {}
+    const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
     const ctx = {
       storePath: getCronStorePath(),
       jid,
@@ -669,6 +670,7 @@ async function main() {
       scheduleOneShot,
       startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: getCronStorePath(), telegramBot: telegramBot || undefined }),
       groupNonOwner: !!bioOpts.groupNonOwner,
+      isGroup: isGroupJid,
     };
     const isGroupNonOwner = !!bioOpts.groupNonOwner;
     const skillContext = isGroupNonOwner
@@ -685,7 +687,6 @@ async function main() {
           groupNonOwner: true,
         }
       : { groupSenderName: bioOpts.groupSenderName };
-    const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
     const inMemoryHistory = getLast5Exchanges(jid);
     const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
