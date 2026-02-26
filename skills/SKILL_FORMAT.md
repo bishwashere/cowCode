@@ -1,5 +1,7 @@
 # Skill format (compact-compatible)
 
+One central agent handles everything: it picks the right skill from the list, runs it in the shared executor, and keeps things smooth. Skills add smarts like shortcuts or recipes; the heavy lifting stays shared. No babysitters, no extras.
+
 Every skill must be **compact-compatible** so the loader can inject a short list (name + description) on each run and full doc when the skill is called.
 
 ## Required frontmatter

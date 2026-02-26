@@ -1,7 +1,7 @@
 /**
- * Central executor: runs tool operations (add, delete, list, etc.) with LLM-provided args.
- * No logic in skill folders; tool schemas come from tools.json + config.
- * Skill availability is determined only by config (main or per-group); no extra group restrictions.
+ * Single central executor. The agent picks the right skill from the list and runs it here.
+ * Skills are shortcuts/recipes (SKILL.md + one entry in the map); all heavy lifting is shared.
+ * No per-skill babysitters—one dispatcher, one place.
  */
 
 import { executeCron } from '../lib/executors/cron.js';
@@ -53,11 +53,7 @@ export async function executeSkill(skillId, ctx, args, toolName) {
   const run = EXECUTORS[skillId];
   if (!run) return JSON.stringify({ error: `Unknown skill: ${skillId}` });
   try {
-    if (skillId === 'memory') {
-      const result = await executeMemory(ctx, args, toolName || 'memory_search');
-      return typeof result === 'string' ? result : JSON.stringify(result);
-    }
-    const result = await run(ctx, args);
+    const result = await run(ctx, args, toolName);
     return typeof result === 'string' ? result : JSON.stringify(result);
   } catch (err) {
     console.error('[skills]', skillId, err.message);
