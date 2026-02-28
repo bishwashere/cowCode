@@ -1,4 +1,0 @@
-{
-  "id": "memory",
-  "description": "Semantic search and save over notes (MEMORY.md, memory/*.md) and chat history. Chat is baked in—every message auto-indexed; 'Remember what we said yesterday?' pulls from logs. No manual moo index. Tools: memory_search, memory_get, memory_save. See SKILL.md."
-}

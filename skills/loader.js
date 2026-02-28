@@ -122,7 +122,7 @@ export function getSkillContext(options = {}) {
                   },
                   command: {
                     type: 'string',
-                    description: 'Operation name. e.g. cron: list, add, remove; search: search, navigate; browse: navigate, click, scroll, fill, screenshot, reset; vision: describe. Use arguments.action if not set.',
+                    description: 'Operation name. e.g. cron: list, add, remove; search: search, navigate; browse: navigate, click, scroll, fill, screenshot, reset; vision: describe, generate. Use arguments.action if not set.',
                   },
                   arguments: {
                     type: 'object',

@@ -1,1 +1,0 @@
-{"id":"vision","description":"Describe or analyze an image using a vision-capable model. Use arguments.image, arguments.url, or arguments.path for the image (file path from \"Image file: ...\" in message, URL, or \"webcam\"). Live camera: image \"webcam\" or source \"webcam\". See SKILL.md."}

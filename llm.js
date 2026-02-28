@@ -3,10 +3,10 @@
  * are env var names). Supports preset providers and multiple models with priority.
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getConfigPath } from './lib/paths.js';
+import { getConfigPath, getUploadsDir } from './lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -427,6 +427,81 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
     }
   }
   throw lastError || new Error('No vision-capable LLM responded');
+}
+
+/**
+ * Image generation (OpenAI DALL·E). Requires config.skills.vision.imageGeneration.apiKey (env var name)
+ * or an OpenAI key from skills.vision.fallback when provider is openai.
+ * Saves image to uploads dir and returns { path, caption } for sending to chat.
+ * @param {string} prompt - What to draw.
+ * @param {{ size?: string, model?: string }} [opts] - Optional size (default 1024x1024), model (default dall-e-3).
+ * @returns {Promise<{ path: string, caption: string }>}
+ */
+export async function generateImage(prompt, opts = {}) {
+  const p = (prompt && String(prompt).trim()) || '';
+  if (!p) throw new Error('generateImage requires a prompt');
+
+  const config = (() => {
+    try {
+      const raw = readFileSync(getConfigPath(), 'utf8');
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      return {};
+    }
+  })();
+
+  const imageCfg = config.skills?.vision?.imageGeneration;
+  let apiKey = null;
+  if (imageCfg && imageCfg.apiKey) {
+    apiKey = fromEnv(imageCfg.apiKey) || fromEnv('LLM_1_API_KEY');
+  }
+  if (!apiKey || apiKey === 'not-needed') {
+    const fallback = config.skills?.vision?.fallback;
+    if (fallback && String(fallback.provider || '').toLowerCase() === 'openai' && fallback.apiKey) {
+      apiKey = fromEnv(fallback.apiKey) || fromEnv('LLM_1_API_KEY');
+    }
+  }
+  if (!apiKey || String(apiKey).trim() === '') {
+    throw new Error('Image generation needs an OpenAI API key. Set skills.vision.imageGeneration.apiKey (env var name) or use OpenAI as vision fallback and run setup.');
+  }
+
+  const size = opts.size || imageCfg?.size || '1024x1024';
+  const model = opts.model || imageCfg?.model || 'dall-e-3';
+
+  const res = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey.trim()}`,
+    },
+    body: JSON.stringify({
+      model,
+      prompt: p,
+      n: 1,
+      size: model.startsWith('dall-e-3') ? size : (size === '1024x1792' || size === '1792x1024' ? '1024x1024' : size),
+      response_format: 'b64_json',
+      quality: 'standard',
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Image generation failed ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const b64 = data.data?.[0]?.b64_json;
+  const revised = data.data?.[0]?.revised_prompt;
+  if (!b64) throw new Error('No image data in response');
+
+  const uploadsDir = getUploadsDir();
+  if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+  const path = join(uploadsDir, `generated-${Date.now()}.png`);
+  const buf = Buffer.from(b64, 'base64');
+  writeFileSync(path, buf);
+
+  const caption = (revised && String(revised).trim()) ? String(revised).trim().slice(0, 500) : p.slice(0, 500);
+  return { path, caption };
 }
 
 export { loadConfig, PRESETS };

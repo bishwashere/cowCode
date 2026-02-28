@@ -2,11 +2,13 @@
 
 One central agent handles everything: it picks the right skill from the list, runs it in the shared executor, and keeps things smooth. Skills add smarts like shortcuts or recipes; the heavy lifting stays shared. No babysitters, no extras.
 
-Every skill must be **compact-compatible** so the loader can inject a short list (name + description) on each run and full doc when the skill is called.
+Every skill is **one file**: `SKILL.md`. There is no `skill.json` — all metadata lives in the markdown frontmatter.
 
-## Required frontmatter
+Every skill must be **compact-compatible** so the loader can inject a short list (id + description) on each run and full doc when the skill is called.
 
-In each skill's `SKILL.md`, use YAML frontmatter between the first `---` and second `---`:
+## Required frontmatter (in SKILL.md only)
+
+In each skill's `SKILL.md`, use YAML frontmatter between the first `---` and second `---`. No separate structure file; id and description are enough for discovery:
 
 - **`id`** (optional) — Skill id used in `run_skill` (defaults to folder name). Must match the skill folder name (e.g. `cron`, `search`, `memory`).
 - **`description`** (required) — One-line summary for the compact list. Keep it under ~280 characters. Used when the loader builds the compact list; the model sees this before choosing a skill.

@@ -692,7 +692,7 @@ async function main() {
     const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
       : (inMemoryHistory.length > 0 ? inMemoryHistory : readLastPrivateExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES));
-    const { textToSend, voiceReplyText } = await runAgentTurn({
+    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption } = await runAgentTurn({
       userText: text,
       ctx,
       systemPrompt: buildSystemPrompt(systemPromptOpts),
@@ -706,8 +706,16 @@ async function main() {
       (!textForSend || !textForSend.trim() || /^\[NO_REPLY\]\s*$/i.test(textForSend.trim()));
     if (!isGroupNoReply) {
       let voiceBuffer = null;
+      let imageBuffer = null;
+      if (imageReplyPath && existsSync(imageReplyPath)) {
+        try {
+          imageBuffer = readFileSync(imageReplyPath);
+        } catch (err) {
+          console.error('[vision] read image failed:', err.message);
+        }
+      }
       const textForVoice = (voiceReplyText && voiceReplyText.trim()) ? voiceReplyText.trim() : null;
-      if (textForVoice) {
+      if (textForVoice && !imageBuffer) {
         try {
           const speechConfig = getSpeechConfig();
           if (speechConfig?.elevenLabsApiKey) {
@@ -718,10 +726,18 @@ async function main() {
         }
       }
       const replyText = (voiceReplyText && voiceReplyText.trim()) ? voiceReplyText.trim() : textForSend;
+      const captionForImage = (replyText && replyText.trim()) ? replyText.replace(/^\[CowCode\]\s*/i, '').trim() : (imageReplyCaption || '');
       try {
-        const sent = voiceBuffer
-          ? await sock.sendMessage(jid, isTelegramChatId(jid) ? { voice: voiceBuffer } : { audio: voiceBuffer, ptt: true })
-          : await sock.sendMessage(jid, { text: replyText });
+        let sent;
+        if (voiceBuffer) {
+          sent = await sock.sendMessage(jid, isTelegramChatId(jid) ? { voice: voiceBuffer } : { audio: voiceBuffer, ptt: true });
+        } else if (imageBuffer) {
+          sent = await sock.sendMessage(jid, isTelegramChatId(jid)
+            ? { image: imageBuffer, caption: captionForImage }
+            : { image: imageBuffer, caption: captionForImage, mimetype: 'image/png' });
+        } else {
+          sent = await sock.sendMessage(jid, { text: replyText });
+        }
         if (sent?.key?.id && ourSentIdsRef?.current) {
           ourSentIdsRef.current.add(sent.key.id);
           if (ourSentIdsRef.current.size > MAX_OUR_SENT_IDS) {
