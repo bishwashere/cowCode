@@ -418,7 +418,6 @@ function ensureConfig() {
     config.tide = {
       enabled: false,
       silenceCooldownMinutes: 30,
-      jid: '',
       inactiveStart: '23:00',
       inactiveEnd: '06:00',
     };
