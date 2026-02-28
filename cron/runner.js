@@ -12,6 +12,9 @@ import { isTelegramChatId } from '../lib/telegram.js';
 import { addPending as addPendingTelegram } from '../lib/pending-telegram.js';
 import { getCronStorePath, getWorkspaceDir } from '../lib/paths.js';
 import { toUserMessage } from '../lib/user-error.js';
+import { appendExchange } from '../lib/chat-log.js';
+import { getMemoryConfig } from '../lib/memory-config.js';
+import { indexChatExchange } from '../lib/memory-index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..');
@@ -106,7 +109,21 @@ async function runJobOnce({ job, sock, selfJid }) {
     child.stdin.end(payload, 'utf8');
   });
   const text = isTelegramChatId(jid) ? textToSend.replace(/^\[CowCode\]\s*/i, '').trim() : textToSend;
-  if (text) await sendCronReply(jid, text);
+  if (text) {
+    await sendCronReply(jid, text);
+    const workspaceDir = getWorkspaceDir();
+    const exchange = { user: job.message || '', assistant: text, timestampMs: Date.now(), jid };
+    try {
+      const memoryConfig = getMemoryConfig();
+      if (memoryConfig) {
+        await indexChatExchange(memoryConfig, exchange);
+      } else {
+        appendExchange(workspaceDir, exchange);
+      }
+    } catch (err) {
+      console.error('[cron] Chat log write failed:', err.message);
+    }
+  }
 }
 
 /**
