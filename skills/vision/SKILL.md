@@ -1,7 +1,7 @@
 ---
 id: vision
 name: Vision
-description: Describe or analyze an image using a vision-capable model. Built-in chaining: screenshot → vision → act. Live camera: image "webcam" or source "webcam". Image: file path (browse screenshot, user upload), URL, or webcam. See SKILL.md.
+description: Describe or analyze an image using a vision-capable model. Use arguments.image, arguments.url, or arguments.path for the image (file path from "Image file: ..." in message, URL, or "webcam"). Live camera: image "webcam" or source "webcam". See SKILL.md.
 ---
 
 # Vision
@@ -14,9 +14,9 @@ Read or analyze an image using a **vision-capable LLM**. Use when the user sends
 
 Call **run_skill** with **skill: "vision"**. Set **command** or **arguments.action** to **describe**. Arguments:
 
-- **arguments.image** (or **arguments.url**) — **Required** (unless **arguments.source** is **"webcam"**). Either:
+- **arguments.image**, **arguments.url**, or **arguments.path** — **Required** (unless **arguments.source** is **"webcam"**). Pass the image as one of these (all work the same): **image**, **url**, or **path**. Value can be:
   - **"webcam"** — Capture one frame from the default webcam (live camera). Use for "what do you see", "describe the room", etc.
-  - A **file path** (e.g. browse screenshot path under `~/.cowcode/browse-screenshots/`, or user upload under uploads), or
+  - A **file path** (e.g. when the message says "Image file: /path/to/file.jpg", use that path as **arguments.image** or **arguments.path**; or browse screenshot under `~/.cowcode/browse-screenshots/`, or user upload under uploads), or
   - An **image URL** (http/https), or
   - A **data URI** (data:image/...;base64,...).
 - **arguments.source** — Optional. Set to **"webcam"** to use the live camera instead of **arguments.image**.
@@ -25,12 +25,12 @@ Call **run_skill** with **skill: "vision"**. Set **command** or **arguments.acti
 
 ## When to use Vision
 
-- **User sent an image in chat** — The message will include a file path where the image was saved. Call vision with that path and the user's caption (or "What's in this image?").
+- **User sent an image in chat** — The message will include a file path where the image was saved (e.g. "Image file: /path/to/tg-123-78.jpg"). Call vision with **arguments.image** or **arguments.path** set to that path, and **arguments.prompt** to the user's caption (or "What's in this image?").
 - **"Show me what you see" / "What's in the room?"** — Use **arguments.image: "webcam"** (or **arguments.source: "webcam"**) to capture from the webcam and describe the scene.
 - **After a browse screenshot** — Screenshot details include a path under `~/.cowcode/browse-screenshots/`. Use vision with that path to describe or analyze the page; then chain with click/fill/scroll as needed. No need for the user to say "describe this then click."
 - **Any image URL** — Pass the URL as **arguments.image** or **arguments.url** to have the vision model describe it.
 
-You must provide an image source: **arguments.image** or **arguments.url**, or **arguments.source: "webcam"**.
+You must provide an image source: **arguments.image**, **arguments.url**, or **arguments.path** (file path from "Image file: ..." in the message), or **arguments.source: "webcam"**.
 
 ## Config (set at install/setup)
 
