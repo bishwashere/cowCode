@@ -290,9 +290,29 @@ function migrateSkillsConfigToIncludeDefaults() {
   } catch (_) {}
 }
 
+/** Migration: ensure tide config block exists so it can be enabled by the user. Default: enabled false. */
+function migrateTideConfig() {
+  try {
+    const path = getConfigPath();
+    if (!existsSync(path)) return;
+    const raw = readFileSync(path, 'utf8');
+    const config = JSON.parse(raw);
+    if (config.tide != null && typeof config.tide === 'object') return;
+    config.tide = {
+      enabled: false,
+      silenceCooldownMinutes: 30,
+      jid: '',
+      inactiveStart: '23:00',
+      inactiveEnd: '06:00',
+    };
+    writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
+  } catch (_) {}
+}
+
 async function main() {
   ensureStateDir();
   migrateSkillsConfigToIncludeDefaults();
+  migrateTideConfig();
   if (authOnly && existsSync(getAuthDir())) {
     rmSync(getAuthDir(), { recursive: true });
     mkdirSync(getAuthDir(), { recursive: true });

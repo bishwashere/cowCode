@@ -32,8 +32,25 @@
     ]
   },
   "skills": {
-    "enabled": ["cron", "search", "browse", "vision", "memory"],
-    "available": ["cron", "search", "browse", "vision", "memory", "gog", "read", "write", "edit", "apply-patch"],
+    "enabled": [
+      "cron",
+      "search",
+      "browse",
+      "vision",
+      "memory"
+    ],
+    "available": [
+      "cron",
+      "search",
+      "browse",
+      "vision",
+      "memory",
+      "gog",
+      "read",
+      "write",
+      "edit",
+      "apply-patch"
+    ],
     "search": {
       "provider": "brave",
       "count": 8
@@ -47,5 +64,12 @@
       "enabled": false,
       "botToken": "TELEGRAM_BOT_TOKEN"
     }
+  },
+  "tide": {
+    "enabled": false,
+    "silenceCooldownMinutes": 30,
+    "jid": "",
+    "inactiveStart": "23:00",
+    "inactiveEnd": "06:00"
   }
 }

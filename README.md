@@ -95,7 +95,7 @@ Tide runs the agent after the chat has been quiet for a while (no user message n
 }
 ```
 
-* **enabled** — `true` to run tide; `false` or omit to disable.
+* **enabled** — Tide is in the default config but off (`false`). Set to `true` to enable.
 * **silenceCooldownMinutes** — Both how often we check and how long the chat must be silent before pinging (default 30). We only wake up every N minutes and only send if there’s been no message in or out for at least N minutes.
 * **jid** — Where to send the agent’s reply (your WhatsApp JID or Telegram chat id). If omitted, the agent still runs but no message is sent.
 * **inactiveStart** — 24h time (e.g. `"23:00"`). Tide will not run at or after this time (in your local timezone from `agents.defaults.userTimezone`).

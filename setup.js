@@ -414,6 +414,16 @@ function ensureConfig() {
       saveConfig(config);
     }
   }
+  if (config && !config.tide) {
+    config.tide = {
+      enabled: false,
+      silenceCooldownMinutes: 30,
+      jid: '',
+      inactiveStart: '23:00',
+      inactiveEnd: '06:00',
+    };
+    saveConfig(config);
+  }
   return config;
 }
 
