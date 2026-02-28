@@ -83,19 +83,25 @@ Everything stays on your computer.
 
 # 🌊 Tide (periodic check)
 
-Tide runs the agent on a schedule to check for pending tasks or follow-ups (no user message needed). Enable and set the interval in `~/.cowcode/config.json`:
+Tide runs the agent after the chat has been quiet for a while (no user message needed). Configure in `~/.cowcode/config.json`:
 
 ```json
 "tide": {
   "enabled": true,
-  "intervalMinutes": 30,
-  "jid": "YOUR_WHATSAPP_JID_OR_TELEGRAM_CHAT_ID"
+  "silenceCooldownMinutes": 60,
+  "jid": "YOUR_WHATSAPP_JID_OR_TELEGRAM_CHAT_ID",
+  "inactiveStart": "23:00",
+  "inactiveEnd": "06:00"
 }
 ```
 
 * **enabled** — `true` to run tide; `false` or omit to disable.
-* **intervalMinutes** — How often to run (default 30). Minimum 1.
+* **silenceCooldownMinutes** — Both how often we check and how long the chat must be silent before pinging (default 30). We only wake up every N minutes and only send if there’s been no message in or out for at least N minutes.
 * **jid** — Where to send the agent’s reply (your WhatsApp JID or Telegram chat id). If omitted, the agent still runs but no message is sent.
+* **inactiveStart** — 24h time (e.g. `"23:00"`). Tide will not run at or after this time (in your local timezone from `agents.defaults.userTimezone`).
+* **inactiveEnd** — 24h time (e.g. `"06:00"`). Tide will not run before this time. With `inactiveStart` after `inactiveEnd`, this defines an overnight quiet window (e.g. 11 PM–6 AM).
+
+Tide is designed to be quietly helpful: it only speaks after real silence, keeps messages short and tied to recent context (e.g. “Still no reply on that—should I follow up?” or “Tests passed. What’s next?”), and does not double-text if you don’t answer.
 
 ---
 

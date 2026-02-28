@@ -76,7 +76,11 @@ function buildTideSystemPrompt(workspaceDir) {
   if (whoAmIContent) identityBlock += '\n\n' + whoAmIContent;
   if (myHumanContent) identityBlock += '\n\n' + myHumanContent;
   const base = soulContent + identityBlock;
-  const tideLine = '\n\nThis is a tide run: a periodic check. The user did not send a message. Check for pending tasks, follow-ups, or things to do for the user. If yes, reply with what to do or say (your reply will be sent to the user). If no, reply with nothing or a single line saying nothing to do.';
+  const tideLine = `
+
+# Tide (quiet check)
+The chat has been quiet. Only speak if you have something short, useful, and tied to what you were last doing. Examples: "Still no reply on that poll request. Should I follow up?" or "I ran the tests. Everything passed. What's next?"
+Only say something when: a follow-up is needed (e.g. waiting on their reply), you finished something that needs sign-off, or there is one concrete next step. Otherwise reply with nothing or a single line like "nothing to do". Do not double-text. If they don't answer after this, we will not ping again until much later. Be quietly helpful—not clingy. Quiet is golden.`;
   return base + timeBlock + tideLine;
 }
 
@@ -91,11 +95,14 @@ async function main() {
   }
   const storePath = payload.storePath && String(payload.storePath).trim() || getCronStorePath();
   const workspaceDir = payload.workspaceDir && String(payload.workspaceDir).trim() || getWorkspaceDir();
+  const historyMessages = Array.isArray(payload.historyMessages)
+    ? payload.historyMessages.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    : [];
   const timeCtx = getSchedulingTimeContext();
   const userText =
-    '[Tide] Periodic check. Current time: ' +
+    '[Tide] Chat has been quiet. Current time: ' +
     timeCtx.nowIso +
-    '. Do you have any pending tasks, follow-ups, or things to do for the user? If yes, reply with what to do or say (your reply will be sent to the user). If no, reply with nothing or a single line saying nothing to do.';
+    '. Based on the last few messages: is there one short, useful thing to say? (e.g. follow-up on something we are waiting on, or "I finished X—what next?") If yes, reply with that only. If no, reply with nothing or "nothing to do".';
   const noop = () => {};
   const ctx = { storePath, jid, workspaceDir, scheduleOneShot: noop, startCron: noop, groupNonOwner: false };
   const { runSkillTool, getFullSkillDoc } = getSkillContext();
@@ -106,7 +113,7 @@ async function main() {
     ctx,
     systemPrompt,
     tools: toolsToUse,
-    historyMessages: [],
+    historyMessages,
     getFullSkillDoc,
   });
   process.stdout.write(JSON.stringify({ textToSend: textToSend || '' }) + '\n');

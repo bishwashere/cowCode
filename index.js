@@ -37,13 +37,13 @@ import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid } fro
 import { isWhatsAppGroupJid } from './lib/whatsapp.js';
 import { addPending as addPendingTelegram, clearPending as clearPendingTelegram } from './lib/pending-telegram.js';
 import { getChannelsConfig } from './lib/channels-config.js';
-import { getSchedulingTimeContext } from './lib/timezone.js';
+import { getSchedulingTimeContext, isInTideInactiveWindow } from './lib/timezone.js';
 import { getOwnerConfig, isOwner } from './lib/owner-config.js';
 import { getGroupAddedBy, setGroupAddedBy } from './lib/telegram-group-added-by.js';
 import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
-import { appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
+import { appendExchange, appendGroupExchange, getLastExchangeTimestamp, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
 import { ensureGroupConfigFor, readGroupMd } from './lib/group-config.js';
@@ -421,12 +421,29 @@ async function main() {
     } catch (_) {}
     const tide = config.tide || {};
     if (!tide.enabled) return;
+    const inactiveStart = tide.inactiveStart && String(tide.inactiveStart).trim();
+    const inactiveEnd = tide.inactiveEnd && String(tide.inactiveEnd).trim();
+    if (inactiveStart && inactiveEnd && isInTideInactiveWindow(inactiveStart, inactiveEnd)) return;
     const tideJid = tide.jid && String(tide.jid).trim() ? String(tide.jid).trim() : null;
     if (!tideJid || !sock?.sendMessage) return;
+    const silenceCooldownMinutes = Math.max(0, Number(tide.silenceCooldownMinutes));
+    if (silenceCooldownMinutes > 0) {
+      const lastTs = getLastExchangeTimestamp(getWorkspaceDir(), tideJid);
+      if (lastTs != null) {
+        const quietMs = Date.now() - lastTs;
+        if (quietMs < silenceCooldownMinutes * 60 * 1000) return;
+      }
+    }
+    const historyMessages = readLastPrivateExchanges(getWorkspaceDir(), tideJid, 5);
+    if (historyMessages.length >= 2) {
+      const lastUserMsg = historyMessages[historyMessages.length - 2];
+      if (lastUserMsg.role === 'user' && lastUserMsg.content === 'Tide check') return;
+    }
     const payload = JSON.stringify({
       jid: tideJid,
       storePath: getCronStorePath(),
       workspaceDir: getWorkspaceDir(),
+      historyMessages,
     });
     let textToSend = '';
     try {
@@ -464,7 +481,8 @@ async function main() {
       console.error('[tide]', e.message);
       return;
     }
-    const text = (textToSend || '').trim();
+    const rawText = (textToSend || '').trim();
+    const text = isTelegramChatId(tideJid) ? rawText.replace(/^\[CowCode\]\s*/i, '').trim() : rawText;
     const nothingPhrases = /^(nothing|n\/?a|no(ne)?\s*to\s*do|all\s*good|nothing\s*to\s*report\.?)\s*\.?$/i;
     if (!text || (text.length < 50 && nothingPhrases.test(text))) return;
     try {
@@ -472,6 +490,17 @@ async function main() {
       console.log('[tide] Sent to', tideJid.slice(0, 20) + (tideJid.length > 20 ? '…' : ''));
     } catch (e) {
       console.error('[tide] Send failed:', e.message);
+    }
+    const exchange = { user: 'Tide check', assistant: text, timestampMs: Date.now(), jid: tideJid };
+    try {
+      const memoryConfig = getMemoryConfig();
+      if (memoryConfig) {
+        await indexChatExchange(memoryConfig, exchange);
+      } else {
+        appendExchange(getWorkspaceDir(), exchange);
+      }
+    } catch (err) {
+      console.error('[tide] Chat log write failed:', err.message);
     }
   }
   function startTide(sockRef, selfJidRef) {
@@ -483,12 +512,12 @@ async function main() {
     const tide = config.tide || {};
     if (!tide.enabled) return;
     if (tideIntervalId) clearInterval(tideIntervalId);
-    const intervalMinutes = Math.max(1, Number(tide.intervalMinutes) || 30);
-    const intervalMs = intervalMinutes * 60 * 1000;
+    const cooldownMinutes = Math.max(1, Number(tide.silenceCooldownMinutes) || 30);
+    const intervalMs = cooldownMinutes * 60 * 1000;
     tideIntervalId = setInterval(() => {
       runTide().catch((e) => console.error('[tide]', e.message));
     }, intervalMs);
-    console.log('[tide] Started: every', intervalMinutes, 'minutes' + (tide.jid ? ' → ' + String(tide.jid).slice(0, 25) + '…' : ' (no jid; run only)'));
+    console.log('[tide] Started: cooldown', cooldownMinutes, 'min' + (tide.jid ? ' → ' + String(tide.jid).slice(0, 25) + '…' : ' (no jid; run only)'));
   }
   function stopTide() {
     if (tideIntervalId) {
