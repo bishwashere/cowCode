@@ -43,7 +43,7 @@ import { getGroupAddedBy, setGroupAddedBy } from './lib/telegram-group-added-by.
 import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
-import { appendExchange, appendGroupExchange, getLastExchangeTimestamp, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
+import { appendExchange, appendGroupExchange, getLastExchangeTimestamp, getPrivateChatJidsByLastActivity, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
 import { ensureGroupConfigFor, readGroupMd } from './lib/group-config.js';
@@ -431,8 +431,20 @@ async function main() {
 
   // Agent logic: getSkillContext() called on every run; compact list in tool; full doc injected when a skill is called.
 
-  /** Tide: periodic check in its own process (does not block chat). Reply sent to tide.jid like cron. */
+  /** Tide: periodic check in its own process (does not block chat). Reply sent to resolved jid (config, owner, or most recent private chat). */
   let tideIntervalId = null;
+  function getTideJidResolved(config, workspaceDir) {
+    const fromConfig = config.tide?.jid != null && String(config.tide.jid).trim();
+    if (fromConfig) return fromConfig;
+    const channelsConfig = getChannelsConfig();
+    if (channelsConfig.telegram?.enabled) {
+      const owner = getOwnerConfig();
+      if (owner.telegramUserId != null) return String(owner.telegramUserId);
+    }
+    const byActivity = getPrivateChatJidsByLastActivity(workspaceDir);
+    const telegramLike = byActivity.find((x) => /^\d+$/.test(String(x.jid).trim()));
+    return telegramLike ? String(telegramLike.jid).trim() : null;
+  }
   async function runTide() {
     let config = {};
     try {
@@ -444,7 +456,7 @@ async function main() {
     const inactiveStart = tide.inactiveStart && String(tide.inactiveStart).trim();
     const inactiveEnd = tide.inactiveEnd && String(tide.inactiveEnd).trim();
     if (inactiveStart && inactiveEnd && isInTideInactiveWindow(inactiveStart, inactiveEnd)) return;
-    const tideJid = tide.jid && String(tide.jid).trim() ? String(tide.jid).trim() : null;
+    const tideJid = getTideJidResolved(config, getWorkspaceDir());
     if (!tideJid || !sock?.sendMessage) return;
     const silenceCooldownMinutes = Math.max(0, Number(tide.silenceCooldownMinutes));
     if (silenceCooldownMinutes > 0) {
@@ -537,7 +549,9 @@ async function main() {
     tideIntervalId = setInterval(() => {
       runTide().catch((e) => console.error('[tide]', e.message));
     }, intervalMs);
-    console.log('[tide] Started: cooldown', cooldownMinutes, 'min' + (tide.jid ? ' → ' + String(tide.jid).slice(0, 25) + '…' : ' (no jid; run only)'));
+    const resolvedJid = getTideJidResolved(config, getWorkspaceDir());
+    const jidLog = resolvedJid ? ' → ' + String(resolvedJid).slice(0, 25) + '…' : ' (jid auto-detected at run time from owner or recent chat)';
+    console.log('[tide] Started: cooldown', cooldownMinutes, 'min' + jidLog);
   }
   function stopTide() {
     if (tideIntervalId) {

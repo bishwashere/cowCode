@@ -89,7 +89,6 @@ Tide runs the agent after the chat has been quiet for a while (no user message n
 "tide": {
   "enabled": true,
   "silenceCooldownMinutes": 60,
-  "jid": "YOUR_WHATSAPP_JID_OR_TELEGRAM_CHAT_ID",
   "inactiveStart": "23:00",
   "inactiveEnd": "06:00"
 }
@@ -97,7 +96,7 @@ Tide runs the agent after the chat has been quiet for a while (no user message n
 
 * **enabled** — Tide is in the default config but off (`false`). Set to `true` to enable.
 * **silenceCooldownMinutes** — Both how often we check and how long the chat must be silent before pinging (default 30). We only wake up every N minutes and only send if there’s been no message in or out for at least N minutes.
-* **jid** — Where to send the agent’s reply (your WhatsApp JID or Telegram chat id). If omitted, the agent still runs but no message is sent.
+* **jid** — Where to send the agent’s reply (your WhatsApp JID or Telegram chat id). If omitted, Tide auto-detects: with Telegram it uses the bot owner's private chat (config.owner.telegramUserId), or the most recently active private chat. Set only to override (e.g. a specific WhatsApp JID).
 * **inactiveStart** — 24h time (e.g. `"23:00"`). Tide will not run at or after this time (in your local timezone from `agents.defaults.userTimezone`).
 * **inactiveEnd** — 24h time (e.g. `"06:00"`). Tide will not run before this time. With `inactiveStart` after `inactiveEnd`, this defines an overnight quiet window (e.g. 11 PM–6 AM).
 
