@@ -5,7 +5,7 @@
  * Usage:
  *   const { judgeUserGotWhatTheyWanted } = await import('./e2e-judge.js');
  *   const { pass, reason } = await judgeUserGotWhatTheyWanted(userMessage, botReply, stateDir, { prompt: customPrompt });
- *   or use default prompt with skillHint: 'cron' | 'browser' | 'memory' | 'home-assistant'
+ *   or use default prompt with skillHint: 'cron' | 'browser' | 'memory' | 'home-assistant' | 'write' | 'edit' | 'me'
  */
 
 import dotenv from 'dotenv';
@@ -40,7 +40,7 @@ export async function judgeUserGotWhatTheyWanted(userMessage, botReply, stateDir
 /**
  * @param {string} userMessage
  * @param {string} botReply
- * @param {string} skillHint - 'cron' | 'browser' | 'memory' | 'skill'
+ * @param {string} skillHint - 'cron' | 'browser' | 'memory' | 'write' | 'edit' | 'me' | 'skill'
  */
 function buildDefaultJudgePrompt(userMessage, botReply, skillHint) {
   const criteria = {
@@ -50,6 +50,12 @@ function buildDefaultJudgePrompt(userMessage, botReply, skillHint) {
       'For news/headlines: the reply should contain headlines, a summary, or current news. For search/navigate: the reply should address the query with relevant content. For non-news queries: the reply should not be only a generic news block.',
     memory:
       'The bot has access to memory. If the user asked to recall something from a previous message, the reply should reference or state what was stored. If the bot says it does not know or does not have that information, answer NO.',
+    write:
+      'For writing or creating a file: the reply should confirm the file was written, created, or saved (e.g. path, success). Refusing to write or an error without attempting the skill is NO.',
+    edit:
+      'For editing or replacing text in a file: the reply should confirm the edit was applied (e.g. replaced, updated). Refusing to edit or an error because the bot did not call the edit skill is NO.',
+    me:
+      'For "what do you know about me?" or profile: the reply should be a short profile, summary of notes/memory, or say there is little/no information. A friendly "I don\'t have much" or empty profile is YES. An error or refusing to use the me skill is NO.',
     skill:
       'The reply should address what the user asked in a helpful way. If the user asked for specific data (e.g. a list), the reply should contain that or a clear explanation (e.g. "no items"). Error messages or setup instructions alone are not "what they wanted" unless the user asked for help.',
   };

@@ -52,10 +52,6 @@ const BROWSER_SPECIFIC_QUERIES = [
  * @returns {Promise<string>} Reply text (what would be sent to the user).
  */
 function runE2E(userMessage) {
- * @param {string} userMessage
- * @returns {Promise<string>} Reply text (what would be sent to the user).
- */
-function runE2E(userMessage) {
   return new Promise((resolve, reject) => {
     const child = spawn('node', ['index.js', '--test', userMessage], {
       cwd: ROOT,
