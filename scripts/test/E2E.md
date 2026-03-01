@@ -38,3 +38,19 @@ Every E2E test that checks “did the skill do the right thing for the user?” 
 Tests that verify **internal contracts** (e.g. cron store has exactly one job after one add, run-job stdout format, one-shot scheduling) can keep code assertions; the skill-facing behavior should go through the judge.
 
 See individual test files for skill-specific judge prompts and setup.
+
+## Skill test inputs
+
+Each skill test has its own folder with an **inputs.md** that lists the test file name and inputs:
+
+| Folder | Test file | Open for |
+|--------|-----------|----------|
+| [cron/](cron/inputs.md) | `test-cron-e2e.js` | List/add/recurring/manage queries |
+| [tide/](tide/inputs.md) | `test-tide.js` | Payload (jid, historyMessages) |
+| [agent/](agent/inputs.md) | `test-agent.js` | Scenario messages |
+| [edit/](edit/inputs.md) | `test-edit-e2e.js` | Edit target file + queries |
+| [write/](write/inputs.md) | `test-write-e2e.js` | Write queries |
+| [browser/](browser/inputs.md) | `test-browser-e2e.js` | News / non-news / search queries |
+| [memory/](memory/inputs.md) | `test-memory-e2e.js` | Store phrase + recall query |
+| [me/](me/inputs.md) | `test-me-e2e.js` | Me/memory queries |
+| [home-assistant/](home-assistant/inputs.md) | `test-home-assistant-e2e.js` | HA queries |
