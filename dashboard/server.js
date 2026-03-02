@@ -579,23 +579,36 @@ app.post('/api/chat', (req, res) => {
 });
 
 // ---- Tests (skill test runner: list, inputs, run) ----
-
-const TEST_LIST = [
-  { id: 'cron', name: 'Cron E2E', script: 'scripts/test/test-cron-e2e.js', inputsPath: 'scripts/test/cron/inputs.md' },
-  { id: 'tide', name: 'Tide', script: 'scripts/test/test-tide.js', inputsPath: 'scripts/test/tide/inputs.md' },
-  { id: 'agent', name: 'Agent', script: 'scripts/test/test-agent.js', inputsPath: 'scripts/test/agent/inputs.md' },
-  { id: 'edit', name: 'Edit E2E', script: 'scripts/test/test-edit-e2e.js', inputsPath: 'scripts/test/edit/inputs.md' },
-  { id: 'write', name: 'Write E2E', script: 'scripts/test/test-write-e2e.js', inputsPath: 'scripts/test/write/inputs.md' },
-  { id: 'browser', name: 'Browser E2E', script: 'scripts/test/test-browser-e2e.js', inputsPath: 'scripts/test/browser/inputs.md' },
-  { id: 'memory', name: 'Memory E2E', script: 'scripts/test/test-memory-e2e.js', inputsPath: 'scripts/test/memory/inputs.md' },
-  { id: 'me', name: 'Me E2E', script: 'scripts/test/test-me-e2e.js', inputsPath: 'scripts/test/me/inputs.md' },
-  { id: 'home-assistant', name: 'Home Assistant E2E', script: 'scripts/test/test-home-assistant-e2e.js', inputsPath: 'scripts/test/home-assistant/inputs.md' },
-];
+// Discover tests automatically: any scripts/test/<dir>/ with inputs.md and a matching test-<dir>-e2e.js or test-<dir>.js
 
 const TEST_RUN_TIMEOUT_MS = 180_000; // 3 min per test
 
+function getTestList() {
+  const testDir = join(INSTALL_DIR, 'scripts', 'test');
+  if (!existsSync(testDir)) return [];
+  const dirs = readdirSync(testDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+  const list = [];
+  for (const id of dirs) {
+    const inputsPath = join(testDir, id, 'inputs.md');
+    if (!existsSync(inputsPath)) continue;
+    const scriptE2e = join(testDir, 'test-' + id + '-e2e.js');
+    const scriptPlain = join(testDir, 'test-' + id + '.js');
+    const scriptPath = existsSync(scriptE2e) ? scriptE2e : (existsSync(scriptPlain) ? scriptPlain : null);
+    if (!scriptPath) continue;
+    const script = 'scripts/test/' + (existsSync(scriptE2e) ? 'test-' + id + '-e2e.js' : 'test-' + id + '.js');
+    const name = id.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') +
+      (script.endsWith('-e2e.js') ? ' E2E' : '');
+    list.push({ id, name, script, inputsPath: 'scripts/test/' + id + '/inputs.md' });
+  }
+  return list;
+}
+
 function runOneTest(testId) {
-  const test = TEST_LIST.find((t) => t.id === testId);
+  const tests = getTestList();
+  const test = tests.find((t) => t.id === testId);
   if (!test) return Promise.reject(new Error(`Unknown test: ${testId}`));
   const scriptPath = join(INSTALL_DIR, test.script);
   if (!existsSync(scriptPath)) return Promise.reject(new Error(`Script not found: ${test.script}`));
@@ -646,7 +659,7 @@ function runOneTest(testId) {
 
 app.get('/api/tests', (_req, res) => {
   try {
-    res.json({ tests: TEST_LIST });
+    res.json({ tests: getTestList() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -696,7 +709,7 @@ function parseInputMessages(content) {
 
 app.get('/api/tests/inputs/:id', (req, res) => {
   try {
-    const test = TEST_LIST.find((t) => t.id === req.params.id);
+    const test = getTestList().find((t) => t.id === req.params.id);
     if (!test) {
       res.status(404).json({ error: 'Test not found' });
       return;
@@ -712,12 +725,12 @@ app.get('/api/tests/inputs/:id', (req, res) => {
 
 app.post('/api/tests/run', async (req, res) => {
   const testId = req.body?.testId;
-  if (testId !== 'all' && !TEST_LIST.some((t) => t.id === testId)) {
+  if (testId !== 'all' && !getTestList().some((t) => t.id === testId)) {
     res.status(400).json({ error: 'testId must be a test id or "all"' });
     return;
   }
   try {
-    const ids = testId === 'all' ? TEST_LIST.map((t) => t.id) : [testId];
+    const ids = testId === 'all' ? getTestList().map((t) => t.id) : [testId];
     const results = [];
     for (const id of ids) {
       const result = await runOneTest(id);

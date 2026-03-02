@@ -19,6 +19,43 @@ const args = process.argv.slice(2);
 const sub = args[0];
 const isForceUpdate = args.slice(1).some((a) => a === '--force' || a === '-f');
 
+/** After a successful update: restart moo and run dashboard, with clear logging. */
+function runPostUpdateRestartAndDashboard() {
+  console.log('');
+  console.log('  Restarting bot and starting dashboard...');
+  const daemonScript = join(INSTALL_DIR, 'scripts', 'daemon.sh');
+  if (existsSync(daemonScript)) {
+    const restartResult = spawnSync('bash', [daemonScript, 'restart'], {
+      stdio: 'inherit',
+      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      cwd: INSTALL_DIR,
+    });
+    if (restartResult.status === 0) {
+      console.log('  ✓ Restarted moo.');
+    } else {
+      console.error('  ✗ Moo restart had issues. You can run: cowcode moo restart');
+    }
+  } else {
+    console.log('  (moo script not found; run cowcode moo start if needed)');
+  }
+  const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
+  if (existsSync(serverPath)) {
+    const dashResult = spawnSync(process.execPath, [join(INSTALL_DIR, 'cli.js'), 'dashboard'], {
+      stdio: 'inherit',
+      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      cwd: INSTALL_DIR,
+    });
+    if (dashResult.status === 0) {
+      console.log('  ✓ Dashboard started.');
+    } else {
+      console.error('  ✗ Dashboard failed to start. You can run: cowcode dashboard');
+    }
+  } else {
+    console.log('  (dashboard not found; run cowcode dashboard if needed)');
+  }
+  console.log('');
+}
+
 if (sub === 'moo') {
   const action = args[1];
   if (!action || !['start', 'stop', 'status', 'restart'].includes(action)) {
@@ -116,28 +153,7 @@ if (sub === 'moo') {
         process.exit(code);
         return;
       }
-      // After successful force update: restart moo and run dashboard so user doesn't forget
-      console.log('');
-      console.log('  Restarting bot and starting dashboard...');
-      const daemonScript = join(INSTALL_DIR, 'scripts', 'daemon.sh');
-      if (existsSync(daemonScript)) {
-        const restartResult = spawnSync('bash', [daemonScript, 'restart'], {
-          stdio: 'inherit',
-          env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
-          cwd: INSTALL_DIR,
-        });
-        if (restartResult.status !== 0) {
-          console.error('  (moo restart had issues; you can run: cowcode moo restart)');
-        }
-      }
-      const serverPath = join(INSTALL_DIR, 'dashboard', 'server.js');
-      if (existsSync(serverPath)) {
-        spawnSync(process.execPath, [join(INSTALL_DIR, 'cli.js'), 'dashboard'], {
-          stdio: 'inherit',
-          env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
-          cwd: INSTALL_DIR,
-        });
-      }
+      runPostUpdateRestartAndDashboard();
       process.exit(0);
     });
   } else {
@@ -152,7 +168,12 @@ if (sub === 'moo') {
       env,
       cwd: INSTALL_DIR,
     });
-    child.on('close', (code) => process.exit(code ?? 0));
+    child.on('close', (code) => {
+      if (code === 0) {
+        runPostUpdateRestartAndDashboard();
+      }
+      process.exit(code ?? 0);
+    });
   }
 } else if (sub === 'uninstall') {
   const script = join(INSTALL_DIR, 'uninstall.sh');
