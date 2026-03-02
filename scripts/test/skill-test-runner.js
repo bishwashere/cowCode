@@ -26,11 +26,15 @@ export async function runSkillTests(skillName, tests, opts = {}) {
   let failed = 0;
   for (const t of tests) {
     try {
-      await t.run();
+      const result = await t.run();
       passed++;
+      const reply = result && (typeof result === 'string' ? result : result.reply);
+      if (reply) console.log(`  Reply: ${reply.slice(0, 500)}`);
       console.log(`  [SUCCESS] ${t.name}`);
     } catch (err) {
       failed++;
+      const reply = err && err.reply;
+      if (reply) console.log(`  Reply: ${reply.slice(0, 500)}`);
       const msg = (err && err.message) || String(err);
       console.log(`  [FAILED] ${t.name} — ${msg.slice(0, 200)}${msg.length > 200 ? '…' : ''}`);
     }

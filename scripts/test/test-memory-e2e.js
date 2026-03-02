@@ -233,6 +233,7 @@ async function main() {
         }
         assert(parsed.user === storeMessage, `Expected last exchange user to match. Got user: ${(parsed.user || '').slice(0, 80)}`);
         assert(parsed.assistant && parsed.assistant.length > 0, 'Expected non-empty assistant reply in chat log');
+        return { reply };
       },
     },
     {
@@ -246,8 +247,11 @@ async function main() {
         const replyContainsPhrase = reply2 && reply2.includes(STORED_PHRASE);
         if (!pass && !replyContainsPhrase) {
           const stderrHint = run.stderr ? ` Stderr (last 300): ${run.stderr.slice(-300)}` : '';
-          throw new Error(`Memory recall failed: LLM judge said the bot did not answer the user's question. Judge: ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply2 || '').slice(0, 400)}.${stderrHint}`);
+          const err = new Error(`Memory recall failed: LLM judge said the bot did not answer the user's question. Judge: ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply2 || '').slice(0, 400)}.${stderrHint}`);
+          err.reply = reply2;
+          throw err;
         }
+        return { reply: reply2 };
       },
     },
     {
@@ -296,11 +300,14 @@ async function main() {
           reply.includes('subdir') ||
           reply.includes('bar.js');
         if (!hasIndexedContent) {
-          throw new Error(
+          const err = new Error(
             'Expected reply to include file/dir names from the indexed workspace (e2e-fs-test, foo.txt, subdir, bar.js). Reply (first 500 chars): ' +
               reply.slice(0, 500)
           );
+          err.reply = reply;
+          throw err;
         }
+        return { reply };
       },
     },
   ];

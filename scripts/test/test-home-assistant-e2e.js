@@ -142,12 +142,13 @@ async function main() {
       run: async () => {
         const userMessage = 'list my lights';
         const { reply } = await runE2E(userMessage);
-        console.log('  Input:  ', userMessage);
-        console.log('  Output: ', reply ? reply.split('\n').join('\n           ') : '(empty)');
         const { pass, reason } = await judgeUserGotWhatTheyWanted(userMessage, reply, DEFAULT_STATE_DIR);
         if (!pass) {
-          throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
         }
+        return { reply };
       },
     },
     {
@@ -155,12 +156,13 @@ async function main() {
       run: async () => {
         const userMessage = 'What lights do I have?';
         const { reply } = await runE2E(userMessage);
-        console.log('  Input:  ', userMessage);
-        console.log('  Output: ', reply ? reply.split('\n').join('\n           ') : '(empty)');
         const { pass, reason } = await judgeUserGotWhatTheyWanted(userMessage, reply, DEFAULT_STATE_DIR);
         if (!pass) {
-          throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
         }
+        return { reply };
       },
     },
     {
@@ -168,12 +170,13 @@ async function main() {
       run: async () => {
         const userMessage = 'List all my devices';
         const { reply } = await runE2E(userMessage);
-        console.log('  Input:  ', userMessage);
-        console.log('  Output: ', reply ? reply.split('\n').join('\n           ') : '(empty)');
         const { pass, reason } = await judgeUserGotWhatTheyWanted(userMessage, reply, DEFAULT_STATE_DIR);
         if (!pass) {
-          throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
         }
+        return { reply };
       },
     },
   ];

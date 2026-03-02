@@ -94,16 +94,18 @@ async function main() {
   const stateDirEmpty = createTempStateDir(false);
   const stateDirWithMemory = createTempStateDir(true);
 
-  const REPLY_PREVIEW_LEN = 400;
   const tests = [
     ...ME_QUERIES.slice(0, 2).map((query) => ({
       name: `me (empty): "${query}"`,
       run: async () => {
         const reply = await runE2E(query, { stateDir: stateDirEmpty });
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDirEmpty, { skillHint: 'me' });
-        console.log(`  Reply: ${(reply || '').slice(0, REPLY_PREVIEW_LEN)}${(reply || '').length > REPLY_PREVIEW_LEN ? '…' : ''}`);
-        if (reason) console.log(`  Judge: ${reason.trim().slice(0, 200)}`);
-        if (!pass) throw new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
+        return { reply };
       },
     })),
     ...ME_QUERIES.slice(2, 4).map((query) => ({
@@ -111,9 +113,12 @@ async function main() {
       run: async () => {
         const reply = await runE2E(query, { stateDir: stateDirWithMemory });
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDirWithMemory, { skillHint: 'me' });
-        console.log(`  Reply: ${(reply || '').slice(0, REPLY_PREVIEW_LEN)}${(reply || '').length > REPLY_PREVIEW_LEN ? '…' : ''}`);
-        if (reason) console.log(`  Judge: ${reason.trim().slice(0, 200)}`);
-        if (!pass) throw new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
+        return { reply };
       },
     })),
   ];

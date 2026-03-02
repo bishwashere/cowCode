@@ -103,7 +103,12 @@ async function main() {
       run: async () => {
         const reply = await runE2E(query);
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
-        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
+        return { reply };
       },
     })),
     ...NON_NEWS_QUERIES.map((query) => ({
@@ -111,7 +116,12 @@ async function main() {
       run: async () => {
         const reply = await runE2E(query);
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
-        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
+        return { reply };
       },
     })),
     ...BROWSER_SPECIFIC_QUERIES.map((query) => ({
@@ -119,7 +129,12 @@ async function main() {
       run: async () => {
         const reply = await runE2E(query);
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
-        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
+        return { reply };
       },
     })),
   ];

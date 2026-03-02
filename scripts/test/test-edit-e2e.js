@@ -100,12 +100,17 @@ async function main() {
 
   const tests = EDIT_QUERIES.map((query, index) => ({
     name: `edit: "${query.slice(0, 45)}…"`,
-    run: async () => {
-      resetEditTarget();
-      const reply = await runE2E(query, { stateDir });
-      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'edit' });
-      if (!pass) throw new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
-    },
+run: async () => {
+  resetEditTarget();
+  const reply = await runE2E(query, { stateDir });
+  const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'edit' });
+  if (!pass) {
+    const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+    err.reply = reply;
+    throw err;
+  }
+  return { reply };
+},
   }));
 
   const { failed } = await runSkillTests('edit', tests);

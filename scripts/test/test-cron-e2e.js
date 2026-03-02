@@ -280,7 +280,12 @@ async function main() {
       run: async () => {
         const reply = await runE2E(query);
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
-        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
+        return { reply };
       },
     })),
     {
@@ -289,11 +294,16 @@ async function main() {
         const { stateDir, storePath } = createTempStateDir();
         const reply = await runE2E(singleAddQuery, { stateDir });
         const { pass, reason } = await judgeUserGotWhatTheyWanted(singleAddQuery, reply, stateDir, { skillHint: 'cron' });
-        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
         const { jobs } = loadStore(storePath);
         assert(jobs.length === 1, `One "add" message must create exactly one job; got ${jobs.length}. Duplicate-add bug.`);
         const atTimes = jobs.filter((j) => j.schedule?.kind === 'at' && j.schedule?.at).map((j) => j.schedule.at);
         assert(new Set(atTimes).size === atTimes.length, `All one-shot jobs must have unique "at" times; got duplicates.`);
+        return { reply };
       },
     },
     ...CRON_LIST_QUERIES.map((query) => ({
@@ -301,7 +311,12 @@ async function main() {
       run: async () => {
         const reply = await runE2E(query);
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
-        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
+        return { reply };
       },
     })),
     ...CRON_RECURRING_ADD_QUERIES.map(({ query, expectedExpr }) => ({
@@ -310,7 +325,11 @@ async function main() {
         const { stateDir, storePath } = createTempStateDir();
         const reply = await runE2E(query, { stateDir });
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'cron' });
-        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
         const { jobs } = loadStore(storePath);
         const cronJobs = jobs.filter((j) => j.schedule?.kind === 'cron' && j.schedule?.expr);
         assert(cronJobs.length >= 1, `Expected at least one cron (recurring) job for "${query}"; got ${jobs.length} jobs, cron: ${cronJobs.length}.`);
@@ -318,6 +337,7 @@ async function main() {
           const found = cronJobs.some((j) => j.schedule.expr === expectedExpr);
           assert(found, `Expected cron expr "${expectedExpr}" for "${query}". Got: ${cronJobs.map((j) => j.schedule.expr).join(', ')}`);
         }
+        return { reply };
       },
     })),
     {
@@ -329,6 +349,7 @@ async function main() {
         assert(result.textToSend && result.textToSend.length > 0, `run-job should return non-empty textToSend; got: ${JSON.stringify(result)}`);
         const hasExpected = /Cron E2E execute test OK|execute test OK/i.test(result.textToSend);
         assert(result.textToSend.length > 10 && (hasExpected || result.textToSend.length > 30), `run-job should return substantive reply; got (first 200): ${result.textToSend.slice(0, 200)}`);
+        return { reply: result.textToSend };
       },
     },
     {
@@ -378,7 +399,12 @@ async function main() {
       run: async () => {
         const reply = await runE2E(query);
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
-        if (!pass) throw new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        if (!pass) {
+          const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+          err.reply = reply;
+          throw err;
+        }
+        return { reply };
       },
     })),
   ];

@@ -91,11 +91,16 @@ async function main() {
 
   const tests = WRITE_QUERIES.map((query) => ({
     name: `write: "${query.slice(0, 50)}…"`,
-    run: async () => {
-      const reply = await runE2E(query, { stateDir });
-      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'write' });
-      if (!pass) throw new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
-    },
+run: async () => {
+  const reply = await runE2E(query, { stateDir });
+  const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'write' });
+  if (!pass) {
+    const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+    err.reply = reply;
+    throw err;
+  }
+  return { reply };
+},
   }));
 
   const { failed } = await runSkillTests('write', tests);
