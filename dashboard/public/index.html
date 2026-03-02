@@ -235,12 +235,13 @@
       min-width: 0;
     }
     .test-detail-pane {
-      flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
       min-width: 0;
     }
+    .test-detail-pane:first-child { flex: 0 0 35%; }
+    .test-detail-pane:last-child  { flex: 1; }
     .test-detail-pane + .test-detail-pane { border-left: 1px solid var(--border); }
     .test-detail-pane-header {
       padding: 0.5rem 0.75rem;
@@ -286,6 +287,62 @@
       color: var(--text);
       margin: 0;
       line-height: 1.5;
+    }
+    .test-output-entry {
+      margin-bottom: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .test-output-entry-header {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+    .test-output-entry-header .status-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .test-output-entry-header .status-dot.pass { background: #28a745; }
+    .test-output-entry-header .status-dot.fail { background: #dc3545; }
+    .test-output-reply {
+      padding: 0.45rem 0.6rem;
+      font-size: 0.82rem;
+      color: var(--text);
+      word-break: break-word;
+      line-height: 1.5;
+      border-bottom: 1px solid var(--border);
+    }
+    .test-output-reply-label {
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 0.15rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .test-output-judge {
+      padding: 0.4rem 0.6rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      word-break: break-word;
+      line-height: 1.4;
+    }
+    .test-output-judge.pass { color: #155724; }
+    .test-output-judge.fail { color: #721c24; }
+    .test-output-summary {
+      margin-top: 0.5rem;
+      padding: 0.45rem 0.6rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
     }
     .test-detail-empty {
       color: var(--muted);
@@ -1096,14 +1153,128 @@
       }
     });
 
-    var testOutputs = {};
+    var testRawResults = {};
     var testInputsCache = {};
     var testStatusMap = {};
     var activeTestId = null;
 
-    function formatTestOutput(x) {
-      var head = '--- ' + (x.name || x.testId) + ' (exit ' + (x.exitCode != null ? x.exitCode : 'timeout') + ', ' + (x.durationMs ? (x.durationMs / 1000).toFixed(1) + 's' : '') + ') ---\n';
-      return head + (x.stdout || '') + (x.stderr ? '\n' + x.stderr : '');
+    function parseTestOutput(result) {
+      var stdout = result.stdout || '';
+      var entries = [];
+      var lines = stdout.split('\n');
+      var curReply = '';
+      var curJudge = '';
+      var curName = '';
+      var collectingReply = false;
+      var collectingJudge = false;
+
+      function flush(status) {
+        if (curReply || curJudge || curName) {
+          entries.push({ name: curName, reply: curReply.trim(), judge: curJudge.trim(), pass: status === 'pass' });
+        }
+        curReply = ''; curJudge = ''; curName = ''; collectingReply = false; collectingJudge = false;
+      }
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        var trimmed = line.trim();
+
+        if (/^\[SUCCESS\]/.test(trimmed)) {
+          flush('pass');
+          continue;
+        }
+        if (/^\[FAILED\]/.test(trimmed) && /—/.test(trimmed)) {
+          if (!curJudge) {
+            var failReason = trimmed.replace(/^\[FAILED\]\s*[^—]*—\s*/, '');
+            curJudge = failReason;
+          }
+          flush('fail');
+          continue;
+        }
+
+        // skill-test-runner format: "  Reply: ..."
+        if (/^\s*Reply:\s/.test(line)) {
+          collectingJudge = false;
+          collectingReply = true;
+          curReply = line.replace(/^\s*Reply:\s*/, '');
+          continue;
+        }
+        if (/^\s*Judge:\s/.test(line)) {
+          collectingReply = false;
+          collectingJudge = true;
+          curJudge = line.replace(/^\s*Judge:\s*/, '');
+          continue;
+        }
+
+        // agent test format: "Scenario: name" / "Reply: ..."
+        if (/^Scenario:\s/.test(trimmed)) {
+          if (curReply || curName) flush(curReply ? 'pass' : null);
+          curName = trimmed.replace(/^Scenario:\s*/, '');
+          continue;
+        }
+        if (/^Message:\s/.test(trimmed)) {
+          continue;
+        }
+        if (/^Reply:\s/.test(trimmed)) {
+          collectingReply = true;
+          collectingJudge = false;
+          curReply = trimmed.replace(/^Reply:\s*/, '');
+          continue;
+        }
+
+        // continuation lines for multi-line reply/judge
+        if (collectingReply && trimmed && !/^─+$/.test(trimmed) && !/^Skill:/.test(trimmed) && !/^\[/.test(trimmed) && !/^---/.test(trimmed)) {
+          curReply += '\n' + line.trimStart();
+          continue;
+        }
+        if (collectingJudge && trimmed && !/^─+$/.test(trimmed) && !/^\[/.test(trimmed) && !/^---/.test(trimmed)) {
+          curJudge += '\n' + line.trimStart();
+          continue;
+        }
+
+        collectingReply = false;
+        collectingJudge = false;
+      }
+      if (curReply || curJudge || curName) flush(curReply ? 'pass' : null);
+
+      // extract summary line
+      var summaryMatch = stdout.match(/Passed:\s*(\d+),\s*Failed:\s*(\d+)/);
+      var doneMatch = stdout.match(/Done\.\s*Scenarios:\s*(\d+)\s*Failed:\s*(\d+)/);
+      var summary = '';
+      if (summaryMatch) summary = 'Passed: ' + summaryMatch[1] + ', Failed: ' + summaryMatch[2];
+      else if (doneMatch) summary = 'Scenarios: ' + doneMatch[1] + ', Failed: ' + doneMatch[2];
+
+      return { entries: entries, summary: summary, exitCode: result.exitCode, durationMs: result.durationMs };
+    }
+
+    function renderOutputResults(parsed) {
+      if (!parsed || !parsed.entries.length) {
+        var meta = '';
+        if (parsed && parsed.exitCode != null) meta = ' (exit ' + parsed.exitCode + (parsed.durationMs ? ', ' + (parsed.durationMs / 1000).toFixed(1) + 's' : '') + ')';
+        return '<div class="test-detail-empty">No structured output' + escapeHtml(meta) + '</div>';
+      }
+      var html = '';
+      parsed.entries.forEach(function (e) {
+        var statusClass = e.pass ? 'pass' : 'fail';
+        html += '<div class="test-output-entry">';
+        if (e.name) {
+          html += '<div class="test-output-entry-header"><span class="status-dot ' + statusClass + '"></span>' + escapeHtml(e.name) + '</div>';
+        }
+        if (e.reply) {
+          html += '<div class="test-output-reply"><div class="test-output-reply-label">Reply</div>' + escapeHtml(e.reply) + '</div>';
+        }
+        if (e.judge) {
+          var judgeClass = /^YES/i.test(e.judge.trim()) ? 'pass' : (/^NO/i.test(e.judge.trim()) ? 'fail' : '');
+          html += '<div class="test-output-judge ' + judgeClass + '"><strong>Judge:</strong> ' + escapeHtml(e.judge) + '</div>';
+        }
+        html += '</div>';
+      });
+      if (parsed.summary) {
+        html += '<div class="test-output-summary">' + escapeHtml(parsed.summary);
+        if (parsed.durationMs) html += ' &middot; ' + (parsed.durationMs / 1000).toFixed(1) + 's';
+        html += '</div>';
+      }
+      return html;
     }
 
     function renderInputMessages(messages) {
@@ -1157,8 +1328,9 @@
           });
       }
 
-      if (testOutputs[testId]) {
-        outputEl.innerHTML = '<pre class="test-output-pre">' + escapeHtml(testOutputs[testId]) + '</pre>';
+      if (testRawResults[testId]) {
+        var parsed = parseTestOutput(testRawResults[testId]);
+        outputEl.innerHTML = renderOutputResults(parsed);
       } else {
         outputEl.innerHTML = '<div class="test-detail-empty">No output yet. Run the test.</div>';
       }
@@ -1207,12 +1379,13 @@
       }
     }
 
-    function setTestOutput(testId, text, passed) {
-      testOutputs[testId] = text;
+    function setTestOutput(testId, result, passed) {
+      testRawResults[testId] = result;
       updateSidebarStatus(testId, passed);
       if (activeTestId === testId) {
         var outputEl = document.getElementById('test-detail-output');
-        outputEl.innerHTML = '<pre class="test-output-pre">' + escapeHtml(text || '(no output)') + '</pre>';
+        var parsed = parseTestOutput(result);
+        outputEl.innerHTML = renderOutputResults(parsed);
       }
     }
 
@@ -1226,14 +1399,13 @@
         var d = await r.json();
         var results = d.results || [];
         if (results.length) {
-          var out = formatTestOutput(results[0]);
           var passed = results[0].exitCode === 0;
-          setTestOutput(id, out, passed);
+          setTestOutput(id, results[0], passed);
         }
         statusEl.textContent = results.every(function (x) { return x.exitCode === 0; }) ? 'Done (passed).' : 'Done (some failed).';
       } catch (e) {
         var err = 'Error: ' + (e.message || 'Request failed');
-        setTestOutput(id, err, false);
+        setTestOutput(id, { stdout: err, stderr: '', exitCode: 1, durationMs: 0 }, false);
         statusEl.textContent = err;
       }
       document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = false; });
@@ -1250,7 +1422,7 @@
         var d = await r.json();
         var results = d.results || [];
         results.forEach(function (x) {
-          setTestOutput(x.testId, formatTestOutput(x), x.exitCode === 0);
+          setTestOutput(x.testId, x, x.exitCode === 0);
         });
         var passed = results.filter(function (x) { return x.exitCode === 0; }).length;
         statusEl.textContent = 'Done: ' + passed + '/' + results.length + ' passed.';
