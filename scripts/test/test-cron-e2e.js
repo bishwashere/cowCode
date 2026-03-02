@@ -130,11 +130,13 @@ function runE2E(userMessage, opts = {}) {
         .slice(startIdx + E2E_REPLY_MARKER_START.length, endIdx)
         .replace(/^\n+|\n+$/g, '')
         .trim();
+      const skillsMatch = stdout.match(/E2E_SKILLS_CALLED:\s*(.+)/);
+      const skillsCalled = skillsMatch ? skillsMatch[1].trim().split(',').map((s) => s.trim()).filter(Boolean) : [];
       if (code !== 0) {
         reject(new Error(`Process exited ${code}. Reply: ${reply.slice(0, 200)}`));
         return;
       }
-      resolve(reply);
+      resolve({ reply, skillsCalled });
     });
   });
 }
@@ -242,11 +244,13 @@ async function runReport() {
       let cronSet = '—';
       if (type === 'add' || type === 'add-single' || type === 'add-recurring') {
         const { stateDir, storePath } = createTempStateDir();
-        reply = await runE2E(query, { stateDir });
+        const res = await runE2E(query, { stateDir });
+        reply = res.reply ?? res;
         const { jobs } = loadStore(storePath);
         cronSet = formatCronSet(jobs);
       } else {
-        reply = await runE2E(query);
+        const res = await runE2E(query);
+        reply = res.reply ?? res;
       }
       rows.push({ query, reply, cronSet });
       console.log('  ✓', query.slice(0, 50) + (query.length > 50 ? '…' : ''));
@@ -278,56 +282,64 @@ async function main() {
     ...CRON_ADD_QUERIES.map((query) => ({
       name: `cron add: "${query}"`,
       run: async () => {
-        const reply = await runE2E(query);
+        const result = await runE2E(query);
+        const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     })),
     {
       name: `cron add: exact job count — "${singleAddQuery}"`,
       run: async () => {
         const { stateDir, storePath } = createTempStateDir();
-        const reply = await runE2E(singleAddQuery, { stateDir });
+        const result = await runE2E(singleAddQuery, { stateDir });
+        const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(singleAddQuery, reply, stateDir, { skillHint: 'cron' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
         const { jobs } = loadStore(storePath);
         assert(jobs.length === 1, `One "add" message must create exactly one job; got ${jobs.length}. Duplicate-add bug.`);
         const atTimes = jobs.filter((j) => j.schedule?.kind === 'at' && j.schedule?.at).map((j) => j.schedule.at);
         assert(new Set(atTimes).size === atTimes.length, `All one-shot jobs must have unique "at" times; got duplicates.`);
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     },
     ...CRON_LIST_QUERIES.map((query) => ({
       name: `cron list: "${query}"`,
       run: async () => {
-        const reply = await runE2E(query);
+        const result = await runE2E(query);
+        const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     })),
     ...CRON_RECURRING_ADD_QUERIES.map(({ query, expectedExpr }) => ({
       name: `cron recurring: "${query}"`,
       run: async () => {
         const { stateDir, storePath } = createTempStateDir();
-        const reply = await runE2E(query, { stateDir });
+        const result = await runE2E(query, { stateDir });
+        const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'cron' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
         const { jobs } = loadStore(storePath);
@@ -337,7 +349,7 @@ async function main() {
           const found = cronJobs.some((j) => j.schedule.expr === expectedExpr);
           assert(found, `Expected cron expr "${expectedExpr}" for "${query}". Got: ${cronJobs.map((j) => j.schedule.expr).join(', ')}`);
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     })),
     {
@@ -397,14 +409,16 @@ async function main() {
     ...REMINDER_MANAGE_QUERIES.map((query) => ({
       name: `cron manage: "${query}"`,
       run: async () => {
-        const reply = await runE2E(query);
+        const result = await runE2E(query);
+        const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'cron' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     })),
   ];

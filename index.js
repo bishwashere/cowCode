@@ -721,6 +721,7 @@ async function main() {
   }
 
   async function runAgentWithSkills(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts = {}) {
+    let skillsCalled = [];
     console.log('[agent] handling:', text.slice(0, 50) + (text.length > 50 ? '…' : ''));
     try {
       await sock.sendPresenceUpdate('composing', jid);
@@ -754,7 +755,7 @@ async function main() {
     const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
       : (inMemoryHistory.length > 0 ? inMemoryHistory : readLastPrivateExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES));
-    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption } = await runAgentTurn({
+    const turnResult = await runAgentTurn({
       userText: text,
       ctx,
       systemPrompt: buildSystemPrompt(systemPromptOpts),
@@ -762,6 +763,8 @@ async function main() {
       historyMessages,
       getFullSkillDoc: skillContext.getFullSkillDoc,
     });
+    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = turnResult || {};
+    if (Array.isArray(called) && called.length) skillsCalled = called;
     const textForSend = isTelegramChatId(jid) ? textToSend.replace(/^\[CowCode\]\s*/i, '').trim() : textToSend;
     const isGroupNoReply = bioOpts.groupNonOwner && !bioOpts.groupMentioned &&
       !(voiceReplyText && voiceReplyText.trim()) &&
@@ -855,6 +858,7 @@ async function main() {
         }
       }
     }
+  return { skillsCalled: skillsCalled || [] };
   }
 
   // --test: run main code path once with mock socket (set above), then exit. No WhatsApp auth.
@@ -867,13 +871,17 @@ async function main() {
     const sentIds = { current: new Set() };
     for (const [i, testMsg] of [testMsg1, testMsg2].filter(Boolean).entries()) {
       console.log('[test] Running main code path with message', i + 1 + ':', testMsg.slice(0, 60));
+      let runRet = { skillsCalled: [] };
       try {
-        await runAgentWithSkills(sock, 'test@s.whatsapp.net', testMsg, lastSent, 'test@s.whatsapp.net', sentIds);
+        runRet = await runAgentWithSkills(sock, 'test@s.whatsapp.net', testMsg, lastSent, 'test@s.whatsapp.net', sentIds) || runRet;
       } catch (err) {
         lastSent.set('test@s.whatsapp.net', 'Moo — ' + (err && err.message ? err.message : String(err)));
       }
       const reply = lastSent.get('test@s.whatsapp.net');
       if (reply != null && (testMsg2 ? (i === 1) : true)) {
+        if (Array.isArray(runRet.skillsCalled) && runRet.skillsCalled.length) {
+          console.log('E2E_SKILLS_CALLED: ' + runRet.skillsCalled.join(','));
+        }
         console.log('E2E_REPLY_START');
         process.stdout.write(reply + '\n');
         console.log('E2E_REPLY_END');

@@ -74,11 +74,13 @@ function runE2E(userMessage, opts = {}) {
         .slice(startIdx + E2E_REPLY_MARKER_START.length, endIdx)
         .replace(/^\n+|\n+$/g, '')
         .trim();
+      const skillsMatch = stdout.match(/E2E_SKILLS_CALLED:\s*(.+)/);
+      const skillsCalled = skillsMatch ? skillsMatch[1].trim().split(',').map((s) => s.trim()).filter(Boolean) : [];
       if (code !== 0) {
         reject(new Error(`Process exited ${code}. Reply: ${reply.slice(0, 200)}`));
         return;
       }
-      resolve(reply);
+      resolve({ reply, skillsCalled });
     });
   });
 }
@@ -91,16 +93,18 @@ async function main() {
 
   const tests = WRITE_QUERIES.map((query) => ({
     name: `write: "${query.slice(0, 50)}…"`,
-run: async () => {
-  const reply = await runE2E(query, { stateDir });
-  const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'write' });
-  if (!pass) {
-    const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
-    err.reply = reply;
-    throw err;
-  }
-  return { reply };
-},
+    run: async () => {
+      const result = await runE2E(query, { stateDir });
+      const reply = result.reply ?? result;
+      const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'write' });
+      if (!pass) {
+        const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
+        err.reply = reply;
+        err.skillsCalled = result.skillsCalled;
+        throw err;
+      }
+      return { reply, skillsCalled: result.skillsCalled };
+    },
   }));
 
   const { failed } = await runSkillTests('write', tests);

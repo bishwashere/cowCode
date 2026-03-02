@@ -85,7 +85,9 @@ function runE2E(userMessage) {
         .slice(startIdx + E2E_REPLY_MARKER_START.length, endIdx)
         .replace(/^\n+|\n+$/g, '')
         .trim();
-      resolve({ code, reply, stderr });
+      const skillsMatch = stdout.match(/E2E_SKILLS_CALLED:\s*(.+)/);
+      const skillsCalled = skillsMatch ? skillsMatch[1].trim().split(',').map((s) => s.trim()).filter(Boolean) : [];
+      resolve({ code, reply, stderr, skillsCalled });
     });
   });
 }
@@ -98,42 +100,48 @@ async function main() {
       name: 'List my lights — LLM judge: user got what they wanted',
       run: async () => {
         const userMessage = 'list my lights';
-        const { reply } = await runE2E(userMessage);
+        const result = await runE2E(userMessage);
+        const reply = result.reply;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(userMessage, reply, DEFAULT_STATE_DIR, { skillHint: 'home-assistant' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     },
     {
       name: 'What lights do I have — LLM judge: user got what they wanted',
       run: async () => {
         const userMessage = 'What lights do I have?';
-        const { reply } = await runE2E(userMessage);
+        const result = await runE2E(userMessage);
+        const reply = result.reply;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(userMessage, reply, DEFAULT_STATE_DIR, { skillHint: 'home-assistant' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     },
     {
       name: 'List all my devices — so we see at least something returned from the API',
       run: async () => {
         const userMessage = 'List all my devices';
-        const { reply } = await runE2E(userMessage);
+        const result = await runE2E(userMessage);
+        const reply = result.reply;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(userMessage, reply, DEFAULT_STATE_DIR, { skillHint: 'home-assistant' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     },
   ];

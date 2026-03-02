@@ -84,11 +84,13 @@ function runE2E(userMessage) {
         .slice(startIdx + E2E_REPLY_MARKER_START.length, endIdx)
         .replace(/^\n+|\n+$/g, '')
         .trim();
+      const skillsMatch = stdout.match(/E2E_SKILLS_CALLED:\s*(.+)/);
+      const skillsCalled = skillsMatch ? skillsMatch[1].trim().split(',').map((s) => s.trim()).filter(Boolean) : [];
       if (code !== 0) {
         reject(new Error(`Process exited ${code}. Reply: ${reply.slice(0, 200)}`));
         return;
       }
-      resolve(reply);
+      resolve({ reply, skillsCalled });
     });
   });
 }
@@ -101,40 +103,46 @@ async function main() {
     ...NEWS_QUERIES.map((query) => ({
       name: `news: "${query}"`,
       run: async () => {
-        const reply = await runE2E(query);
+        const result = await runE2E(query);
+        const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     })),
     ...NON_NEWS_QUERIES.map((query) => ({
       name: `non-news: "${query}"`,
       run: async () => {
-        const reply = await runE2E(query);
+        const result = await runE2E(query);
+        const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     })),
     ...BROWSER_SPECIFIC_QUERIES.map((query) => ({
       name: `browser: "${query}"`,
       run: async () => {
-        const reply = await runE2E(query);
+        const result = await runE2E(query);
+        const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, DEFAULT_STATE_DIR, { skillHint: 'browser' });
         if (!pass) {
           const err = new Error(`Judge: user did not get what they wanted. ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     })),
   ];

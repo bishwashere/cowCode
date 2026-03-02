@@ -29,11 +29,15 @@ export async function runSkillTests(skillName, tests, opts = {}) {
       const result = await t.run();
       passed++;
       const reply = result && (typeof result === 'string' ? result : result.reply);
+      const skillsCalled = result && typeof result === 'object' && Array.isArray(result.skillsCalled) ? result.skillsCalled : [];
+      if (skillsCalled.length) console.log(`  Skills called: ${skillsCalled.join(', ')}`);
       if (reply) console.log(`  Reply: ${reply.slice(0, 500)}`);
       console.log(`  [SUCCESS] ${t.name}`);
     } catch (err) {
       failed++;
       const reply = err && err.reply;
+      const skillsCalled = err && Array.isArray(err.skillsCalled) ? err.skillsCalled : [];
+      if (skillsCalled.length) console.log(`  Skills called: ${skillsCalled.join(', ')}`);
       if (reply) console.log(`  Reply: ${reply.slice(0, 500)}`);
       const msg = (err && err.message) || String(err);
       console.log(`  [FAILED] ${t.name} — ${msg.slice(0, 200)}${msg.length > 200 ? '…' : ''}`);

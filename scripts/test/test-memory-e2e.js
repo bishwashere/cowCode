@@ -170,11 +170,13 @@ function runE2E(userMessage, opts = {}) {
         .slice(startIdx + E2E_REPLY_MARKER_START.length, endIdx)
         .replace(/^\n+|\n+$/g, '')
         .trim();
+      const skillsMatch = stdout.match(/E2E_SKILLS_CALLED:\s*(.+)/);
+      const skillsCalled = skillsMatch ? skillsMatch[1].trim().split(',').map((s) => s.trim()).filter(Boolean) : [];
       if (code !== 0) {
         reject(new Error(`Process exited ${code}. Reply: ${reply.slice(0, 200)}`));
         return;
       }
-      resolve({ reply, stderr });
+      resolve({ reply, stderr, skillsCalled });
     });
   });
 }
@@ -220,7 +222,8 @@ async function main() {
       name: 'memory: chat log written',
       run: async () => {
         const { stateDir, workspaceDir } = createTempStateDir();
-        const { reply } = await runE2E(storeMessage, { stateDir });
+        const run = await runE2E(storeMessage, { stateDir });
+        const reply = run.reply;
         assert(reply && reply.length > 0, 'Expected non-empty reply');
         const log = getLatestChatLog(workspaceDir);
         assert(log && log.lines.length >= 1, 'Expected at least one line in chat-log');
@@ -233,7 +236,7 @@ async function main() {
         }
         assert(parsed.user === storeMessage, `Expected last exchange user to match. Got user: ${(parsed.user || '').slice(0, 80)}`);
         assert(parsed.assistant && parsed.assistant.length > 0, 'Expected non-empty assistant reply in chat log');
-        return { reply };
+        return { reply, skillsCalled: run.skillsCalled };
       },
     },
     {
@@ -249,9 +252,10 @@ async function main() {
           const stderrHint = run.stderr ? ` Stderr (last 300): ${run.stderr.slice(-300)}` : '';
           const err = new Error(`Memory recall failed: LLM judge said the bot did not answer the user's question. Judge: ${reason || 'NO'}. Bot reply (first 400 chars): ${(reply2 || '').slice(0, 400)}.${stderrHint}`);
           err.reply = reply2;
+          err.skillsCalled = run.skillsCalled;
           throw err;
         }
-        return { reply: reply2 };
+        return { reply: reply2, skillsCalled: run.skillsCalled };
       },
     },
     {
@@ -286,7 +290,8 @@ async function main() {
         assert(existsSync(indexDbPath), 'Index DB not found at ' + indexDbPath + '. Index CLI stdout: ' + (indexResult.stdout || '').slice(-400));
         console.log('[filesystem test] stateDir:', stateDir, 'index.db size:', statSync(indexDbPath).size);
         const userMessage = 'Search my memory for directory contents or list of files and folders, then tell me what files or directories you find.';
-        const { reply } = await runE2E(userMessage, { stateDir });
+        const result = await runE2E(userMessage, { stateDir });
+        const reply = result.reply;
 
         console.log('\n--- memory: filesystem index test (E2E) ---');
         console.log('Input (user message):', userMessage);
@@ -305,9 +310,10 @@ async function main() {
               reply.slice(0, 500)
           );
           err.reply = reply;
+          err.skillsCalled = result.skillsCalled;
           throw err;
         }
-        return { reply };
+        return { reply, skillsCalled: result.skillsCalled };
       },
     },
   ];

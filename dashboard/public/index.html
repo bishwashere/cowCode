@@ -326,6 +326,11 @@
       text-transform: uppercase;
       letter-spacing: 0.03em;
     }
+    .test-output-skills {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
     .test-output-judge {
       padding: 0.4rem 0.6rem;
       font-size: 0.78rem;
@@ -1165,14 +1170,15 @@
       var curReply = '';
       var curJudge = '';
       var curName = '';
+      var curSkillsCalled = '';
       var collectingReply = false;
       var collectingJudge = false;
 
       function flush(status) {
         if (curReply || curJudge || curName) {
-          entries.push({ name: curName, reply: curReply.trim(), judge: curJudge.trim(), pass: status === 'pass' });
+          entries.push({ name: curName, reply: curReply.trim(), judge: curJudge.trim(), skillsCalled: curSkillsCalled.trim(), pass: status === 'pass' });
         }
-        curReply = ''; curJudge = ''; curName = ''; collectingReply = false; collectingJudge = false;
+        curReply = ''; curJudge = ''; curName = ''; curSkillsCalled = ''; collectingReply = false; collectingJudge = false;
       }
 
       for (var i = 0; i < lines.length; i++) {
@@ -1192,7 +1198,11 @@
           continue;
         }
 
-        // skill-test-runner format: "  Reply: ..."
+        // skill-test-runner format: "  Skills called: ..." then "  Reply: ..."
+        if (/^\s*Skills called:\s/.test(line)) {
+          curSkillsCalled = line.replace(/^\s*Skills called:\s*/, '');
+          continue;
+        }
         if (/^\s*Reply:\s/.test(line)) {
           collectingJudge = false;
           collectingReply = true;
@@ -1259,6 +1269,9 @@
         html += '<div class="test-output-entry">';
         if (e.name) {
           html += '<div class="test-output-entry-header"><span class="status-dot ' + statusClass + '"></span>' + escapeHtml(e.name) + '</div>';
+        }
+        if (e.skillsCalled) {
+          html += '<div class="test-output-skills"><strong>Skills called:</strong> ' + escapeHtml(e.skillsCalled) + '</div>';
         }
         if (e.reply) {
           html += '<div class="test-output-reply"><div class="test-output-reply-label">Reply</div>' + escapeHtml(e.reply) + '</div>';
