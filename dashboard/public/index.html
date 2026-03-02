@@ -173,6 +173,9 @@
     .group-sub-nav button { background: none; border: none; font: inherit; color: var(--muted); cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 4px; }
     .group-sub-nav button:hover { color: var(--text); }
     .group-sub-nav button.active { color: var(--accent); font-weight: 500; }
+    #test-list .skill-row { cursor: pointer; padding: 0.4rem 0; border-radius: 4px; }
+    #test-list .skill-row:hover { background: var(--bg); }
+    #test-list .skill-row.selected { border-left: 3px solid var(--accent); padding-left: 0.5rem; margin-left: 2px; }
     .group-sub-panel { display: none; }
     .group-sub-panel.active { display: block; }
     .history-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
@@ -227,6 +230,7 @@
     <a href="#groups" data-page="groups">Groups</a>
     <a href="#llm" data-page="llm">LLM</a>
     <a href="#config" data-page="config">Config</a>
+    <a href="#test" data-page="test">Test</a>
   </nav>
 
   <div id="page-chat" class="page active">
@@ -396,9 +400,35 @@
     </div>
   </div>
 
+  <div id="page-test" class="page">
+    <div class="card">
+      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skill tests</h2>
+      <p class="skill-meta" style="margin:0 0 1rem 0;">Run individual tests or all at once. Inputs are from each test's inputs.md; output is stdout/stderr from the run.</p>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
+        <button type="button" id="test-run-all">Run all</button>
+        <span id="test-run-status" class="skill-meta" style="margin:0;"></span>
+      </div>
+      <div id="test-list" style="margin-bottom:1rem;"></div>
+      <div class="group-sub-nav" style="margin-bottom:0.5rem;">
+        <button type="button" data-test-panel="inputs" class="active">Inputs</button>
+        <button type="button" data-test-panel="output">Output</button>
+      </div>
+      <div id="test-panel-inputs" class="group-sub-panel active" style="padding:0.5rem 0;">
+        <div class="detail-label" style="margin-bottom:0.35rem;">Test inputs (from inputs.md)</div>
+        <pre id="test-inputs-content" style="margin:0; white-space:pre-wrap; font-size:0.85rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.75rem; max-height:20rem; overflow:auto;"></pre>
+        <p id="test-inputs-empty" class="empty" style="display:none; margin:0.5rem 0 0 0;">Select a test to view inputs.</p>
+      </div>
+      <div id="test-panel-output" class="group-sub-panel" style="padding:0.5rem 0; display:none;">
+        <div class="detail-label" style="margin-bottom:0.35rem;">Last run output (stdout + stderr)</div>
+        <pre id="test-output-content" style="margin:0; white-space:pre-wrap; font-size:0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.75rem; max-height:24rem; overflow:auto;"></pre>
+        <p id="test-output-empty" class="empty" style="display:none; margin:0.5rem 0 0 0;">No output yet. Run a test to see results.</p>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API = '';
-    var validPages = ['chat', 'status', 'crons', 'skills', 'groups', 'llm', 'config', 'soul'];
+    var validPages = ['chat', 'status', 'crons', 'skills', 'groups', 'llm', 'config', 'soul', 'test'];
     function setPage(name, soulFileId) {
       if (!name || !validPages.includes(name)) name = 'chat';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -412,6 +442,7 @@
       if (name === 'groups') fetchGroups();
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
+      if (name === 'test') fetchTests();
       if (name === 'soul') {
         fetchSoulFiles().then(function () {
           if (soulFileId) selectSoulFile(soulFileId);
@@ -894,6 +925,130 @@
       const d = await r.json();
       document.getElementById('full-config').textContent = JSON.stringify(d, null, 2);
     }
+
+    var selectedTestId = null;
+    var lastTestOutput = '';
+
+    async function fetchTests() {
+      try {
+        var r = await fetch(API + '/api/tests');
+        var d = await r.json();
+        var tests = d.tests || [];
+        var listEl = document.getElementById('test-list');
+        listEl.innerHTML = tests.map(function (t) {
+          return '<div class="skill-row" style="align-items:center; gap:0.75rem;" data-test-id="' + escapeHtml(t.id) + '"><span class="skill-id">' + escapeHtml(t.name) + '</span><button type="button" class="test-run-one" data-test-id="' + escapeHtml(t.id) + '">Run</button></div>';
+        }).join('');
+        listEl.querySelectorAll('.skill-row').forEach(function (row) {
+          var id = row.getAttribute('data-test-id');
+          if (id) row.addEventListener('click', function (e) { if (!e.target.classList.contains('test-run-one')) selectTest(id); });
+        });
+        listEl.querySelectorAll('.test-run-one').forEach(function (btn) {
+          btn.addEventListener('click', function (e) { e.stopPropagation(); runTest(btn.getAttribute('data-test-id')); });
+        });
+        if (tests.length && !selectedTestId) selectTest(tests[0].id);
+      } catch (e) {
+        document.getElementById('test-list').innerHTML = '<p class="error">Failed to load tests.</p>';
+      }
+    }
+
+    function selectTest(id) {
+      selectedTestId = id;
+      document.querySelectorAll('#test-list .skill-row').forEach(function (row) {
+        row.classList.toggle('selected', row.getAttribute('data-test-id') === id);
+      });
+      loadTestInputs(id);
+    }
+
+    async function loadTestInputs(id) {
+      var contentEl = document.getElementById('test-inputs-content');
+      var emptyEl = document.getElementById('test-inputs-empty');
+      if (!id) { contentEl.textContent = ''; emptyEl.style.display = 'block'; return; }
+      emptyEl.style.display = 'none';
+      try {
+        var r = await fetch(API + '/api/tests/inputs/' + encodeURIComponent(id));
+        var d = await r.json();
+        contentEl.textContent = d.content || '';
+      } catch (e) {
+        contentEl.textContent = '';
+      }
+    }
+
+    async function runTest(id) {
+      var statusEl = document.getElementById('test-run-status');
+      statusEl.textContent = 'Running ' + id + '…';
+      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = true; });
+      document.getElementById('test-run-all').disabled = true;
+      try {
+        var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: id }) });
+        var d = await r.json();
+        var results = d.results || [];
+        var out = results.map(function (x) {
+          var head = '--- ' + (x.name || x.testId) + ' (exit ' + (x.exitCode != null ? x.exitCode : 'timeout') + ', ' + (x.durationMs ? (x.durationMs / 1000).toFixed(1) + 's' : '') + ') ---\n';
+          return head + (x.stdout || '') + (x.stderr ? '\n' + x.stderr : '');
+        }).join('\n\n');
+        lastTestOutput = out;
+        document.getElementById('test-output-content').textContent = out || '(no output)';
+        document.getElementById('test-output-empty').style.display = out ? 'none' : 'block';
+        statusEl.textContent = results.every(function (x) { return x.exitCode === 0; }) ? 'Done (passed).' : 'Done (some failed).';
+        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === 'output'); });
+        document.getElementById('test-panel-inputs').style.display = 'none';
+        document.getElementById('test-panel-output').style.display = 'block';
+      } catch (e) {
+        lastTestOutput = 'Error: ' + (e.message || 'Request failed');
+        document.getElementById('test-output-content').textContent = lastTestOutput;
+        document.getElementById('test-output-empty').style.display = 'none';
+        statusEl.textContent = 'Error: ' + (e.message || '');
+        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === 'output'); });
+        document.getElementById('test-panel-inputs').style.display = 'none';
+        document.getElementById('test-panel-output').style.display = 'block';
+      }
+      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = false; });
+      document.getElementById('test-run-all').disabled = false;
+    }
+
+    async function runAllTests() {
+      var statusEl = document.getElementById('test-run-status');
+      statusEl.textContent = 'Running all tests…';
+      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = true; });
+      document.getElementById('test-run-all').disabled = true;
+      try {
+        var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: 'all' }) });
+        var d = await r.json();
+        var results = d.results || [];
+        var out = results.map(function (x) {
+          var head = '--- ' + (x.name || x.testId) + ' (exit ' + (x.exitCode != null ? x.exitCode : 'timeout') + ', ' + (x.durationMs ? (x.durationMs / 1000).toFixed(1) + 's' : '') + ') ---\n';
+          return head + (x.stdout || '') + (x.stderr ? '\n' + x.stderr : '');
+        }).join('\n\n');
+        lastTestOutput = out;
+        document.getElementById('test-output-content').textContent = out || '(no output)';
+        document.getElementById('test-output-empty').style.display = out ? 'none' : 'block';
+        var passed = results.filter(function (x) { return x.exitCode === 0; }).length;
+        statusEl.textContent = 'Done: ' + passed + '/' + results.length + ' passed.';
+        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === 'output'); });
+        document.getElementById('test-panel-inputs').style.display = 'none';
+        document.getElementById('test-panel-output').style.display = 'block';
+      } catch (e) {
+        lastTestOutput = 'Error: ' + (e.message || 'Request failed');
+        document.getElementById('test-output-content').textContent = lastTestOutput;
+        document.getElementById('test-output-empty').style.display = 'none';
+        statusEl.textContent = 'Error: ' + (e.message || '');
+        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === 'output'); });
+        document.getElementById('test-panel-inputs').style.display = 'none';
+        document.getElementById('test-panel-output').style.display = 'block';
+      }
+      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = false; });
+      document.getElementById('test-run-all').disabled = false;
+    }
+
+    document.getElementById('test-run-all').addEventListener('click', function () { runAllTests(); });
+    document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var panel = b.getAttribute('data-test-panel');
+        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === panel); });
+        document.getElementById('test-panel-inputs').style.display = panel === 'inputs' ? 'block' : 'none';
+        document.getElementById('test-panel-output').style.display = panel === 'output' ? 'block' : 'none';
+      });
+    });
 
     var selectedSoulFileId = null;
 

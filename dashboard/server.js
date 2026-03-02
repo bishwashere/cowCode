@@ -564,6 +564,114 @@ app.post('/api/chat', (req, res) => {
   child.stdin.end(payload, 'utf8');
 });
 
+// ---- Tests (skill test runner: list, inputs, run) ----
+
+const TEST_LIST = [
+  { id: 'cron', name: 'Cron E2E', script: 'scripts/test/test-cron-e2e.js', inputsPath: 'scripts/test/cron/inputs.md' },
+  { id: 'tide', name: 'Tide', script: 'scripts/test/test-tide.js', inputsPath: 'scripts/test/tide/inputs.md' },
+  { id: 'agent', name: 'Agent', script: 'scripts/test/test-agent.js', inputsPath: 'scripts/test/agent/inputs.md' },
+  { id: 'edit', name: 'Edit E2E', script: 'scripts/test/test-edit-e2e.js', inputsPath: 'scripts/test/edit/inputs.md' },
+  { id: 'write', name: 'Write E2E', script: 'scripts/test/test-write-e2e.js', inputsPath: 'scripts/test/write/inputs.md' },
+  { id: 'browser', name: 'Browser E2E', script: 'scripts/test/test-browser-e2e.js', inputsPath: 'scripts/test/browser/inputs.md' },
+  { id: 'memory', name: 'Memory E2E', script: 'scripts/test/test-memory-e2e.js', inputsPath: 'scripts/test/memory/inputs.md' },
+  { id: 'me', name: 'Me E2E', script: 'scripts/test/test-me-e2e.js', inputsPath: 'scripts/test/me/inputs.md' },
+  { id: 'home-assistant', name: 'Home Assistant E2E', script: 'scripts/test/test-home-assistant-e2e.js', inputsPath: 'scripts/test/home-assistant/inputs.md' },
+];
+
+const TEST_RUN_TIMEOUT_MS = 180_000; // 3 min per test
+
+function runOneTest(testId) {
+  const test = TEST_LIST.find((t) => t.id === testId);
+  if (!test) return Promise.reject(new Error(`Unknown test: ${testId}`));
+  const scriptPath = join(INSTALL_DIR, test.script);
+  if (!existsSync(scriptPath)) return Promise.reject(new Error(`Script not found: ${test.script}`));
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const child = spawn(process.execPath, [scriptPath], {
+      cwd: INSTALL_DIR,
+      env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      resolve({
+        testId: test.id,
+        name: test.name,
+        exitCode: null,
+        stdout,
+        stderr: stderr + '\n[Timed out after ' + TEST_RUN_TIMEOUT_MS / 1000 + 's]',
+        durationMs: Date.now() - start,
+        timedOut: true,
+      });
+    }, TEST_RUN_TIMEOUT_MS);
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+    child.on('close', (code, signal) => {
+      clearTimeout(timeout);
+      resolve({
+        testId: test.id,
+        name: test.name,
+        exitCode: code,
+        signal: signal || null,
+        stdout,
+        stderr,
+        durationMs: Date.now() - start,
+        timedOut: false,
+      });
+    });
+  });
+}
+
+app.get('/api/tests', (_req, res) => {
+  try {
+    res.json({ tests: TEST_LIST });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/tests/inputs/:id', (req, res) => {
+  try {
+    const test = TEST_LIST.find((t) => t.id === req.params.id);
+    if (!test) {
+      res.status(404).json({ error: 'Test not found' });
+      return;
+    }
+    const path = join(INSTALL_DIR, test.inputsPath);
+    const content = existsSync(path) ? readFileSync(path, 'utf8') : '';
+    res.json({ testId: test.id, name: test.name, content });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tests/run', async (req, res) => {
+  const testId = req.body?.testId;
+  if (testId !== 'all' && !TEST_LIST.some((t) => t.id === testId)) {
+    res.status(400).json({ error: 'testId must be a test id or "all"' });
+    return;
+  }
+  try {
+    const ids = testId === 'all' ? TEST_LIST.map((t) => t.id) : [testId];
+    const results = [];
+    for (const id of ids) {
+      const result = await runOneTest(id);
+      results.push(result);
+    }
+    res.json({ results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---- Soul / workspace MD files (SOUL.md, WhoAmI.md, MyHuman.md, MEMORY.md, memory/*.md) ----
 
 const SOUL_FILE_IDS = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'MEMORY.md'];
