@@ -652,6 +652,48 @@ app.get('/api/tests', (_req, res) => {
   }
 });
 
+function parseInputMessages(content) {
+  if (!content) return [];
+  const lines = content.split('\n');
+  const groups = [];
+  let cur = { group: '', messages: [] };
+  let inInputs = false;
+  let tableMessageCol = -1;
+
+  for (const raw of lines) {
+    const t = raw.trim();
+    if (/^##\s+Inputs/.test(t)) { inInputs = true; continue; }
+    if (!inInputs) continue;
+    if (/^##\s+/.test(t) && !/^###/.test(t)) break; // next h2 ends Inputs
+
+    if (/^###\s+/.test(t)) {
+      if (cur.messages.length || cur.group) groups.push(cur);
+      cur = { group: t.replace(/^###\s*/, ''), messages: [] };
+      tableMessageCol = -1;
+      continue;
+    }
+
+    if (t.startsWith('|') && /Message/i.test(t)) {
+      const cols = t.split('|').map(c => c.trim()).filter(Boolean);
+      tableMessageCol = cols.findIndex(c => /^Message$/i.test(c));
+      continue;
+    }
+    if (/^\|[\s\-|]+\|$/.test(t)) continue;
+
+    if (tableMessageCol >= 0 && t.startsWith('|')) {
+      const cols = t.split('|').map(c => c.trim()).filter(Boolean);
+      if (cols[tableMessageCol]) cur.messages.push(cols[tableMessageCol]);
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(t)) { cur.messages.push(t.replace(/^[-*]\s+/, '')); continue; }
+    if (/^\d+\.\s+/.test(t)) { cur.messages.push(t.replace(/^\d+\.\s+/, '')); continue; }
+  }
+
+  if (cur.messages.length || cur.group) groups.push(cur);
+  return groups;
+}
+
 app.get('/api/tests/inputs/:id', (req, res) => {
   try {
     const test = TEST_LIST.find((t) => t.id === req.params.id);
@@ -659,9 +701,10 @@ app.get('/api/tests/inputs/:id', (req, res) => {
       res.status(404).json({ error: 'Test not found' });
       return;
     }
-    const path = join(INSTALL_DIR, test.inputsPath);
-    const content = existsSync(path) ? readFileSync(path, 'utf8') : '';
-    res.json({ testId: test.id, name: test.name, content });
+    const p = join(INSTALL_DIR, test.inputsPath);
+    const content = existsSync(p) ? readFileSync(p, 'utf8') : '';
+    const messages = parseInputMessages(content);
+    res.json({ testId: test.id, name: test.name, content, messages });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

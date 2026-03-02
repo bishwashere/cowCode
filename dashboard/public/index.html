@@ -189,58 +189,111 @@
     .group-sub-nav button { background: none; border: none; font: inherit; color: var(--muted); cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 4px; }
     .group-sub-nav button:hover { color: var(--text); }
     .group-sub-nav button.active { color: var(--accent); font-weight: 500; }
-    .test-tiles-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-      gap: 1rem;
-    }
-    .test-tile {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
+    .test-master-detail {
       display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
+      gap: 0;
+      height: calc(100vh - 11rem);
+      min-height: 400px;
     }
-    .test-tile-header {
+    .test-sidebar {
+      min-width: 14rem;
+      max-width: 18rem;
+      width: 22%;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .test-sidebar-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.5rem;
-      flex-wrap: wrap;
+      padding: 0.55rem 0.75rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      gap: 0.4rem;
+      transition: background 0.15s;
     }
-    .test-tile-name { font-weight: 600; font-size: 1rem; color: var(--text); }
-    .test-tile-section {
+    .test-sidebar-item:hover { background: rgba(0,0,0,0.04); }
+    .test-sidebar-item.active { background: var(--accent); color: #fff; }
+    .test-sidebar-item.active:hover { background: var(--accent); }
+    .test-sidebar-item .test-sidebar-name { font-weight: 500; font-size: 0.9rem; }
+    .test-sidebar-item .test-sidebar-status {
+      font-size: 0.7rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .test-sidebar-item .test-sidebar-status.pass { background: #d4edda; color: #155724; }
+    .test-sidebar-item .test-sidebar-status.fail { background: #f8d7da; color: #721c24; }
+    .test-sidebar-item.active .test-sidebar-status.pass { background: rgba(255,255,255,0.25); color: #fff; }
+    .test-sidebar-item.active .test-sidebar-status.fail { background: rgba(255,255,255,0.25); color: #fff; }
+    .test-detail-area {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .test-detail-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .test-detail-pane + .test-detail-pane { border-left: 1px solid var(--border); }
+    .test-detail-pane-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .test-detail-pane-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem;
+      font-size: 0.85rem;
+    }
+    .test-input-group { margin-bottom: 0.75rem; }
+    .test-input-group-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .test-input-msg {
+      padding: 0.35rem 0.55rem;
+      margin-bottom: 0.25rem;
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 6px;
-      overflow: hidden;
-      background: var(--bg);
+      font-size: 0.82rem;
+      color: var(--text);
+      word-break: break-word;
     }
-    .test-tile-section-header {
-      cursor: pointer;
-      padding: 0.4rem 0.6rem;
-      font-size: 0.85rem;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      user-select: none;
-    }
-    .test-tile-section-header:hover { color: var(--text); background: rgba(0,0,0,0.05); }
-    .test-tile-section-header .chevron { font-size: 0.7rem; transition: transform 0.2s; }
-    .test-tile-section.collapsed .chevron { transform: rotate(-90deg); }
-    .test-tile-section-body {
-      padding: 0.5rem 0.75rem;
-      font-size: 0.8rem;
+    .test-output-pre {
       white-space: pre-wrap;
       word-break: break-word;
-      max-height: 16rem;
-      overflow: auto;
-      border-top: 1px solid var(--border);
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 0.8rem;
+      color: var(--text);
+      margin: 0;
+      line-height: 1.5;
     }
-    .test-tile-section.collapsed .test-tile-section-body { display: none; }
-    .test-tile-section-body.empty { color: var(--muted); font-style: italic; }
+    .test-detail-empty {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 0.85rem;
+      padding: 2rem;
+      text-align: center;
+    }
     .group-sub-panel { display: none; }
     .group-sub-panel.active { display: block; }
     .history-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
@@ -471,14 +524,31 @@
   </div>
 
   <div id="page-test" class="page">
-    <div class="card">
-      <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skill tests</h2>
-      <p class="skill-meta" style="margin:0 0 1rem 0;">Run individual tests or all at once. Each tile shows inputs (from inputs.md) and output (stdout/stderr); click Input or Output to expand.</p>
-      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
-        <button type="button" id="test-run-all">Run all</button>
-        <span id="test-run-status" class="skill-meta" style="margin:0;"></span>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:0.65rem 0.75rem; border-bottom:1px solid var(--border);">
+        <h2 style="margin:0; font-size:1rem;">Skill tests</h2>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span id="test-run-status" class="skill-meta" style="margin:0;"></span>
+          <button type="button" id="test-run-all" style="font-size:0.8rem;">Run all</button>
+        </div>
       </div>
-      <div id="test-list" class="test-tiles-grid"></div>
+      <div class="test-master-detail">
+        <div id="test-sidebar" class="test-sidebar"></div>
+        <div id="test-detail-area" class="test-detail-area">
+          <div class="test-detail-pane">
+            <div class="test-detail-pane-header">Input</div>
+            <div id="test-detail-input" class="test-detail-pane-body">
+              <div class="test-detail-empty">Select a test from the list</div>
+            </div>
+          </div>
+          <div class="test-detail-pane">
+            <div class="test-detail-pane-header">Output</div>
+            <div id="test-detail-output" class="test-detail-pane-body">
+              <div class="test-detail-empty">Select a test from the list</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1027,44 +1097,70 @@
     });
 
     var testOutputs = {};
+    var testInputsCache = {};
+    var testStatusMap = {};
+    var activeTestId = null;
 
     function formatTestOutput(x) {
       var head = '--- ' + (x.name || x.testId) + ' (exit ' + (x.exitCode != null ? x.exitCode : 'timeout') + ', ' + (x.durationMs ? (x.durationMs / 1000).toFixed(1) + 's' : '') + ') ---\n';
       return head + (x.stdout || '') + (x.stderr ? '\n' + x.stderr : '');
     }
 
-    function getTileByTestId(testId) {
-      var list = document.querySelectorAll('#test-list .test-tile');
-      for (var i = 0; i < list.length; i++) { if (list[i].getAttribute('data-test-id') === testId) return list[i]; }
-      return null;
+    function renderInputMessages(messages) {
+      if (!messages || !messages.length) return '<div class="test-detail-empty">No inputs defined</div>';
+      var html = '';
+      messages.forEach(function (g) {
+        html += '<div class="test-input-group">';
+        if (g.group) html += '<div class="test-input-group-title">' + escapeHtml(g.group) + '</div>';
+        (g.messages || []).forEach(function (m) {
+          html += '<div class="test-input-msg">' + escapeHtml(m) + '</div>';
+        });
+        html += '</div>';
+      });
+      return html;
     }
 
-    function setTileOutput(testId, text) {
-      testOutputs[testId] = text;
-      var tile = getTileByTestId(testId);
-      if (!tile) return;
-      var body = tile.querySelector('.test-tile-section[data-section="output"] .test-tile-section-body');
-      if (body) {
-        body.textContent = text || '(no output)';
-        body.classList.toggle('empty', !text);
+    function updateSidebarStatus(testId, passed) {
+      testStatusMap[testId] = passed;
+      var item = document.querySelector('.test-sidebar-item[data-test-id="' + testId + '"]');
+      if (!item) return;
+      var badge = item.querySelector('.test-sidebar-status');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'test-sidebar-status';
+        item.appendChild(badge);
       }
+      badge.textContent = passed ? 'PASS' : 'FAIL';
+      badge.className = 'test-sidebar-status ' + (passed ? 'pass' : 'fail');
     }
 
-    async function loadTileInputs(testId) {
-      var tile = getTileByTestId(testId);
-      if (!tile) return;
-      var body = tile.querySelector('.test-tile-section[data-section="input"] .test-tile-section-body');
-      if (!body || body.dataset.loaded === '1') return;
-      body.dataset.loaded = '1';
-      body.textContent = 'Loading…';
-      try {
-        var r = await fetch(API + '/api/tests/inputs/' + encodeURIComponent(testId));
-        var d = await r.json();
-        body.textContent = d.content || '(no inputs)';
-        body.classList.toggle('empty', !(d.content && d.content.trim()));
-      } catch (e) {
-        body.textContent = 'Failed to load inputs.';
-        body.classList.remove('empty');
+    function showTestDetail(testId) {
+      activeTestId = testId;
+      document.querySelectorAll('.test-sidebar-item').forEach(function (el) {
+        el.classList.toggle('active', el.getAttribute('data-test-id') === testId);
+      });
+      var inputEl = document.getElementById('test-detail-input');
+      var outputEl = document.getElementById('test-detail-output');
+
+      if (testInputsCache[testId]) {
+        inputEl.innerHTML = renderInputMessages(testInputsCache[testId]);
+      } else {
+        inputEl.innerHTML = '<div class="test-detail-empty">Loading…</div>';
+        fetch(API + '/api/tests/inputs/' + encodeURIComponent(testId))
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            testInputsCache[testId] = d.messages || [];
+            if (activeTestId === testId) inputEl.innerHTML = renderInputMessages(testInputsCache[testId]);
+          })
+          .catch(function () {
+            if (activeTestId === testId) inputEl.innerHTML = '<div class="test-detail-empty">Failed to load inputs</div>';
+          });
+      }
+
+      if (testOutputs[testId]) {
+        outputEl.innerHTML = '<pre class="test-output-pre">' + escapeHtml(testOutputs[testId]) + '</pre>';
+      } else {
+        outputEl.innerHTML = '<div class="test-detail-empty">No output yet. Run the test.</div>';
       }
     }
 
@@ -1073,43 +1169,50 @@
         var r = await fetch(API + '/api/tests');
         var d = await r.json();
         var tests = d.tests || [];
-        var listEl = document.getElementById('test-list');
-        listEl.innerHTML = tests.map(function (t) {
+        var sidebar = document.getElementById('test-sidebar');
+        sidebar.innerHTML = tests.map(function (t) {
           var tid = escapeHtml(t.id);
           var name = escapeHtml(t.name);
-          return '<div class="test-tile" data-test-id="' + tid + '">' +
-            '<div class="test-tile-header">' +
-              '<span class="test-tile-name">' + name + '</span>' +
-              '<button type="button" class="test-run-one" data-test-id="' + tid + '">Run</button>' +
-            '</div>' +
-            '<div class="test-tile-section collapsed" data-section="input">' +
-              '<div class="test-tile-section-header"><span class="chevron">▼</span> Input</div>' +
-              '<div class="test-tile-section-body empty">Click to load</div>' +
-            '</div>' +
-            '<div class="test-tile-section collapsed" data-section="output">' +
-              '<div class="test-tile-section-header"><span class="chevron">▼</span> Output</div>' +
-              '<div class="test-tile-section-body empty">No output yet. Run the test.</div>' +
-            '</div>' +
+          var statusHtml = '';
+          if (testStatusMap[t.id] !== undefined) {
+            var p = testStatusMap[t.id];
+            statusHtml = '<span class="test-sidebar-status ' + (p ? 'pass' : 'fail') + '">' + (p ? 'PASS' : 'FAIL') + '</span>';
+          }
+          return '<div class="test-sidebar-item" data-test-id="' + tid + '">' +
+            '<span class="test-sidebar-name">' + name + '</span>' +
+            '<button type="button" class="test-run-one" data-test-id="' + tid + '" style="font-size:0.75rem; padding:0.15rem 0.45rem;">Run</button>' +
+            statusHtml +
             '</div>';
         }).join('');
 
-        listEl.querySelectorAll('.test-tile-section-header').forEach(function (header) {
-          header.addEventListener('click', function () {
-            var section = header.closest('.test-tile-section');
-            if (!section) return;
-            section.classList.toggle('collapsed');
-            var testId = section.closest('.test-tile') && section.closest('.test-tile').getAttribute('data-test-id');
-            if (testId && section.getAttribute('data-section') === 'input') loadTileInputs(testId);
+        sidebar.querySelectorAll('.test-sidebar-item').forEach(function (item) {
+          item.addEventListener('click', function (e) {
+            if (e.target.classList.contains('test-run-one')) return;
+            showTestDetail(item.getAttribute('data-test-id'));
           });
         });
 
-        listEl.querySelectorAll('.test-run-one').forEach(function (btn) {
-          btn.addEventListener('click', function (e) { e.stopPropagation(); runTest(btn.getAttribute('data-test-id')); });
+        sidebar.querySelectorAll('.test-run-one').forEach(function (btn) {
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var tid = btn.getAttribute('data-test-id');
+            showTestDetail(tid);
+            runTest(tid);
+          });
         });
 
-        Object.keys(testOutputs).forEach(function (id) { setTileOutput(id, testOutputs[id]); });
+        if (tests.length && !activeTestId) showTestDetail(tests[0].id);
       } catch (e) {
-        document.getElementById('test-list').innerHTML = '<p class="error">Failed to load tests.</p>';
+        document.getElementById('test-sidebar').innerHTML = '<p class="error" style="padding:0.5rem;">Failed to load tests.</p>';
+      }
+    }
+
+    function setTestOutput(testId, text, passed) {
+      testOutputs[testId] = text;
+      updateSidebarStatus(testId, passed);
+      if (activeTestId === testId) {
+        var outputEl = document.getElementById('test-detail-output');
+        outputEl.innerHTML = '<pre class="test-output-pre">' + escapeHtml(text || '(no output)') + '</pre>';
       }
     }
 
@@ -1124,12 +1227,13 @@
         var results = d.results || [];
         if (results.length) {
           var out = formatTestOutput(results[0]);
-          setTileOutput(id, out);
+          var passed = results[0].exitCode === 0;
+          setTestOutput(id, out, passed);
         }
         statusEl.textContent = results.every(function (x) { return x.exitCode === 0; }) ? 'Done (passed).' : 'Done (some failed).';
       } catch (e) {
         var err = 'Error: ' + (e.message || 'Request failed');
-        setTileOutput(id, err);
+        setTestOutput(id, err, false);
         statusEl.textContent = err;
       }
       document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = false; });
@@ -1145,7 +1249,9 @@
         var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: 'all' }) });
         var d = await r.json();
         var results = d.results || [];
-        results.forEach(function (x) { setTileOutput(x.testId, formatTestOutput(x)); });
+        results.forEach(function (x) {
+          setTestOutput(x.testId, formatTestOutput(x), x.exitCode === 0);
+        });
         var passed = results.filter(function (x) { return x.exitCode === 0; }).length;
         statusEl.textContent = 'Done: ' + passed + '/' + results.length + ' passed.';
       } catch (e) {
