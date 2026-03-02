@@ -1,6 +1,6 @@
 {
   "name": "cowcode",
-  "version": "1.0.7",
+  "version": "2.0.0",
   "description": "WhatsApp + configurable local/cloud LLM. No tools, just reply.",
   "type": "module",
   "main": "index.js",

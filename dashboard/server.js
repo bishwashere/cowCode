@@ -523,6 +523,20 @@ app.patch('/api/config', (req, res) => {
   }
 });
 
+app.put('/api/config', (req, res) => {
+  try {
+    const body = req.body;
+    if (body == null || typeof body !== 'object' || Array.isArray(body)) {
+      res.status(400).json({ error: 'Config must be a JSON object' });
+      return;
+    }
+    saveConfig(body);
+    res.json(body);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---- Chat with LLM (dashboard chat space) ----
 
 const CHAT_SCRIPT = join(INSTALL_DIR, 'scripts', 'chat-dashboard.js');

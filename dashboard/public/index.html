@@ -118,6 +118,22 @@
     button:hover { filter: brightness(1.1); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     .config-json { white-space: pre-wrap; font-size: 0.8rem; overflow-x: auto; }
+    .config-json-editable {
+      display: block;
+      width: 100%;
+      min-height: 24rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      color: var(--text);
+      resize: vertical;
+    }
+    .config-json-editable:focus { outline: none; border-color: var(--accent); }
     .error { color: var(--red); font-size: 0.9rem; }
     .empty { color: var(--muted); font-style: italic; }
     .field { margin-bottom: 1rem; }
@@ -173,9 +189,58 @@
     .group-sub-nav button { background: none; border: none; font: inherit; color: var(--muted); cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 4px; }
     .group-sub-nav button:hover { color: var(--text); }
     .group-sub-nav button.active { color: var(--accent); font-weight: 500; }
-    #test-list .skill-row { cursor: pointer; padding: 0.4rem 0; border-radius: 4px; }
-    #test-list .skill-row:hover { background: var(--bg); }
-    #test-list .skill-row.selected { border-left: 3px solid var(--accent); padding-left: 0.5rem; margin-left: 2px; }
+    .test-tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+      gap: 1rem;
+    }
+    .test-tile {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .test-tile-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .test-tile-name { font-weight: 600; font-size: 1rem; color: var(--text); }
+    .test-tile-section {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .test-tile-section-header {
+      cursor: pointer;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      user-select: none;
+    }
+    .test-tile-section-header:hover { color: var(--text); background: rgba(0,0,0,0.05); }
+    .test-tile-section-header .chevron { font-size: 0.7rem; transition: transform 0.2s; }
+    .test-tile-section.collapsed .chevron { transform: rotate(-90deg); }
+    .test-tile-section-body {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 16rem;
+      overflow: auto;
+      border-top: 1px solid var(--border);
+    }
+    .test-tile-section.collapsed .test-tile-section-body { display: none; }
+    .test-tile-section-body.empty { color: var(--muted); font-style: italic; }
     .group-sub-panel { display: none; }
     .group-sub-panel.active { display: block; }
     .history-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
@@ -395,34 +460,25 @@
   <div id="page-config" class="page">
     <div class="card">
       <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Config</h2>
-      <p class="read-only-note">Final configuration (read-only). Written to config.json.</p>
-      <pre id="full-config" class="config-json"></pre>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Edit the full config below and save to write config.json. Invalid JSON will show an error on save.</p>
+      <textarea id="full-config" class="config-json-editable" spellcheck="false"></textarea>
+      <div style="margin-top:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+        <button type="button" id="config-save">Save</button>
+        <span id="config-saved" style="color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+        <span id="config-error" class="error" style="display:none;"></span>
+      </div>
     </div>
   </div>
 
   <div id="page-test" class="page">
     <div class="card">
       <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Skill tests</h2>
-      <p class="skill-meta" style="margin:0 0 1rem 0;">Run individual tests or all at once. Inputs are from each test's inputs.md; output is stdout/stderr from the run.</p>
+      <p class="skill-meta" style="margin:0 0 1rem 0;">Run individual tests or all at once. Each tile shows inputs (from inputs.md) and output (stdout/stderr); click Input or Output to expand.</p>
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
         <button type="button" id="test-run-all">Run all</button>
         <span id="test-run-status" class="skill-meta" style="margin:0;"></span>
       </div>
-      <div id="test-list" style="margin-bottom:1rem;"></div>
-      <div class="group-sub-nav" style="margin-bottom:0.5rem;">
-        <button type="button" data-test-panel="inputs" class="active">Inputs</button>
-        <button type="button" data-test-panel="output">Output</button>
-      </div>
-      <div id="test-panel-inputs" class="group-sub-panel active" style="padding:0.5rem 0;">
-        <div class="detail-label" style="margin-bottom:0.35rem;">Test inputs (from inputs.md)</div>
-        <pre id="test-inputs-content" style="margin:0; white-space:pre-wrap; font-size:0.85rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.75rem; max-height:20rem; overflow:auto;"></pre>
-        <p id="test-inputs-empty" class="empty" style="display:none; margin:0.5rem 0 0 0;">Select a test to view inputs.</p>
-      </div>
-      <div id="test-panel-output" class="group-sub-panel" style="padding:0.5rem 0; display:none;">
-        <div class="detail-label" style="margin-bottom:0.35rem;">Last run output (stdout + stderr)</div>
-        <pre id="test-output-content" style="margin:0; white-space:pre-wrap; font-size:0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.75rem; max-height:24rem; overflow:auto;"></pre>
-        <p id="test-output-empty" class="empty" style="display:none; margin:0.5rem 0 0 0;">No output yet. Run a test to see results.</p>
-      </div>
+      <div id="test-list" class="test-tiles-grid"></div>
     </div>
   </div>
 
@@ -921,13 +977,96 @@
     });
 
     async function fetchConfig() {
-      const r = await fetch(API + '/api/config');
-      const d = await r.json();
-      document.getElementById('full-config').textContent = JSON.stringify(d, null, 2);
+      try {
+        const r = await fetch(API + '/api/config');
+        const d = await r.json();
+        document.getElementById('full-config').value = JSON.stringify(d, null, 2);
+        document.getElementById('config-error').style.display = 'none';
+        document.getElementById('config-error').textContent = '';
+      } catch (e) {
+        document.getElementById('config-error').textContent = 'Failed to load config.';
+        document.getElementById('config-error').style.display = 'inline';
+      }
     }
 
-    var selectedTestId = null;
-    var lastTestOutput = '';
+    document.getElementById('config-save').addEventListener('click', async function () {
+      var textarea = document.getElementById('full-config');
+      var savedEl = document.getElementById('config-saved');
+      var errEl = document.getElementById('config-error');
+      savedEl.style.display = 'none';
+      errEl.style.display = 'none';
+      errEl.textContent = '';
+      var raw = textarea.value.trim();
+      var config;
+      try {
+        config = raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        errEl.textContent = 'Invalid JSON: ' + (e.message || 'parse error');
+        errEl.style.display = 'inline';
+        return;
+      }
+      if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+        errEl.textContent = 'Config must be a JSON object.';
+        errEl.style.display = 'inline';
+        return;
+      }
+      try {
+        var r = await fetch(API + '/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
+        if (!r.ok) {
+          var d = await r.json().catch(function () { return {}; });
+          throw new Error(d.error || 'Save failed');
+        }
+        var d = await r.json();
+        textarea.value = JSON.stringify(d, null, 2);
+        savedEl.style.display = 'inline';
+        setTimeout(function () { savedEl.style.display = 'none'; }, 2500);
+      } catch (e) {
+        errEl.textContent = e.message || 'Failed to save config.';
+        errEl.style.display = 'inline';
+      }
+    });
+
+    var testOutputs = {};
+
+    function formatTestOutput(x) {
+      var head = '--- ' + (x.name || x.testId) + ' (exit ' + (x.exitCode != null ? x.exitCode : 'timeout') + ', ' + (x.durationMs ? (x.durationMs / 1000).toFixed(1) + 's' : '') + ') ---\n';
+      return head + (x.stdout || '') + (x.stderr ? '\n' + x.stderr : '');
+    }
+
+    function getTileByTestId(testId) {
+      var list = document.querySelectorAll('#test-list .test-tile');
+      for (var i = 0; i < list.length; i++) { if (list[i].getAttribute('data-test-id') === testId) return list[i]; }
+      return null;
+    }
+
+    function setTileOutput(testId, text) {
+      testOutputs[testId] = text;
+      var tile = getTileByTestId(testId);
+      if (!tile) return;
+      var body = tile.querySelector('.test-tile-section[data-section="output"] .test-tile-section-body');
+      if (body) {
+        body.textContent = text || '(no output)';
+        body.classList.toggle('empty', !text);
+      }
+    }
+
+    async function loadTileInputs(testId) {
+      var tile = getTileByTestId(testId);
+      if (!tile) return;
+      var body = tile.querySelector('.test-tile-section[data-section="input"] .test-tile-section-body');
+      if (!body || body.dataset.loaded === '1') return;
+      body.dataset.loaded = '1';
+      body.textContent = 'Loading…';
+      try {
+        var r = await fetch(API + '/api/tests/inputs/' + encodeURIComponent(testId));
+        var d = await r.json();
+        body.textContent = d.content || '(no inputs)';
+        body.classList.toggle('empty', !(d.content && d.content.trim()));
+      } catch (e) {
+        body.textContent = 'Failed to load inputs.';
+        body.classList.remove('empty');
+      }
+    }
 
     async function fetchTests() {
       try {
@@ -936,40 +1075,41 @@
         var tests = d.tests || [];
         var listEl = document.getElementById('test-list');
         listEl.innerHTML = tests.map(function (t) {
-          return '<div class="skill-row" style="align-items:center; gap:0.75rem;" data-test-id="' + escapeHtml(t.id) + '"><span class="skill-id">' + escapeHtml(t.name) + '</span><button type="button" class="test-run-one" data-test-id="' + escapeHtml(t.id) + '">Run</button></div>';
+          var tid = escapeHtml(t.id);
+          var name = escapeHtml(t.name);
+          return '<div class="test-tile" data-test-id="' + tid + '">' +
+            '<div class="test-tile-header">' +
+              '<span class="test-tile-name">' + name + '</span>' +
+              '<button type="button" class="test-run-one" data-test-id="' + tid + '">Run</button>' +
+            '</div>' +
+            '<div class="test-tile-section collapsed" data-section="input">' +
+              '<div class="test-tile-section-header"><span class="chevron">▼</span> Input</div>' +
+              '<div class="test-tile-section-body empty">Click to load</div>' +
+            '</div>' +
+            '<div class="test-tile-section collapsed" data-section="output">' +
+              '<div class="test-tile-section-header"><span class="chevron">▼</span> Output</div>' +
+              '<div class="test-tile-section-body empty">No output yet. Run the test.</div>' +
+            '</div>' +
+            '</div>';
         }).join('');
-        listEl.querySelectorAll('.skill-row').forEach(function (row) {
-          var id = row.getAttribute('data-test-id');
-          if (id) row.addEventListener('click', function (e) { if (!e.target.classList.contains('test-run-one')) selectTest(id); });
+
+        listEl.querySelectorAll('.test-tile-section-header').forEach(function (header) {
+          header.addEventListener('click', function () {
+            var section = header.closest('.test-tile-section');
+            if (!section) return;
+            section.classList.toggle('collapsed');
+            var testId = section.closest('.test-tile') && section.closest('.test-tile').getAttribute('data-test-id');
+            if (testId && section.getAttribute('data-section') === 'input') loadTileInputs(testId);
+          });
         });
+
         listEl.querySelectorAll('.test-run-one').forEach(function (btn) {
           btn.addEventListener('click', function (e) { e.stopPropagation(); runTest(btn.getAttribute('data-test-id')); });
         });
-        if (tests.length && !selectedTestId) selectTest(tests[0].id);
+
+        Object.keys(testOutputs).forEach(function (id) { setTileOutput(id, testOutputs[id]); });
       } catch (e) {
         document.getElementById('test-list').innerHTML = '<p class="error">Failed to load tests.</p>';
-      }
-    }
-
-    function selectTest(id) {
-      selectedTestId = id;
-      document.querySelectorAll('#test-list .skill-row').forEach(function (row) {
-        row.classList.toggle('selected', row.getAttribute('data-test-id') === id);
-      });
-      loadTestInputs(id);
-    }
-
-    async function loadTestInputs(id) {
-      var contentEl = document.getElementById('test-inputs-content');
-      var emptyEl = document.getElementById('test-inputs-empty');
-      if (!id) { contentEl.textContent = ''; emptyEl.style.display = 'block'; return; }
-      emptyEl.style.display = 'none';
-      try {
-        var r = await fetch(API + '/api/tests/inputs/' + encodeURIComponent(id));
-        var d = await r.json();
-        contentEl.textContent = d.content || '';
-      } catch (e) {
-        contentEl.textContent = '';
       }
     }
 
@@ -982,25 +1122,15 @@
         var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: id }) });
         var d = await r.json();
         var results = d.results || [];
-        var out = results.map(function (x) {
-          var head = '--- ' + (x.name || x.testId) + ' (exit ' + (x.exitCode != null ? x.exitCode : 'timeout') + ', ' + (x.durationMs ? (x.durationMs / 1000).toFixed(1) + 's' : '') + ') ---\n';
-          return head + (x.stdout || '') + (x.stderr ? '\n' + x.stderr : '');
-        }).join('\n\n');
-        lastTestOutput = out;
-        document.getElementById('test-output-content').textContent = out || '(no output)';
-        document.getElementById('test-output-empty').style.display = out ? 'none' : 'block';
+        if (results.length) {
+          var out = formatTestOutput(results[0]);
+          setTileOutput(id, out);
+        }
         statusEl.textContent = results.every(function (x) { return x.exitCode === 0; }) ? 'Done (passed).' : 'Done (some failed).';
-        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === 'output'); });
-        document.getElementById('test-panel-inputs').style.display = 'none';
-        document.getElementById('test-panel-output').style.display = 'block';
       } catch (e) {
-        lastTestOutput = 'Error: ' + (e.message || 'Request failed');
-        document.getElementById('test-output-content').textContent = lastTestOutput;
-        document.getElementById('test-output-empty').style.display = 'none';
-        statusEl.textContent = 'Error: ' + (e.message || '');
-        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === 'output'); });
-        document.getElementById('test-panel-inputs').style.display = 'none';
-        document.getElementById('test-panel-output').style.display = 'block';
+        var err = 'Error: ' + (e.message || 'Request failed');
+        setTileOutput(id, err);
+        statusEl.textContent = err;
       }
       document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = false; });
       document.getElementById('test-run-all').disabled = false;
@@ -1015,40 +1145,17 @@
         var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: 'all' }) });
         var d = await r.json();
         var results = d.results || [];
-        var out = results.map(function (x) {
-          var head = '--- ' + (x.name || x.testId) + ' (exit ' + (x.exitCode != null ? x.exitCode : 'timeout') + ', ' + (x.durationMs ? (x.durationMs / 1000).toFixed(1) + 's' : '') + ') ---\n';
-          return head + (x.stdout || '') + (x.stderr ? '\n' + x.stderr : '');
-        }).join('\n\n');
-        lastTestOutput = out;
-        document.getElementById('test-output-content').textContent = out || '(no output)';
-        document.getElementById('test-output-empty').style.display = out ? 'none' : 'block';
+        results.forEach(function (x) { setTileOutput(x.testId, formatTestOutput(x)); });
         var passed = results.filter(function (x) { return x.exitCode === 0; }).length;
         statusEl.textContent = 'Done: ' + passed + '/' + results.length + ' passed.';
-        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === 'output'); });
-        document.getElementById('test-panel-inputs').style.display = 'none';
-        document.getElementById('test-panel-output').style.display = 'block';
       } catch (e) {
-        lastTestOutput = 'Error: ' + (e.message || 'Request failed');
-        document.getElementById('test-output-content').textContent = lastTestOutput;
-        document.getElementById('test-output-empty').style.display = 'none';
         statusEl.textContent = 'Error: ' + (e.message || '');
-        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === 'output'); });
-        document.getElementById('test-panel-inputs').style.display = 'none';
-        document.getElementById('test-panel-output').style.display = 'block';
       }
       document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = false; });
       document.getElementById('test-run-all').disabled = false;
     }
 
     document.getElementById('test-run-all').addEventListener('click', function () { runAllTests(); });
-    document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var panel = b.getAttribute('data-test-panel');
-        document.querySelectorAll('#page-test .group-sub-nav button[data-test-panel]').forEach(function (x) { x.classList.toggle('active', x.getAttribute('data-test-panel') === panel); });
-        document.getElementById('test-panel-inputs').style.display = panel === 'inputs' ? 'block' : 'none';
-        document.getElementById('test-panel-output').style.display = panel === 'output' ? 'block' : 'none';
-      });
-    });
 
     var selectedSoulFileId = null;
 
