@@ -455,7 +455,10 @@ async function main() {
     const waSock = whatsappSockRef.current;
     if (isTgJid && !telegramBot) return;
     if (!isTgJid && !waSock?.sendMessage) return;
-    const historyMessages = readLastPrivateExchanges(getWorkspaceDir(), tideJid, 5);
+    const isTgGroup = isTelegramGroupJid(tideJid);
+    const historyMessages = isTgGroup
+      ? readLastGroupExchanges(getWorkspaceDir(), tideJid, 5)
+      : readLastPrivateExchanges(getWorkspaceDir(), tideJid, 5);
     if (historyMessages.length >= 2) {
       const lastUserMsg = historyMessages[historyMessages.length - 2];
       if (lastUserMsg.role === 'user' && lastUserMsg.content === 'Tide check') return;
@@ -521,11 +524,15 @@ async function main() {
     }
     const exchange = { user: 'Tide check', assistant: text, timestampMs: Date.now(), jid: tideJid };
     try {
-      const memoryConfig = getMemoryConfig();
-      if (memoryConfig) {
-        await indexChatExchange(memoryConfig, exchange);
+      if (isTgGroup) {
+        appendGroupExchange(getWorkspaceDir(), tideJid, exchange);
       } else {
-        appendExchange(getWorkspaceDir(), exchange);
+        const memoryConfig = getMemoryConfig();
+        if (memoryConfig) {
+          await indexChatExchange(memoryConfig, exchange);
+        } else {
+          appendExchange(getWorkspaceDir(), exchange);
+        }
       }
     } catch (err) {
       console.error('[tide] Chat log write failed:', err.message);
@@ -851,7 +858,7 @@ async function main() {
           }
         }
         console.log('[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');
-        if (!isGroupJid) scheduleTideFollowUp(jid);
+        if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);
         const alreadySentBioPrompt = bioOpts.bioPromptSentJids?.has(jid);
         if (bioOpts.pendingBioConfirmJids != null && !isBioSet() && !alreadySentBioPrompt) {
           try {
@@ -875,7 +882,7 @@ async function main() {
           addPendingTelegram(jid, replyText);
           console.log('[replied] Telegram queued (send failed, will retry on next message):', errMsg);
         }
-        if (!isGroupJid) scheduleTideFollowUp(jid);
+        if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);
       }
     }
   return { skillsCalled: skillsCalled || [] };
