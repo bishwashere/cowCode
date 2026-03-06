@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * CLI entry: auth, moo start/stop/status/restart, or update.
- * Usage: cowcode auth | cowcode moo start|stop|status|restart | cowcode logs | cowcode update [--force]
+ * CLI entry: auth, moo start/stop/status/restart, update, and skill add/install.
+ * Usage: cowcode auth | cowcode moo start|stop|status|restart | cowcode logs | cowcode add <skill-id> | cowcode update [--force]
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
@@ -218,10 +218,11 @@ if (sub === 'moo') {
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
-} else if (sub === 'skills') {
+} else if (sub === 'skills' || sub === 'add') {
   const skillSub = args[1];
-  const skillArg = args[2];
-  if (skillSub === 'install' && skillArg) {
+  const skillArg = sub === 'add' ? args[1] : args[2];
+  const wantsInstall = sub === 'add' ? !!skillArg : (skillSub === 'install' && !!skillArg);
+  if (wantsInstall) {
     (async () => {
       try {
         const skillInstallPath = join(INSTALL_DIR, 'lib', 'skill-install.js');
@@ -238,10 +239,11 @@ if (sub === 'moo') {
       }
     })();
   } else {
-    console.log('Usage: cowcode skills install <skill-id>');
-    console.log('  Example: cowcode skills install home-assistant');
-    console.log('  Installs a skill (adds to config) and prompts only for that skill\'s required env vars.');
-    process.exit(skillSub === 'install' ? 1 : 0);
+    console.log('Usage: cowcode add <skill-id>');
+    console.log('   or: cowcode skills install <skill-id>');
+    console.log('  Example: cowcode add speech');
+    console.log('  Installs/enables a skill and prompts only for that skill\'s required env vars.');
+    process.exit((sub === 'add' || skillSub === 'install') ? 1 : 0);
   }
 } else {
   console.log('Usage: cowcode moo start | stop | status | restart');
@@ -249,6 +251,7 @@ if (sub === 'moo') {
   console.log('       cowcode dashboard');
   console.log('       cowcode index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');
   console.log('       cowcode auth [options]');
+  console.log('       cowcode add <skill-id>');
   console.log('       cowcode skills install <skill-id>');
   console.log('       cowcode update [--force]');
   console.log('       cowcode uninstall');
