@@ -766,6 +766,7 @@ async function main() {
       tools: toolsForRequest,
       historyMessages,
       getFullSkillDoc: skillContext.getFullSkillDoc,
+      resolveToolName: skillContext.resolveToolName,
     });
     const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = turnResult || {};
     if (Array.isArray(called) && called.length) skillsCalled = called;

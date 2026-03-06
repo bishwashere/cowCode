@@ -27,3 +27,14 @@ Call `run_skill` with **skill: "go-write"**. Set **command** or **arguments.acti
 ## When to use
 
 Use when the user asks to copy, move, delete, or create files, or change permissions. Do not use for listing or reading—use **go-read** for that.
+
+## Tool schema
+
+```tool-schema
+go_write_run
+  description: Run a filesystem-changing command. command: cp, mv, rm, touch, or chmod. argv: array of args.
+  parameters:
+    command: string
+    argv: array
+    cwd: string
+```

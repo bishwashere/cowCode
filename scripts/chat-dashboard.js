@@ -48,6 +48,7 @@ async function main() {
       tools: toolsToUse,
       historyMessages,
       getFullSkillDoc: skillContext.getFullSkillDoc,
+      resolveToolName: skillContext.resolveToolName,
     });
     process.stdout.write(JSON.stringify({ textToSend: textToSend || '' }) + '\n');
   } catch (err) {

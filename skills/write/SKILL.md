@@ -24,3 +24,13 @@ Use when the user says things like:
 - "Overwrite .env with …"
 
 One path, one content. No partial updates — use the **edit** skill for find-and-replace.
+
+## Tool schema
+
+```tool-schema
+write_file
+  description: Create or overwrite a file with the given content.
+  parameters:
+    path: string
+    content: string
+```

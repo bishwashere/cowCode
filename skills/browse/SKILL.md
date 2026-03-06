@@ -43,3 +43,40 @@ For **click**, prefer: (1) href pattern `a[href*="/deals/tech"]` if the site use
 - **Browse** (skill "browse"): interact with the web — "open this URL", "click the category", "show me tech deals". Same tab across messages for natural drill-down.
 
 Always pass **arguments.url** for navigate, click, scroll, fill, screenshot (use the "Current page" URL from the last browse result when doing follow-up actions on the same site). **reset** needs no url. Always use a valid CSS selector for **click** and **fill**. Optional: the user can type **/browse-reset** to force a clean slate without going through the agent.
+
+## Tool schema
+
+```tool-schema
+browse_reset
+  description: Close the browser tab and clear the session. No parameters.
+
+browse_navigate
+  description: Open a URL and return page text content.
+  parameters:
+    url: string
+
+browse_click
+  description: Click an element on the page. Use selector (e.g. CSS) and optional url for current tab.
+  parameters:
+    url: string
+    selector: string
+
+browse_scroll
+  description: Scroll the page. Optional direction (down, up, top, bottom).
+  parameters:
+    url: string
+    direction: string
+
+browse_fill
+  description: Fill a form field. Set selector and value.
+  parameters:
+    url: string
+    selector: string
+    value: string
+
+browse_screenshot
+  description: Capture a screenshot. Optional selector. Saved under ~/.cowcode/browse-screenshots/.
+  parameters:
+    url: string
+    selector: string
+```

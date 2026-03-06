@@ -39,6 +39,25 @@ Call **run_skill** with **skill: "vision"**. Set **command** or **arguments.acti
 
 For **describe**, you must provide an image source (or the agent will use the last image from chat history when available): **arguments.image**, **arguments.url**, or **arguments.path** (file path from "Image file: ..." in the message), or **arguments.source: "webcam"**. For **generate**, you must provide **arguments.prompt**.
 
+## Tool schema
+
+```tool-schema
+vision_describe
+  description: Describe or analyze an image. Provide image (path, url, or "webcam"), optional prompt.
+  parameters:
+    image: string
+    url: string
+    path: string
+    prompt: string
+    systemPrompt: string
+
+vision_generate
+  description: Generate an image from a text prompt and send to chat (DALL·E).
+  parameters:
+    prompt: string
+    size: string
+```
+
 ## Config (set at install/setup)
 
 - **If your agent model already supports vision** (e.g. GPT-4o, Claude-3): the image is sent to that model with the same API key; no extra key or switch.

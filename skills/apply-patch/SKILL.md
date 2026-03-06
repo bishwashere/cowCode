@@ -34,3 +34,13 @@ Use when the user says things like:
 - "Apply the diff I'm pasting"
 
 The skill finds where the hunk applies (by matching context), then applies add/remove. Fails if the context does not match the file.
+
+## Tool schema
+
+```tool-schema
+apply_patch_apply
+  description: Apply a Git-style diff hunk to a file. path and hunk required.
+  parameters:
+    path: string
+    hunk: string
+```

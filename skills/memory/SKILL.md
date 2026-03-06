@@ -20,6 +20,33 @@ Semantic search over your **notes** (`MEMORY.md`, `memory/*.md`) and optional **
 - **memory_get** — Set `tool: "memory_get"`, `path` (required, from memory_search). Optional: `from`, `lines`. Read a snippet by path (including chat-log/*.jsonl when the user explicitly asked about past conversations).
 - **memory_save** — Set `tool: "memory_save"`, `text` (required): the note to save. Optional: `file` (default: `MEMORY.md`; use `memory/notes.md` or any `.md` path inside the workspace). Appends the note with today's date prefix and immediately re-indexes so it is searchable at once. Use when the user says "remember that…", "note this down", "save this for later", "add to my notes", etc.
 
+## Tool schema
+
+```tool-schema
+memory_search
+  description: Semantic search over notes (MEMORY.md, memory/*.md), chat log, and filesystem index.
+  parameters:
+    query: string
+    dateFrom: string
+    dateTo: string
+    dateRange: string
+    maxResults: number
+    minScore: number
+
+memory_get
+  description: Read a file/snippet by path (from memory_search result). Use for notes and chat-log paths.
+  parameters:
+    path: string
+    from: number
+    lines: number
+
+memory_save
+  description: Append a note to MEMORY.md or another .md file. Use for "remember that", "note this down".
+  parameters:
+    text: string
+    file: string
+```
+
 ## Config
 
 - Add `"memory"` to `skills.enabled`. Embedding: if an OpenAI key is available (e.g. `OPENAI_API_KEY` or an OpenAI model in LLM config), OpenAI is used; otherwise local (Ollama, `nomic-embed-text`) is used. You can override with `memory.embedding` in config.

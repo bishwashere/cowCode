@@ -15,6 +15,20 @@ Search the web or fetch a page. Call **run_skill** with **skill: "search"**. The
 
 You can pass the command at the top level (`command: "search"`) or inside arguments (`arguments.action: "search"`). Never omit the command/action.
 
+## Tool schema
+
+```tool-schema
+search_search
+  description: Search the web. Use for current time, weather, news, or any live query.
+  parameters:
+    query: string
+
+search_navigate
+  description: Open a URL and return page content.
+  parameters:
+    url: string
+```
+
 ## Config
 
 - Brave Search: set `BRAVE_API_KEY` in .env or `skills.search.apiKey` in config.json (or `skills.browser.search.apiKey` for backward compatibility).

@@ -45,7 +45,7 @@ async function main() {
     '. Based on the last few messages: is there one short, useful thing to say? (e.g. follow-up on something we are waiting on, or "I finished X—what next?") If yes, reply with that only. If no, reply with nothing or "nothing to do".';
   const noop = () => {};
   const ctx = { storePath, jid, workspaceDir, scheduleOneShot: noop, startCron: noop, groupNonOwner: false };
-  const { runSkillTool, getFullSkillDoc } = getSkillContext();
+  const { runSkillTool, getFullSkillDoc, resolveToolName } = getSkillContext();
   const toolsToUse = Array.isArray(runSkillTool) && runSkillTool.length > 0 ? runSkillTool : [];
   const systemPrompt = buildOneOnOneSystemPrompt(workspaceDir) + TIDE_INSTRUCTION;
   const { textToSend } = await runAgentTurn({
@@ -55,6 +55,7 @@ async function main() {
     tools: toolsToUse,
     historyMessages,
     getFullSkillDoc,
+    resolveToolName,
   });
   process.stdout.write(JSON.stringify({ textToSend: textToSend || '' }) + '\n');
 }

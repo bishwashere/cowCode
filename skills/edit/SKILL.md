@@ -24,3 +24,14 @@ Use when the user says things like:
 - "Fix the typo 'teh' to 'the' in readme"
 
 Only exact matches are replaced. If **oldString** does not appear in the file, the skill returns an error and the file is unchanged.
+
+## Tool schema
+
+```tool-schema
+edit_file
+  description: Replace exact string in a file. oldString must match exactly.
+  parameters:
+    path: string
+    oldString: string
+    newString: string
+```

@@ -41,3 +41,20 @@ Optional **tz** for timezone (e.g. `"America/New_York"`). Example job for "every
 - **Intent over wording:** Recognize the intent to have something checked repeatedly or to be notified when something happens; create the recurring job with a default interval if the user did not specify one. Prefer acting (add with sensible defaults) over asking for interval or cutoff first.
 - For multiple new reminders in one message, call run_skill(cron, add) once per reminder with different job.message and job.schedule.
 - For "every one minute for the next three minutes" use three one-shot **at** times. For "every 5 minutes" or "every morning" use **cron** with the **expr** above.
+
+## Tool schema
+
+```tool-schema
+cron_list
+  description: List all scheduled jobs/reminders. No parameters.
+
+cron_add
+  description: Create a reminder. Set job with message and schedule (kind at|cron, at or expr, tz).
+  parameters:
+    job: object
+
+cron_remove
+  description: Remove a scheduled job by id (from list result).
+  parameters:
+    jobId: string
+```

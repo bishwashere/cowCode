@@ -27,3 +27,14 @@ Use when the user says things like:
 - "What's in my config?" / "Show me my config" — use read with path `~/.cowcode/config.json`.
 
 The skill returns the file content as text. No modifications are made.
+
+## Tool schema
+
+```tool-schema
+read_file
+  description: Read a file's contents. Path required; optional from (line) and lines (count).
+  parameters:
+    path: string
+    from: number
+    lines: number
+```

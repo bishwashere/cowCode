@@ -33,6 +33,29 @@ Call **run_skill** with **skill: "speech"**. Set **command** or **arguments.acti
 
 When the user sends a **voice message**, the bot transcribes it with Whisper and feeds the text to the LLM. The system adds a hint so you reply using **reply_as_voice**; your reply is then sent as a voice message. So voice always goes through the speech skill: transcribe for input, **reply_as_voice** for the reply.
 
+## Tool schema
+
+```tool-schema
+speech_transcribe
+  description: Voice to text. Pass path to audio file (mp3, wav, etc.).
+  parameters:
+    audio: string
+    model: string
+    language: string
+
+speech_synthesize
+  description: Text to voice. Pass text and optional voiceId, outputPath.
+  parameters:
+    text: string
+    voiceId: string
+    outputPath: string
+
+speech_reply_as_voice
+  description: Send the reply as a voice message. Pass the exact reply text.
+  parameters:
+    text: string
+```
+
 ## Config (set at install/setup)
 
 Speech uses a **separate setup** from the LLM cloud provider:

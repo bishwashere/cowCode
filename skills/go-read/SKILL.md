@@ -32,3 +32,14 @@ Use when the user asks to list a directory, show file contents (cat/less), or re
 
 List Downloads:
 `run_skill` with skill: "go-read", arguments: { command: "ls", argv: ["-la", "~/Downloads"] }
+
+## Tool schema
+
+```tool-schema
+go_read_run
+  description: Run a read-only filesystem command. command: ls, cd, pwd, cat, or less. argv: array of args.
+  parameters:
+    command: string
+    argv: array
+    cwd: string
+```

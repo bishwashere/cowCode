@@ -32,3 +32,10 @@ No arguments are required. The skill reads **MEMORY.md**, **memory/*.md**, and *
 **Always reply in natural language only.** Do not use numbered sections (e.g. "1) Basics"), bullet points, or lists. Turn the profile into a few short, conversational sentences (e.g. "I know your name is Bishwas. You mentioned it snowed on 2026-02-23. We've been talking about thermostat and Home Assistant lately, and you have a few active reminders."). Keep it friendly and flowing, not structured or list-like.
 
 Use this whenever the user wants to see their profile or what the system knows about them.
+
+## Tool schema
+
+```tool-schema
+me_profile
+  description: Build a profile of what CowCode knows about the user from MEMORY.md, memory/*.md, and recent chat logs. No parameters.
+```

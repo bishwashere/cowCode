@@ -58,3 +58,12 @@ If the user mentions a room or device by name and you don't know the entity_id:
 
 - Entity IDs are `domain.name` (e.g. `light.living_room`, `automation.morning`). Use `list` or `search` to discover them.
 - For raw API calls use: `call <domain> <service> [entity_id]` (advanced).
+
+## Tool schema
+
+```tool-schema
+home_assistant_run
+  description: Run a Home Assistant command. Use command string e.g. "list lights", "on light.xyz", "search kitchen", "state light.living_room".
+  parameters:
+    command: string
+```
