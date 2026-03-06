@@ -784,7 +784,10 @@ async function main() {
           console.error('[vision] read image failed:', err.message);
         }
       }
-      const textForVoice = (voiceReplyText && voiceReplyText.trim()) ? voiceReplyText.trim() : null;
+      const forceVoiceReply = !!bioOpts.forceVoiceReply;
+      const textForVoice = (voiceReplyText && voiceReplyText.trim())
+        ? voiceReplyText.trim()
+        : ((forceVoiceReply && textForSend && textForSend.trim()) ? textForSend.trim() : null);
       if (textForVoice && !imageBuffer) {
         try {
           const speechConfig = getSpeechConfig();
@@ -1230,7 +1233,12 @@ async function main() {
           } catch (_) {}
         }
 
-        runAgentWithSkills(sock, jid, userText, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, { pendingBioJids, pendingBioConfirmJids, bioPromptSentJids }).catch((err) => {
+        runAgentWithSkills(sock, jid, userText, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, {
+          pendingBioJids,
+          pendingBioConfirmJids,
+          bioPromptSentJids,
+          forceVoiceReply: userSentVoice,
+        }).catch((err) => {
           console.error('Background agent error:', err.message);
           const errorText = '[CowCode] Moo — ' + toUserMessage(err);
           sock.sendMessage(jid, { text: errorText }).catch(() => {
