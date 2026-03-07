@@ -416,6 +416,10 @@
 
   <div id="page-chat" class="page active">
     <div class="chat-layout card" style="padding:0;">
+      <div style="display:flex; justify-content:flex-end; align-items:center; gap:0.5rem; padding:0.6rem 0.9rem; border-bottom:1px solid var(--border); background:var(--card);">
+        <span class="skill-meta" style="margin:0;">Agent</span>
+        <select id="chat-agent-select" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.35rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.82rem; min-width:8rem;"></select>
+      </div>
       <div id="chat-messages" class="chat-messages"></div>
       <div class="chat-input-area">
         <textarea id="chat-input" placeholder="Message the LLM…" rows="1"></textarea>
@@ -650,6 +654,7 @@
       if (name === 'skills') fetchSkills();
       if (name === 'agents') fetchAgentsPage();
       if (name === 'groups') fetchGroups();
+      if (name === 'chat') fetchChatAgents();
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
       if (name === 'test') fetchTests();
@@ -943,6 +948,7 @@
         selectedAgentId = d.id || name;
         input.value = '';
         await fetchAgentsPage();
+        await fetchChatAgents();
       }
     });
 
@@ -1647,8 +1653,39 @@
       }
     });
 
+    var selectedChatAgentId = 'main';
     var chatMessages = [];
+    var chatMessagesByAgent = {};
     var chatLoading = false;
+
+    function setChatAgent(agentId) {
+      selectedChatAgentId = agentId || 'main';
+      chatMessages = chatMessagesByAgent[selectedChatAgentId] || [];
+      renderChatMessages();
+    }
+
+    async function fetchChatAgents() {
+      var select = document.getElementById('chat-agent-select');
+      if (!select) return;
+      try {
+        var r = await fetch(API + '/api/agents');
+        var d = await r.json();
+        var agents = Array.isArray(d.agents) ? d.agents : [];
+        if (!agents.length) agents = [{ id: 'main' }];
+        if (!agents.some(function (a) { return a.id === selectedChatAgentId; })) {
+          selectedChatAgentId = agents[0].id;
+        }
+        select.innerHTML = agents.map(function (a) {
+          var id = String(a.id || 'main');
+          var selected = id === selectedChatAgentId ? ' selected' : '';
+          return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(id) + '</option>';
+        }).join('');
+        setChatAgent(selectedChatAgentId);
+      } catch (_) {
+        select.innerHTML = '<option value="main" selected>main</option>';
+        setChatAgent('main');
+      }
+    }
 
     function renderChatMessages() {
       var el = document.getElementById('chat-messages');
@@ -1673,6 +1710,7 @@
       var text = (input.value || '').trim();
       if (!text || chatLoading) return;
       chatMessages.push({ role: 'user', content: text });
+      chatMessagesByAgent[selectedChatAgentId] = chatMessages;
       input.value = '';
       chatLoading = true;
       renderChatMessages();
@@ -1680,7 +1718,7 @@
         var r = await fetch(API + '/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history: chatHistoryForApi().slice(0, -1) })
+          body: JSON.stringify({ message: text, history: chatHistoryForApi().slice(0, -1), agentId: selectedChatAgentId })
         });
         var d = await r.json().catch(function () { return {}; });
         if (!r.ok) {
@@ -1688,8 +1726,10 @@
         } else {
           chatMessages.push({ role: 'assistant', content: (d.reply || '').trim() || '(No reply)' });
         }
+        chatMessagesByAgent[selectedChatAgentId] = chatMessages;
       } catch (e) {
         chatMessages.push({ role: 'assistant', content: 'Error: ' + (e.message || 'Network error') });
+        chatMessagesByAgent[selectedChatAgentId] = chatMessages;
       }
       chatLoading = false;
       renderChatMessages();
@@ -1699,8 +1739,12 @@
     document.getElementById('chat-input').addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
     });
+    document.getElementById('chat-agent-select').addEventListener('change', function (e) {
+      setChatAgent((e.target && e.target.value) || 'main');
+    });
 
     fetchStatus();
+    fetchChatAgents();
     setInterval(fetchStatus, 8000);
     (function () {
       var p = parseHash();

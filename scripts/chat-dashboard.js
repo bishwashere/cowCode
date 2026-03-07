@@ -6,11 +6,12 @@
  * Uses same soul/identity and skills as main app (workspace SOUL.md, WhoAmI.md, MyHuman.md).
  */
 
-import { getEnvPath, getConfigPath, getCronStorePath, getWorkspaceDir } from '../lib/paths.js';
+import { getEnvPath, getCronStorePath, getWorkspaceDir, getAgentWorkspaceDir } from '../lib/paths.js';
 import dotenv from 'dotenv';
 import { getSkillContext } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
+import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig } from '../lib/agent-config.js';
 
 dotenv.config({ path: getEnvPath() });
 
@@ -19,6 +20,10 @@ async function main() {
   for await (const chunk of process.stdin) raw += chunk;
   const payload = JSON.parse(raw || '{}');
   const message = payload.message && String(payload.message).trim();
+  const requestedAgentId = payload.agentId && String(payload.agentId).trim();
+  ensureMainAgentInitialized();
+  const agentId = requestedAgentId || DEFAULT_AGENT_ID;
+  loadAgentConfig(agentId);
   if (!message) {
     process.stdout.write(JSON.stringify({ error: 'message is required' }) + '\n');
     process.exit(1);
@@ -28,23 +33,24 @@ async function main() {
     .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .map((m) => ({ role: m.role, content: String(m.content) }));
 
-  const workspaceDir = getWorkspaceDir();
+  const workspaceDir = getAgentWorkspaceDir(agentId) || getWorkspaceDir();
   const noop = () => {};
   const ctx = {
     storePath: getCronStorePath(),
-    jid: 'dashboard',
+    jid: 'dashboard:' + agentId,
     workspaceDir,
+    agentId,
     scheduleOneShot: noop,
     startCron: noop,
   };
-  const skillContext = getSkillContext();
+  const skillContext = getSkillContext({ agentId });
   const toolsToUse = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0 ? skillContext.runSkillTool : [];
 
   try {
     const { textToSend } = await runAgentTurn({
       userText: message,
       ctx,
-      systemPrompt: buildOneOnOneSystemPrompt(),
+      systemPrompt: buildOneOnOneSystemPrompt(workspaceDir),
       tools: toolsToUse,
       historyMessages,
       getFullSkillDoc: skillContext.getFullSkillDoc,
