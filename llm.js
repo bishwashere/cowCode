@@ -6,7 +6,8 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getConfigPath, getUploadsDir } from './lib/paths.js';
+import { getConfigPath, getUploadsDir, getAgentConfigPath } from './lib/paths.js';
+import { DEFAULT_AGENT_ID } from './lib/agent-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -67,8 +68,15 @@ function parseVisionFallback(config) {
   return { baseUrl: baseUrl || PRESETS.lmstudio, apiKey: apiKey ?? 'not-needed', model: model || 'local', maxTokens };
 }
 
-function loadConfig() {
-  const configPath = getConfigPath();
+function resolveConfigPath(agentId) {
+  const id = typeof agentId === 'string' && agentId.trim() ? agentId.trim() : '';
+  if (!id || id === DEFAULT_AGENT_ID) return getConfigPath();
+  const perAgent = getAgentConfigPath(id);
+  return existsSync(perAgent) ? perAgent : getConfigPath();
+}
+
+function loadConfig(options = {}) {
+  const configPath = resolveConfigPath(options?.agentId);
   let raw = '';
   try {
     raw = readFileSync(configPath, 'utf8');
@@ -215,8 +223,8 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null) 
  * @param {Array<{ role: 'system'|'user'|'assistant', content: string }>} messages
  * @returns {Promise<string>}
  */
-export async function chat(messages) {
-  const { models } = loadConfig();
+export async function chat(messages, options = {}) {
+  const { models } = loadConfig(options);
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
@@ -247,8 +255,8 @@ export async function chat(messages) {
  * @param {Array<{ type: 'function', function: { name: string, description: string, parameters: object } }>} tools - OpenAI tools array
  * @returns {Promise<{ content: string, toolCalls: Array<{ id: string, name: string, arguments: string }> }>}
  */
-export async function chatWithTools(messages, tools) {
-  const { models } = loadConfig();
+export async function chatWithTools(messages, tools, options = {}) {
+  const { models } = loadConfig(options);
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
@@ -286,7 +294,7 @@ export async function chatWithTools(messages, tools) {
  */
 const INTENT_TIMEOUT_MS = 15_000;
 
-export async function classifyIntent(userMessage) {
+export async function classifyIntent(userMessage, options = {}) {
   const messages = [
     {
       role: 'system',
@@ -302,7 +310,7 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
     },
     { role: 'user', content: (userMessage || '').trim() || 'Hi' },
   ];
-  const { models } = loadConfig();
+  const { models } = loadConfig(options);
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
@@ -347,7 +355,7 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
  * imageUrlOrDataUri: data URI or https URL. For file paths, convert to data URI in the caller.
  * @returns {Promise<string>}
  */
-export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'You are a helpful vision assistant. Describe or analyze the image concisely.') {
+export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'You are a helpful vision assistant. Describe or analyze the image concisely.', options = {}) {
   const urlOrData = (imageUrlOrDataUri || '').trim();
   if (!urlOrData) throw new Error('describeImage requires image URL or data URI');
 
@@ -376,7 +384,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
   }
 
   const messages = [{ role: 'user', content: userContentOpenAI }];
-  const { models, visionFallback } = loadConfig();
+  const { models, visionFallback } = loadConfig(options);
   const candidates = visionFallback ? [...models, visionFallback] : [...models];
   let lastError;
   for (const opts of candidates) {
@@ -443,7 +451,7 @@ export async function generateImage(prompt, opts = {}) {
 
   const config = (() => {
     try {
-      const raw = readFileSync(getConfigPath(), 'utf8');
+      const raw = readFileSync(resolveConfigPath(opts?.agentId), 'utf8');
       return raw ? JSON.parse(raw) : {};
     } catch (_) {
       return {};

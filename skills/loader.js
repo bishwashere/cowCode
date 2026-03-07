@@ -8,7 +8,8 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { getConfigPath } from '../lib/paths.js';
-import { getGroupSkillsEnabled } from '../lib/group-config.js';
+import { getGroupRestrictions } from '../lib/group-config.js';
+import { loadAgentConfig, DEFAULT_AGENT_ID } from '../lib/agent-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -183,17 +184,21 @@ function buildToolsFromSchema(skillId, actions) {
   });
 }
 
+function normalizeEnabledList(list) {
+  let normalized = Array.isArray(list) ? list : DEFAULT_ENABLED;
+  if (normalized.includes('core')) {
+    normalized = normalized.filter((id) => id !== 'core').concat('go-read', 'go-write');
+  }
+  return normalized;
+}
+
 export function getSkillsEnabled() {
   try {
     const raw = readFileSync(getConfigPath(), 'utf8');
     const config = JSON.parse(raw);
     const skills = config.skills;
     if (!skills || typeof skills !== 'object') return DEFAULT_ENABLED;
-    let list = Array.isArray(skills.enabled) ? skills.enabled : DEFAULT_ENABLED;
-    if (list.includes('core')) {
-      list = list.filter((id) => id !== 'core').concat('go-read', 'go-write');
-    }
-    return list;
+    return normalizeEnabledList(skills.enabled);
   } catch {
     return DEFAULT_ENABLED;
   }
@@ -207,8 +212,12 @@ export function getSkillsEnabled() {
  * @returns {{ compactList: string, runSkillTool: Array, getFullSkillDoc: (skillId: string) => string, toolNameToSkill: (name: string) => { skillId: string, action: string } | null }}
  */
 export function getSkillContext(options = {}) {
-  const { groupNonOwner = false, groupJid } = options;
-  const enabled = groupNonOwner ? getGroupSkillsEnabled(groupJid) : getSkillsEnabled();
+  const { groupJid, agentId = DEFAULT_AGENT_ID } = options;
+  const agentConfig = loadAgentConfig(agentId);
+  const baseSkills = normalizeEnabledList(agentConfig?.skills?.enabled);
+  const restrictions = groupJid ? getGroupRestrictions(groupJid) : null;
+  const deny = new Set(Array.isArray(restrictions?.skillsDeny) ? restrictions.skillsDeny : []);
+  const enabled = baseSkills.filter((id) => !deny.has(id));
   const idsToLoad = enabled;
   const compactEntries = [];
   const fullDocsById = Object.create(null);

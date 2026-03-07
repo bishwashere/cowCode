@@ -218,6 +218,30 @@ if (sub === 'moo') {
     cwd: INSTALL_DIR,
   });
   child.on('close', (code) => process.exit(code ?? 0));
+} else if (sub === 'create') {
+  const kind = (args[1] || '').toLowerCase();
+  const name = args.slice(2).join(' ').trim();
+  if (kind !== 'agent' || !name) {
+    console.log('Usage: cowcode create agent <name>');
+    console.log('Example: cowcode create agent alex');
+    process.exit((args[1] || args[2]) ? 1 : 0);
+  }
+  (async () => {
+    try {
+      const modPath = join(INSTALL_DIR, 'lib', 'agent-config.js');
+      const mod = await import(pathToFileURL(modPath).href);
+      const result = mod.createAgent(name);
+      if (result.created) {
+        console.log('Created agent:', result.id);
+      } else {
+        console.log('Agent already exists:', result.id);
+      }
+      console.log('You can assign groups to this agent from Dashboard -> Groups.');
+    } catch (err) {
+      console.error('cowCode: failed to create agent.', err?.message || err);
+      process.exit(1);
+    }
+  })();
 } else if (sub === 'skills' || sub === 'add') {
   const skillSub = args[1];
   const skillArg = sub === 'add' ? args[1] : args[2];
@@ -268,6 +292,7 @@ if (sub === 'moo') {
   console.log('       cowcode dashboard');
   console.log('       cowcode index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');
   console.log('       cowcode auth [options]');
+  console.log('       cowcode create agent <name>');
   console.log('       cowcode add <skill-id>');
   console.log('       cowcode skills install <skill-id>');
   console.log('       cowcode update [--force]');

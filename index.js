@@ -3,7 +3,7 @@
  * Config and state live in ~/.cowcode (or COWCODE_STATE_DIR).
  */
 
-import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getGroupDir } from './lib/paths.js';
+import { getAuthDir, getCronStorePath, getConfigPath, getEnvPath, ensureStateDir, getWorkspaceDir, getUploadsDir, getStateDir, getAgentWorkspaceDir } from './lib/paths.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: getEnvPath() });
@@ -24,7 +24,7 @@ const {
   areJidsSameUser,
   downloadMediaMessage,
 } = Baileys;
-import { chat as llmChat, chatWithTools, loadConfig } from './llm.js';
+import { loadConfig } from './llm.js';
 import { runAgentTurn, stripThinking } from './lib/agent.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -46,9 +46,10 @@ import { indexChatExchange } from './lib/memory-index.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
-import { ensureGroupConfigFor, readGroupMd } from './lib/group-config.js';
+import { ensureGroupConfigFor } from './lib/group-config.js';
 import { loadGroupMd, buildGroupPromptBlock } from './lib/group-prompt.js';
 import { buildOneOnOneSystemPrompt } from './lib/system-prompt.js';
+import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID } from './lib/agent-config.js';
 import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/group-display-names.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
 import { toUserMessage, getErrorMessageForLog } from './lib/user-error.js';
@@ -311,6 +312,7 @@ function migrateTideConfig() {
 
 async function main() {
   ensureStateDir();
+  ensureMainAgentInitialized();
   migrateSkillsConfigToIncludeDefaults();
   migrateTideConfig();
   if (authOnly && existsSync(getAuthDir())) {
@@ -694,6 +696,7 @@ async function main() {
   }
 
   function buildSystemPrompt(opts = {}) {
+    const agentId = (opts.agentId && String(opts.agentId).trim()) || DEFAULT_AGENT_ID;
     const forGroup = !!opts.groupSenderName;
     const groupJid = opts.groupJid || 'default';
     if (forGroup) {
@@ -701,12 +704,11 @@ async function main() {
     } else {
       ensureSoulMd();
       ensureBioPersistedToWhoAmI();
-      return buildOneOnOneSystemPrompt();
+      return buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId));
     }
     const timeCtx = getSchedulingTimeContext();
     const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
-    const workspaceDir = getGroupDir(groupJid);
-    let soulContent = readGroupMd(SOUL_MD, groupJid) || readWorkspaceMd(SOUL_MD) || readDefaultSoul();
+    let soulContent = readAgentMd(SOUL_MD, agentId) || readWorkspaceMd(SOUL_MD) || readDefaultSoul();
     const loaded = loadGroupMd(getWorkspaceDir(), DEFAULT_WORKSPACE_DIR);
     const groupBlock = buildGroupPromptBlock(loaded, {
       groupSenderName: opts.groupSenderName,
@@ -714,8 +716,8 @@ async function main() {
       groupNonOwner: !!opts.groupNonOwner,
     });
     if (groupBlock) soulContent += '\n\n' + groupBlock;
-    let whoAmIContent = readGroupMd(WHO_AM_I_MD, groupJid);
-    const myHumanContent = readGroupMd(MY_HUMAN_MD, groupJid);
+    let whoAmIContent = readAgentMd(WHO_AM_I_MD, agentId);
+    const myHumanContent = readAgentMd(MY_HUMAN_MD, agentId);
     let identityBlock = '';
     if (whoAmIContent || myHumanContent) {
       if (whoAmIContent) identityBlock += '\n\n' + whoAmIContent;
@@ -731,19 +733,19 @@ async function main() {
       await sock.sendPresenceUpdate('composing', jid);
     } catch (_) {}
     const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
+    const agentId = isGroupJid ? resolveAgentIdForGroup(jid) : DEFAULT_AGENT_ID;
     const ctx = {
       storePath: getCronStorePath(),
       jid,
       workspaceDir: getWorkspaceDir(),
+      agentId,
       scheduleOneShot,
       startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: getCronStorePath(), telegramBot: telegramBot || undefined }),
       groupNonOwner: !!bioOpts.groupNonOwner,
       isGroup: isGroupJid,
     };
     const isGroupNonOwner = !!bioOpts.groupNonOwner;
-    const skillContext = isGroupNonOwner
-      ? getSkillContext({ groupNonOwner: true, groupJid: jid })
-      : getSkillContext();
+    const skillContext = getSkillContext({ groupJid: isGroupJid ? jid : undefined, agentId });
     const toolsForRequest = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0
       ? skillContext.runSkillTool
       : [];
@@ -753,8 +755,9 @@ async function main() {
           groupJid: jid,
           groupMentioned: !!bioOpts.groupMentioned,
           groupNonOwner: true,
+          agentId,
         }
-      : { groupSenderName: bioOpts.groupSenderName };
+      : { groupSenderName: bioOpts.groupSenderName, agentId };
     const inMemoryHistory = getLast5Exchanges(jid);
     const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)

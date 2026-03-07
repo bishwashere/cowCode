@@ -11,14 +11,15 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
-import { getConfigPath, getCronStorePath, getStateDir, getGroupConfigDir, getGroupConfigPath, getWorkspaceDir, getEnvPath } from '../lib/paths.js';
+import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir } from '../lib/paths.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
 dotenv.config({ path: getEnvPath() });
 import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED } from '../skills/loader.js';
-import { ensureGroupConfigFor } from '../lib/group-config.js';
+import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent } from '../lib/agent-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -28,6 +29,7 @@ const HOST = process.env.COWCODE_DASHBOARD_HOST || '127.0.0.1';
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
+ensureMainAgentInitialized();
 
 const DAEMON_SCRIPT = join(INSTALL_DIR, 'scripts', 'daemon.sh');
 const SKILLS_DIR = join(INSTALL_DIR, 'skills');
@@ -53,35 +55,22 @@ function getDaemonRunning() {
 }
 
 function loadConfig() {
-  const path = getConfigPath();
-  if (!existsSync(path)) return {};
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return {};
-  }
+  ensureMainAgentInitialized();
+  return loadAgentConfig(DEFAULT_AGENT_ID);
 }
 
 function saveConfig(config) {
-  writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), 'utf8');
+  ensureMainAgentInitialized();
+  saveAgentConfig(DEFAULT_AGENT_ID, config || {});
+  writeFileSync(getConfigPath(), JSON.stringify(config || {}, null, 2), 'utf8');
 }
 
 function loadGroupConfig(groupId) {
-  const id = groupId || 'default';
-  ensureGroupConfigFor(id);
-  const path = getGroupConfigPath(id);
-  if (!existsSync(path)) return {};
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return {};
-  }
+  return getGroupRestrictions(groupId || 'default');
 }
 
 function saveGroupConfig(groupId, config) {
-  const id = groupId || 'default';
-  ensureGroupConfigFor(id);
-  writeFileSync(getGroupConfigPath(id), JSON.stringify(config, null, 2), 'utf8');
+  return saveGroupRestrictions(groupId || 'default', config || {});
 }
 
 const SKILL_MD_NAMES = ['SKILL.md', 'skill.md'];
@@ -171,8 +160,7 @@ app.get('/api/overview', async (_req, res) => {
     const skillsEnabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
     const skillsEnabledCount = skillsEnabled.length;
     const groupConfig = loadGroupConfig('default');
-    const groupSkillsEnabled = Array.isArray(groupConfig.skills?.enabled) ? groupConfig.skills.enabled : [];
-    const groupSkillsEnabledCount = groupSkillsEnabled.length;
+    const groupSkillsDeniedCount = Array.isArray(groupConfig.skillsDeny) ? groupConfig.skillsDeny.length : 0;
     const models = Array.isArray(config.llm?.models) ? config.llm.models : [];
     const priorityEntry = models.find((m) => m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true') || models[0];
     const priorityModelLabel = priorityEntry ? (priorityEntry.model ? `${priorityEntry.model}` : priorityEntry.provider || '—') : '—';
@@ -185,7 +173,8 @@ app.get('/api/overview', async (_req, res) => {
       port: PORT,
       cronCount,
       skillsEnabledCount,
-      groupSkillsEnabledCount,
+      groupSkillsDeniedCount,
+      groupSkillsEnabledCount: Math.max(0, skillsEnabledCount - groupSkillsDeniedCount),
       priorityModelLabel,
       timezone,
       timeFormat,
@@ -267,12 +256,73 @@ app.patch('/api/skills', (req, res) => {
   }
 });
 
-// Group skills: core, read, cron are available but not enabled by default (no stripping on save)
+app.get('/api/agents', (_req, res) => {
+  try {
+    const ids = listAgentIds();
+    const agents = ids.map((id) => {
+      const config = loadAgentConfig(id);
+      return {
+        id,
+        skillsEnabled: Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED,
+        hasLlm: !!config.llm,
+      };
+    });
+    res.json({ agents });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/agents/:id/config', (req, res) => {
+  try {
+    const id = req.params.id || DEFAULT_AGENT_ID;
+    const config = loadAgentConfig(id);
+    res.json(config);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/agents/:id/config', (req, res) => {
+  try {
+    const id = req.params.id || DEFAULT_AGENT_ID;
+    const patch = req.body || {};
+    const config = loadAgentConfig(id);
+    if (patch.llm !== undefined) config.llm = patch.llm;
+    if (patch.skills !== undefined) config.skills = patch.skills;
+    saveAgentConfig(id, config);
+    if (id === DEFAULT_AGENT_ID) saveConfig(config);
+    res.json(config);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/agents', (req, res) => {
+  try {
+    const rawId = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
+    if (!rawId) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+    const created = createAgent(rawId);
+    const config = loadAgentConfig(created.id);
+    res.status(created.created ? 201 : 200).json({ id: created.id, created: created.created, config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Group skills are now additive restrictions (deny list) on top of agent skills.
 
 app.get('/api/group/skills', (_req, res) => {
   try {
     const groupConfig = loadGroupConfig('default');
-    const enabled = Array.isArray(groupConfig.skills?.enabled) ? groupConfig.skills.enabled : [];
+    const deny = Array.isArray(groupConfig.skillsDeny) ? groupConfig.skillsDeny : [];
+    const agentId = groupConfig.agentId || DEFAULT_AGENT_ID;
+    const agentConfig = loadAgentConfig(agentId);
+    const baseEnabled = Array.isArray(agentConfig.skills?.enabled) ? agentConfig.skills.enabled : DEFAULT_ENABLED;
+    const enabled = baseEnabled.filter((id) => !deny.includes(id));
     const allIds = getAllSkillIds();
     const list = allIds.map((id) => ({
       id,
@@ -293,10 +343,12 @@ app.patch('/api/group/skills', (req, res) => {
       return;
     }
     const config = loadGroupConfig('default');
-    if (!config.skills) config.skills = {};
-    config.skills.enabled = enabled;
-    saveGroupConfig('default', config);
-    res.json({ enabled });
+    const agentId = config.agentId || DEFAULT_AGENT_ID;
+    const agentConfig = loadAgentConfig(agentId);
+    const baseEnabled = Array.isArray(agentConfig.skills?.enabled) ? agentConfig.skills.enabled : DEFAULT_ENABLED;
+    const deny = baseEnabled.filter((id) => !enabled.includes(id));
+    const saved = saveGroupConfig('default', { ...config, skillsDeny: deny });
+    res.json({ enabled, restrictions: saved });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -317,10 +369,12 @@ app.patch('/api/groups/:id/config', (req, res) => {
     const id = req.params.id;
     const patch = req.body || {};
     const config = loadGroupConfig(id);
-    if (patch.llm !== undefined) config.llm = patch.llm;
-    if (patch.skills !== undefined) config.skills = patch.skills;
-    saveGroupConfig(id, config);
-    res.json(config);
+    const next = { ...config };
+    if (patch.agentId !== undefined) next.agentId = patch.agentId;
+    if (patch.skillsDeny !== undefined) next.skillsDeny = Array.isArray(patch.skillsDeny) ? patch.skillsDeny : [];
+    if (patch.tools !== undefined) next.tools = patch.tools;
+    const saved = saveGroupConfig(id, next);
+    res.json(saved);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -330,14 +384,18 @@ app.get('/api/groups/:id/skills', (req, res) => {
   try {
     const id = req.params.id;
     const groupConfig = loadGroupConfig(id);
-    const enabled = Array.isArray(groupConfig.skills?.enabled) ? groupConfig.skills.enabled : [];
+    const deny = Array.isArray(groupConfig.skillsDeny) ? groupConfig.skillsDeny : [];
+    const agentId = resolveAgentIdForGroup(id);
+    const agentConfig = loadAgentConfig(agentId);
+    const baseEnabled = Array.isArray(agentConfig.skills?.enabled) ? agentConfig.skills.enabled : DEFAULT_ENABLED;
+    const enabled = baseEnabled.filter((sid) => !deny.includes(sid));
     const allIds = getAllSkillIds();
     const list = allIds.map((sid) => ({
       id: sid,
       enabled: enabled.includes(sid),
       description: getSkillDescription(sid),
     }));
-    res.json({ skills: list, enabled });
+    res.json({ skills: list, enabled, denied: deny, agentId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -352,10 +410,12 @@ app.patch('/api/groups/:id/skills', (req, res) => {
       return;
     }
     const config = loadGroupConfig(id);
-    if (!config.skills) config.skills = {};
-    config.skills.enabled = enabled;
-    saveGroupConfig(id, config);
-    res.json({ enabled });
+    const agentId = resolveAgentIdForGroup(id);
+    const agentConfig = loadAgentConfig(agentId);
+    const baseEnabled = Array.isArray(agentConfig.skills?.enabled) ? agentConfig.skills.enabled : DEFAULT_ENABLED;
+    const deny = baseEnabled.filter((sid) => !enabled.includes(sid));
+    const saved = saveGroupConfig(id, { ...config, skillsDeny: deny, agentId });
+    res.json({ enabled, restrictions: saved });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -824,23 +884,28 @@ app.patch('/api/workspace-md/:key', (req, res) => {
   }
 });
 
-// ---- Per-group identity files (SOUL.md, WhoAmI.md, MyHuman.md, MEMORY.md) ----
+// ---- Agent identity files ----
 
-const GROUP_IDENTITY_FILES = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'MEMORY.md'];
-const GROUP_IDENTITY_LABELS = { 'SOUL.md': 'Soul', 'WhoAmI.md': 'Who am I', 'MyHuman.md': 'My human', 'MEMORY.md': 'Memory' };
+const AGENT_FILE_IDS = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md', 'MEMORY.md'];
+const AGENT_FILE_LABELS = {
+  'SOUL.md': 'Soul',
+  'WhoAmI.md': 'Who am I',
+  'MyHuman.md': 'My human',
+  'group.md': 'Group rules',
+  'MEMORY.md': 'Memory',
+};
 
-function isAllowedGroupMdKey(key) {
-  return GROUP_IDENTITY_FILES.includes(key);
+function getAgentMdPath(agentId, key) {
+  return join(getAgentWorkspaceDir(agentId), key);
 }
 
-app.get('/api/groups/:id/md', (req, res) => {
+app.get('/api/agents/:id/md', (req, res) => {
   try {
-    const id = req.params.id;
-    ensureGroupConfigFor(id);
-    const groupDir = getGroupConfigDir(id);
-    const files = GROUP_IDENTITY_FILES.map((key) => {
-      const filePath = join(groupDir, key);
-      return { id: key, label: GROUP_IDENTITY_LABELS[key] || key, exists: existsSync(filePath) };
+    const agentId = req.params.id || DEFAULT_AGENT_ID;
+    loadAgentConfig(agentId);
+    const files = AGENT_FILE_IDS.map((id) => {
+      const p = getAgentMdPath(agentId, id);
+      return { id, label: AGENT_FILE_LABELS[id] || id, exists: existsSync(p) };
     });
     res.json({ files });
   } catch (err) {
@@ -848,31 +913,55 @@ app.get('/api/groups/:id/md', (req, res) => {
   }
 });
 
-app.get('/api/groups/:id/md/:key', (req, res) => {
+app.get('/api/agents/:id/md/:key', (req, res) => {
   try {
-    const { id, key } = req.params;
-    if (!isAllowedGroupMdKey(key)) { res.status(400).json({ error: 'Invalid file key' }); return; }
-    ensureGroupConfigFor(id);
-    const filePath = join(getGroupConfigDir(id), key);
-    const content = existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
-    res.json({ id: key, label: GROUP_IDENTITY_LABELS[key] || key, content });
+    const agentId = req.params.id || DEFAULT_AGENT_ID;
+    loadAgentConfig(agentId);
+    const key = req.params.key;
+    if (!AGENT_FILE_IDS.includes(key)) {
+      res.status(400).json({ error: 'Invalid file key' });
+      return;
+    }
+    const path = getAgentMdPath(agentId, key);
+    const content = existsSync(path) ? readFileSync(path, 'utf8') : '';
+    res.json({ id: key, label: AGENT_FILE_LABELS[key] || key, content });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.patch('/api/groups/:id/md/:key', (req, res) => {
+app.patch('/api/agents/:id/md/:key', (req, res) => {
   try {
-    const { id, key } = req.params;
-    if (!isAllowedGroupMdKey(key)) { res.status(400).json({ error: 'Invalid file key' }); return; }
-    ensureGroupConfigFor(id);
-    const filePath = join(getGroupConfigDir(id), key);
+    const agentId = req.params.id || DEFAULT_AGENT_ID;
+    loadAgentConfig(agentId);
+    const key = req.params.key;
+    if (!AGENT_FILE_IDS.includes(key)) {
+      res.status(400).json({ error: 'Invalid file key' });
+      return;
+    }
+    const path = getAgentMdPath(agentId, key);
     const content = typeof req.body?.content === 'string' ? req.body.content : '';
-    writeFileSync(filePath, content, 'utf8');
+    const dir = join(path, '..');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(path, content, 'utf8');
     res.json({ id: key, ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ---- Per-group identity files are deprecated (agent-scoped now) ----
+
+app.get('/api/groups/:id/md', (req, res) => {
+  res.status(410).json({ error: 'Per-group identity files are removed. Use /api/agents/:id/config and agent workspace files.' });
+});
+
+app.get('/api/groups/:id/md/:key', (req, res) => {
+  res.status(410).json({ error: 'Per-group identity files are removed. Use agent identity files instead.' });
+});
+
+app.patch('/api/groups/:id/md/:key', (req, res) => {
+  res.status(410).json({ error: 'Per-group identity files are removed. Use agent identity files instead.' });
 });
 
 // Static files

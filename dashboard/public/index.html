@@ -407,6 +407,7 @@
     <a href="#soul" data-page="soul">Soul</a>
     <a href="#crons" data-page="crons">Crons</a>
     <a href="#skills" data-page="skills">Skills</a>
+    <a href="#agents" data-page="agents">Agents</a>
     <a href="#groups" data-page="groups">Groups</a>
     <a href="#llm" data-page="llm">LLM</a>
     <a href="#config" data-page="config">Config</a>
@@ -505,11 +506,45 @@
     </div>
   </div>
 
+  <div id="page-agents" class="page">
+    <div class="groups-layout">
+      <div class="groups-sidebar card">
+        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Agents</h2>
+        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Default <code>main</code> exists automatically. Create additional agents here.</p>
+        <div style="display:flex; gap:0.4rem; margin-bottom:0.75rem;">
+          <input id="agent-create-name" type="text" placeholder="agent name (e.g. alex)" style="flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.85rem;">
+          <button id="agent-create-btn" type="button" style="margin-top:0;">Create</button>
+        </div>
+        <ul id="agents-list" class="groups-ul"></ul>
+      </div>
+      <div class="groups-main">
+        <div class="card">
+          <h2 id="agent-detail-title" style="margin:0 0 0.5rem 0; font-size:1rem;">Select an agent</h2>
+          <p id="agent-detail-meta" class="skill-meta" style="margin:0 0 0.75rem 0;"></p>
+          <div id="agent-skills-list"></div>
+          <button id="agent-skills-save" style="display:none;">Save skills</button>
+        </div>
+        <div class="card">
+          <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">Identity files</h2>
+          <div id="agent-md-files" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem;"></div>
+          <div id="agent-md-editor" style="display:none;">
+            <div id="agent-md-label" class="skill-meta" style="margin-bottom:0.4rem;"></div>
+            <textarea id="agent-md-textarea" spellcheck="false" style="width:100%; min-height:14rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.75rem; border-radius:6px; font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
+            <div>
+              <button id="agent-md-save" type="button">Save file</button>
+              <span id="agent-md-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="page-groups" class="page">
     <div class="groups-layout">
       <div class="groups-sidebar card">
         <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Groups</h2>
-        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Click a group to edit its skills and LLM. Default settings are used by new groups.</p>
+        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Assign each group to an agent, and add group-specific skill restrictions.</p>
         <ul id="groups-list" class="groups-ul"></ul>
       </div>
       <div class="groups-main">
@@ -518,40 +553,26 @@
           <p class="skill-meta" id="groups-detail-meta" style="margin:0 0 0.75rem 0;"></p>
           <div id="groups-detail-sub-nav" class="group-sub-nav" style="display:none;">
             <button type="button" data-group-tab="skills" class="active">Skills</button>
-            <button type="button" data-group-tab="soul">Soul</button>
-            <button type="button" data-group-tab="llm">LLM</button>
+            <button type="button" data-group-tab="agent">Agent</button>
             <button type="button" data-group-tab="history">History</button>
           </div>
           <div id="groups-detail-skills" class="group-sub-panel active">
-            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Enable or disable skills; click a skill to view its doc (SKILL.md).</p>
+            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Enable/disable skills for this group only. This creates a deny list on top of the selected agent.</p>
             <div id="group-skills-list"></div>
             <button id="group-skills-save" style="display:none;">Save skills</button>
           </div>
-          <div id="groups-detail-llm" class="group-sub-panel">
-            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Max tokens and models for this group. API keys from .env.</p>
-            <div class="field" style="margin-top:0.5rem;">
-              <label>Max tokens</label>
-              <input type="number" id="group-llm-max-tokens" min="256" max="128000" step="256" value="2048">
+          <div id="groups-detail-agent" class="group-sub-panel">
+            <p class="skill-meta" style="margin:0 0 0.75rem 0;">Choose which agent serves this group.</p>
+            <div class="field" style="margin-top:0.25rem;">
+              <label>Agent</label>
+              <select id="group-agent-select" style="width:100%; max-width:24rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.9rem;"></select>
             </div>
-            <div id="group-llm-models" class="llm-models-grid"></div>
-            <button id="group-llm-save">Save LLM</button>
-            <span id="group-llm-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
+            <button id="group-agent-save" type="button">Save agent</button>
+            <span id="group-agent-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span>
           </div>
           <div id="groups-detail-history" class="group-sub-panel">
             <div id="history-stats" class="history-stats"></div>
             <div id="history-log-files" class="history-log-files"></div>
-          </div>
-          <div id="groups-detail-soul" class="group-sub-panel">
-            <p class="skill-meta" style="margin:0 0 0.75rem 0;">Click a file to view or edit. Each group has its own copy — changes only affect this group.</p>
-            <div id="group-soul-files" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;"></div>
-            <div id="group-soul-editor" style="display:none;">
-              <div style="font-size:0.8rem; color:var(--muted); margin-bottom:0.4rem;" id="group-soul-file-label"></div>
-              <textarea id="group-soul-textarea" spellcheck="false" style="width:100%; min-height:16rem; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.75rem; border-radius:6px; font-family:inherit; font-size:0.9rem; resize:vertical; display:block; margin-bottom:0.75rem;"></textarea>
-              <div>
-                <button id="group-soul-save">Save</button>
-                <span id="group-soul-saved" style="margin-left:0.75rem; color:var(--green); font-size:0.85rem; display:none;">Saved.</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -616,7 +637,7 @@
 
   <script>
     const API = '';
-    var validPages = ['chat', 'status', 'crons', 'skills', 'groups', 'llm', 'config', 'soul', 'test'];
+    var validPages = ['chat', 'status', 'crons', 'skills', 'agents', 'groups', 'llm', 'config', 'soul', 'test'];
     function setPage(name, soulFileId) {
       if (!name || !validPages.includes(name)) name = 'chat';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -627,6 +648,7 @@
       if (link) link.classList.add('active');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
+      if (name === 'agents') fetchAgentsPage();
       if (name === 'groups') fetchGroups();
       if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
@@ -825,6 +847,138 @@
       if (r.ok) { skillsDirty = false; document.getElementById('skills-save').style.display = 'none'; }
     });
 
+    var selectedAgentId = 'main';
+    var selectedAgentMdFile = null;
+    var agentSkillsDirty = false;
+
+    async function fetchAgentsPage() {
+      var r = await fetch(API + '/api/agents');
+      var d = await r.json();
+      var list = d.agents || [];
+      if (!list.some(function (a) { return a.id === selectedAgentId; })) selectedAgentId = list.length ? list[0].id : 'main';
+      var ul = document.getElementById('agents-list');
+      ul.innerHTML = list.map(function (a) {
+        var selected = a.id === selectedAgentId ? 'selected' : '';
+        return '<li class="' + selected + '"><button type="button" class="link" data-agent-id="' + escapeHtml(a.id) + '">' + escapeHtml(a.id) + '</button></li>';
+      }).join('');
+      ul.querySelectorAll('button[data-agent-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () { selectAgent(btn.getAttribute('data-agent-id')); });
+      });
+      if (selectedAgentId) await selectAgent(selectedAgentId);
+    }
+
+    async function selectAgent(agentId) {
+      selectedAgentId = agentId || 'main';
+      document.querySelectorAll('#agents-list li').forEach(function (li) {
+        var b = li.querySelector('button[data-agent-id]');
+        li.classList.toggle('selected', b && b.getAttribute('data-agent-id') === selectedAgentId);
+      });
+      document.getElementById('agent-detail-title').textContent = 'Agent: ' + selectedAgentId;
+      document.getElementById('agent-detail-meta').textContent = selectedAgentId === 'main'
+        ? 'Default agent created automatically.'
+        : 'Custom agent for routing specific groups/chats.';
+      await loadAgentSkills(selectedAgentId);
+      await loadAgentMdFiles(selectedAgentId);
+    }
+
+    async function loadAgentSkills(agentId) {
+      var all = await fetch(API + '/api/skills').then(function (r) { return r.json(); });
+      var cfg = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config').then(function (r) { return r.json(); });
+      var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled : (all.enabled || []);
+      var list = all.skills || [];
+      var el = document.getElementById('agent-skills-list');
+      el.innerHTML = list.map(function (s) {
+        var checked = enabled.includes(s.id) ? ' checked' : '';
+        return '<div class="skill-item"><div class="skill-row"><div><span class="skill-id">' + escapeHtml(s.id) + '</span><div class="skill-desc">' + escapeHtml((s.description || '').trim()) + '</div></div><label><input type="checkbox" data-agent-skill="' + escapeHtml(s.id) + '"' + checked + '> Enabled</label></div></div>';
+      }).join('');
+      el.querySelectorAll('input[data-agent-skill]').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          agentSkillsDirty = true;
+          document.getElementById('agent-skills-save').style.display = 'inline-block';
+        });
+      });
+      document.getElementById('agent-skills-save').style.display = 'none';
+      agentSkillsDirty = false;
+    }
+
+    async function loadAgentMdFiles(agentId) {
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md');
+      var d = await r.json();
+      var files = d.files || [];
+      var filesEl = document.getElementById('agent-md-files');
+      filesEl.innerHTML = files.map(function (f) {
+        return '<button type="button" class="agent-md-btn" data-agent-file="' + escapeHtml(f.id) + '" style="background:var(--card); border:1px solid var(--border); color:var(--muted); font:inherit; font-size:0.85rem; padding:0.35rem 0.75rem; border-radius:4px; cursor:pointer; margin-top:0;">' + escapeHtml(f.label) + '</button>';
+      }).join('');
+      filesEl.querySelectorAll('.agent-md-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { selectAgentMdFile(agentId, btn.getAttribute('data-agent-file')); });
+      });
+      if (files.length > 0) await selectAgentMdFile(agentId, files[0].id);
+    }
+
+    async function selectAgentMdFile(agentId, fileId) {
+      selectedAgentMdFile = fileId;
+      document.querySelectorAll('.agent-md-btn').forEach(function (btn) {
+        var active = btn.getAttribute('data-agent-file') === fileId;
+        btn.style.color = active ? 'var(--accent)' : 'var(--muted)';
+        btn.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+      });
+      document.getElementById('agent-md-editor').style.display = 'block';
+      document.getElementById('agent-md-label').textContent = 'Agent file: ' + fileId;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md/' + encodeURIComponent(fileId));
+      var d = await r.json();
+      document.getElementById('agent-md-textarea').value = d.content || '';
+    }
+
+    document.getElementById('agent-create-btn').addEventListener('click', async function () {
+      var input = document.getElementById('agent-create-name');
+      var name = (input.value || '').trim();
+      if (!name) return;
+      var r = await fetch(API + '/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: name })
+      });
+      if (r.ok) {
+        var d = await r.json();
+        selectedAgentId = d.id || name;
+        input.value = '';
+        await fetchAgentsPage();
+      }
+    });
+
+    document.getElementById('agent-skills-save').addEventListener('click', async function () {
+      var checked = document.querySelectorAll('#agent-skills-list input[data-agent-skill]:checked');
+      var enabled = Array.from(checked).map(function (x) { return x.getAttribute('data-agent-skill'); });
+      var cfgRes = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/config');
+      var cfg = await cfgRes.json();
+      cfg.skills = cfg.skills || {};
+      cfg.skills.enabled = enabled;
+      var save = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skills: cfg.skills })
+      });
+      if (save.ok) {
+        document.getElementById('agent-skills-save').style.display = 'none';
+        agentSkillsDirty = false;
+      }
+    });
+
+    document.getElementById('agent-md-save').addEventListener('click', async function () {
+      if (!selectedAgentMdFile || !selectedAgentId) return;
+      var content = document.getElementById('agent-md-textarea').value;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '/md/' + encodeURIComponent(selectedAgentMdFile), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content })
+      });
+      if (r.ok) {
+        var el = document.getElementById('agent-md-saved');
+        el.style.display = 'inline';
+        setTimeout(function () { el.style.display = 'none'; }, 2000);
+      }
+    });
+
     let groupSkillsDirty = false;
     let selectedGroupId = 'default';
 
@@ -871,13 +1025,12 @@
       document.querySelectorAll('#groups-detail-content .group-sub-panel').forEach(function (p) {
         p.classList.toggle('active',
           (p.id === 'groups-detail-skills' && tab === 'skills') ||
-          (p.id === 'groups-detail-llm' && tab === 'llm') ||
-          (p.id === 'groups-detail-history' && tab === 'history') ||
-          (p.id === 'groups-detail-soul' && tab === 'soul')
+          (p.id === 'groups-detail-agent' && tab === 'agent') ||
+          (p.id === 'groups-detail-history' && tab === 'history')
         );
       });
       if (tab === 'history') loadGroupHistory(selectedGroupId);
-      if (tab === 'soul') loadGroupSoul(selectedGroupId);
+      if (tab === 'agent') loadGroupAgent(selectedGroupId);
     }
     function selectGroup(id) {
       selectedGroupId = id;
@@ -889,13 +1042,11 @@
       var metaEl = document.getElementById('groups-detail-meta');
       var subNavEl = document.getElementById('groups-detail-sub-nav');
       var skillsEl = document.getElementById('groups-detail-skills');
-      var llmEl = document.getElementById('groups-detail-llm');
-      var historyEl = document.getElementById('groups-detail-history');
       titleEl.textContent = id === 'default' ? 'Default group settings' : ('Group ' + id);
       subNavEl.style.display = id ? 'flex' : 'none';
       setGroupTab(selectedGroupTab);
       loadGroupSkills(id);
-      loadGroupConfig(id);
+      loadGroupAgent(id);
       if (id !== 'default') {
         fetch(API + '/api/groups/' + encodeURIComponent(id))
           .then(function (r) { return r.ok ? r.json() : null; })
@@ -905,7 +1056,7 @@
           })
           .catch(function () { metaEl.textContent = ''; });
       } else {
-        metaEl.textContent = 'Used as template for new groups. Stored in ~/.cowcode/group/.';
+        metaEl.textContent = 'Used as default restrictions for groups.';
       }
     }
     function timeAgo(isoStr) {
@@ -1016,95 +1167,37 @@
       btn.addEventListener('click', function () { setGroupTab(btn.getAttribute('data-group-tab')); });
     });
 
-    async function loadGroupConfig(groupId) {
-      var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/config');
-      var config = await r.json();
-      var llm = config.llm || {};
-      var maxTokens = Number(llm.maxTokens) || 2048;
-      var models = Array.isArray(llm.models) ? llm.models : [];
-      document.getElementById('group-llm-max-tokens').value = maxTokens;
-      var container = document.getElementById('group-llm-models');
-      container.innerHTML = models.map(function (m, i) {
-        var baseUrl = (m.baseUrl || '').trim();
-        var apiKey = (m.apiKey || '').trim();
-        var priority = m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true';
-        return '<div class="llm-model" data-i="' + i + '"><h3>Model ' + (i + 1) + ': ' + escapeHtml(m.provider || '') + '</h3><div class="form-row"><div class="field"><label>Provider</label><input type="text" data-f="provider" value="' + escapeHtml(m.provider || '') + '"></div></div><div class="form-row"><div class="field"><label>Model name</label><input type="text" data-f="model" value="' + escapeHtml(m.model || '') + '"></div></div><div class="form-row"><div class="field"><label>Base URL (optional)</label><input type="text" data-f="baseUrl" value="' + escapeHtml(baseUrl) + '"></div></div><div class="form-row"><div class="field"><label>API key env var</label><input type="text" data-f="apiKey" value="' + escapeHtml(apiKey) + '"></div></div><div class="form-row"><label><input type="checkbox" data-f="priority" ' + (priority ? 'checked' : '') + '> Priority</label></div></div>';
-      }).join('');
-      if (models.length === 0) { container.innerHTML = '<p class="empty">No models. Add in main Config or paste JSON.</p>'; }
-    }
-
-    document.getElementById('group-llm-save').addEventListener('click', async function () {
-      var maxTokens = Number(document.getElementById('group-llm-max-tokens').value) || 2048;
-      var cards = document.querySelectorAll('#group-llm-models .llm-model');
-      var models = Array.from(cards).map(function (card) {
-        var provider = (card.querySelector('[data-f="provider"]').value || '').trim();
-        var model = (card.querySelector('[data-f="model"]').value || '').trim();
-        var baseUrl = (card.querySelector('[data-f="baseUrl"]').value || '').trim();
-        var apiKey = (card.querySelector('[data-f="apiKey"]').value || '').trim();
-        var priority = card.querySelector('[data-f="priority"]').checked;
-        var o = { provider: provider || 'openai', model: model || 'gpt-4o', apiKey: apiKey || 'LLM_1_API_KEY' };
-        if (baseUrl) o.baseUrl = baseUrl;
-        if (priority) o.priority = true;
-        return o;
-      });
-      var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ llm: { maxTokens: maxTokens, models: models } }) });
-      if (r.ok) { document.getElementById('group-llm-saved').style.display = 'inline'; setTimeout(function () { document.getElementById('group-llm-saved').style.display = 'none'; }, 2000); }
-    });
-
-    var selectedGroupSoulFileId = null;
-
-    async function loadGroupSoul(groupId) {
-      var filesEl = document.getElementById('group-soul-files');
-      var editorEl = document.getElementById('group-soul-editor');
-      filesEl.innerHTML = '';
-      editorEl.style.display = 'none';
-      selectedGroupSoulFileId = null;
+    async function loadGroupAgent(groupId) {
       try {
-        var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/md');
-        var d = await r.json();
-        var files = d.files || [];
-        filesEl.innerHTML = files.map(function (f) {
-          return '<button type="button" class="group-soul-file-btn" data-id="' + escapeHtml(f.id) + '" style="background:var(--card); border:1px solid var(--border); color:var(--muted); font:inherit; font-size:0.85rem; padding:0.35rem 0.75rem; border-radius:4px; cursor:pointer; margin-top:0;">' + escapeHtml(f.label) + '</button>';
+        var [cfgRes, agentsRes] = await Promise.all([
+          fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/config'),
+          fetch(API + '/api/agents')
+        ]);
+        var cfg = await cfgRes.json();
+        var agentsData = await agentsRes.json();
+        var agentId = cfg && cfg.agentId ? cfg.agentId : 'main';
+        var agents = (agentsData && agentsData.agents) ? agentsData.agents : [];
+        var select = document.getElementById('group-agent-select');
+        select.innerHTML = agents.map(function (a) {
+          var selected = a.id === agentId ? ' selected' : '';
+          return '<option value="' + escapeHtml(a.id) + '"' + selected + '>' + escapeHtml(a.id) + '</option>';
         }).join('');
-        filesEl.querySelectorAll('.group-soul-file-btn').forEach(function (btn) {
-          btn.addEventListener('click', function () { selectGroupSoulFile(groupId, btn.getAttribute('data-id')); });
-        });
-        if (files.length > 0) selectGroupSoulFile(groupId, files[0].id);
-      } catch (e) {
-        filesEl.innerHTML = '<span class="skill-meta">Error loading files.</span>';
-      }
+      } catch (_) {}
     }
 
-    async function selectGroupSoulFile(groupId, fileId) {
-      selectedGroupSoulFileId = fileId;
-      document.querySelectorAll('.group-soul-file-btn').forEach(function (btn) {
-        var active = btn.getAttribute('data-id') === fileId;
-        btn.style.color = active ? 'var(--accent)' : 'var(--muted)';
-        btn.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+    document.getElementById('group-agent-save').addEventListener('click', async function () {
+      var select = document.getElementById('group-agent-select');
+      var agentId = select && select.value ? select.value : 'main';
+      var r = await fetch(API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: agentId })
       });
-      document.getElementById('group-soul-file-label').textContent = 'File: ' + fileId + ' — saved to this group\'s config directory only.';
-      document.getElementById('group-soul-editor').style.display = 'block';
-      document.getElementById('group-soul-textarea').value = '';
-      try {
-        var r = await fetch(API + '/api/groups/' + encodeURIComponent(groupId) + '/md/' + encodeURIComponent(fileId));
-        var d = await r.json();
-        document.getElementById('group-soul-textarea').value = d.content || '';
-      } catch (e) {
-        document.getElementById('group-soul-textarea').value = '';
-      }
-    }
-
-    document.getElementById('group-soul-save').addEventListener('click', async function () {
-      if (!selectedGroupSoulFileId) return;
-      var content = document.getElementById('group-soul-textarea').value;
-      var r = await fetch(
-        API + '/api/groups/' + encodeURIComponent(selectedGroupId) + '/md/' + encodeURIComponent(selectedGroupSoulFileId),
-        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) }
-      );
       if (r.ok) {
-        var savedEl = document.getElementById('group-soul-saved');
-        savedEl.style.display = 'inline';
-        setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
+        var saved = document.getElementById('group-agent-saved');
+        saved.style.display = 'inline';
+        setTimeout(function () { saved.style.display = 'none'; }, 2000);
+        loadGroupSkills(selectedGroupId);
       }
     });
 
