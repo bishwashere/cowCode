@@ -779,7 +779,40 @@ async function main() {
       getFullSkillDoc: skillContext.getFullSkillDoc,
       resolveToolName: skillContext.resolveToolName,
     });
-    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = turnResult || {};
+    let resultToUse = turnResult;
+    let skillsCalledFromTurn = Array.isArray(turnResult?.skillsCalled) && turnResult.skillsCalled.length ? turnResult.skillsCalled : [];
+    const hasSearchOrBrowse = (arr) => Array.isArray(arr) && (arr.includes('search') || arr.includes('browse'));
+    const UNCERTAINTY_PATTERN = /I don't know|I'm not sure|I don't have|I'm unable to|my knowledge (doesn't|isn't|might not)|I cannot find|I can't find|outside my knowledge|not in my training|I have no information|I don't have that|I'm not able to|I do not have|I couldn't find|I could not find/i;
+    const firstReply = sanitizeOutboundText((turnResult?.textToSend || '').trim());
+    const firstTextForSend = isTelegramChatId(jid) ? firstReply.replace(/^\[CowCode\]\s*/i, '').trim() : firstReply;
+    if (
+      toolsForRequest.length > 0 &&
+      !hasSearchOrBrowse(skillsCalledFromTurn) &&
+      firstTextForSend &&
+      UNCERTAINTY_PATTERN.test(firstTextForSend)
+    ) {
+      console.log('[agent] uncertainty reply without search/browse, retrying with search instruction');
+      const retryUserText =
+        `[Retry with search] The user asked: "${text.slice(0, 500)}${text.length > 500 ? '…' : ''}". Your previous reply indicated you don't have this information. Use the search skill (or browse if they gave a URL) to look up current information, then reply with what you find.`;
+      try {
+        const retryResult = await runAgentTurn({
+          userText: retryUserText,
+          ctx,
+          systemPrompt: buildSystemPrompt(systemPromptOpts),
+          tools: toolsForRequest,
+          historyMessages,
+          getFullSkillDoc: skillContext.getFullSkillDoc,
+          resolveToolName: skillContext.resolveToolName,
+        });
+        if (retryResult?.textToSend?.trim()) {
+          resultToUse = retryResult;
+          skillsCalledFromTurn = Array.isArray(retryResult.skillsCalled) ? retryResult.skillsCalled : skillsCalledFromTurn;
+        }
+      } catch (err) {
+        console.error('[agent] retry with search failed:', getErrorMessageForLog(err));
+      }
+    }
+    const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = resultToUse || {};
     if (Array.isArray(called) && called.length) skillsCalled = called;
     const cleanedTextToSend = sanitizeOutboundText(textToSend || '');
     const cleanedVoiceReplyText = sanitizeOutboundText(voiceReplyText || '');
