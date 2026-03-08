@@ -888,6 +888,12 @@ async function main() {
           }
         }
         console.log('[replied]', toolsForRequest.length > 0 ? '(agent + skills)' : '(chat)');
+        console.log('[replied] question:', text);
+        const partialLen = 300;
+        console.log('[replied] answer (partial):', (replyText || '').slice(0, partialLen) + ((replyText || '').length > partialLen ? '…' : ''));
+        if (Array.isArray(skillsCalled) && skillsCalled.length > 0) {
+          console.log('[replied] skills called:', skillsCalled.join(', '));
+        }
         if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);
         const alreadySentBioPrompt = bioOpts.bioPromptSentJids?.has(jid);
         if (bioOpts.pendingBioConfirmJids != null && !isBioSet() && !alreadySentBioPrompt) {
