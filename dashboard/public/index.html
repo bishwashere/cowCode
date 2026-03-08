@@ -441,7 +441,7 @@
         <div class="overview-item"><span class="overview-label">Daemon uptime</span><span id="overview-uptime">—</span></div>
         <div class="overview-item"><span class="overview-label">Crons activated</span><span id="overview-crons">—</span></div>
         <div class="overview-item"><span class="overview-label">Skills activated</span><span id="overview-skills">—</span></div>
-        <div class="overview-item"><span class="overview-label">Group skills</span><span id="overview-group-skills">—</span></div>
+        <div class="overview-item"><span class="overview-label">Group restrictions</span><span id="overview-group-skills">—</span></div>
         <div class="overview-item"><span class="overview-label">Priority model</span><span id="overview-model">—</span></div>
         <div class="overview-item"><span class="overview-label">Time zone</span><span id="overview-timezone">—</span></div>
         <div class="overview-item"><span class="overview-label">Time format</span><span id="overview-time-format">—</span></div>
@@ -519,6 +519,9 @@
           <input id="agent-create-name" type="text" placeholder="agent name (e.g. alex)" style="flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.85rem;">
           <button id="agent-create-btn" type="button" style="margin-top:0;">Create</button>
         </div>
+        <div style="display:flex; gap:0.4rem; margin-bottom:0.75rem;">
+          <button id="agent-delete-btn" type="button" style="margin-top:0; background:var(--red); color:#fff;">Delete selected</button>
+        </div>
         <ul id="agents-list" class="groups-ul"></ul>
       </div>
       <div class="groups-main">
@@ -548,7 +551,7 @@
     <div class="groups-layout">
       <div class="groups-sidebar card">
         <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Groups</h2>
-        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Assign each group to an agent, and add group-specific skill restrictions.</p>
+        <p class="skill-meta" style="margin:0 0 0.5rem 0;">Assign each group to an agent, then apply additional restrictions for that group.</p>
         <ul id="groups-list" class="groups-ul"></ul>
       </div>
       <div class="groups-main">
@@ -556,14 +559,14 @@
           <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="groups-detail-title">Select a group</h2>
           <p class="skill-meta" id="groups-detail-meta" style="margin:0 0 0.75rem 0;"></p>
           <div id="groups-detail-sub-nav" class="group-sub-nav" style="display:none;">
-            <button type="button" data-group-tab="skills" class="active">Skills</button>
+            <button type="button" data-group-tab="skills" class="active">Restrictions</button>
             <button type="button" data-group-tab="agent">Agent</button>
             <button type="button" data-group-tab="history">History</button>
           </div>
           <div id="groups-detail-skills" class="group-sub-panel active">
-            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Enable/disable skills for this group only. This creates a deny list on top of the selected agent.</p>
+            <p class="skill-meta" style="margin:0 0 0.5rem 0;">Additional restrictions for this group only. This is a deny list layered on top of the selected agent.</p>
             <div id="group-skills-list"></div>
-            <button id="group-skills-save" style="display:none;">Save skills</button>
+            <button id="group-skills-save" style="display:none;">Save restrictions</button>
           </div>
           <div id="groups-detail-agent" class="group-sub-panel">
             <p class="skill-meta" style="margin:0 0 0.75rem 0;">Choose which agent serves this group.</p>
@@ -720,7 +723,13 @@
         document.getElementById('overview-uptime').textContent = d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—';
         document.getElementById('overview-crons').textContent = typeof d.cronCount === 'number' ? d.cronCount : '—';
         document.getElementById('overview-skills').textContent = typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—';
-        document.getElementById('overview-group-skills').textContent = typeof d.groupSkillsEnabledCount === 'number' ? d.groupSkillsEnabledCount : '—';
+        if (typeof d.groupSkillsDeniedCount === 'number') {
+          document.getElementById('overview-group-skills').textContent = d.groupSkillsDeniedCount + ' denied';
+        } else if (typeof d.groupSkillsEnabledCount === 'number') {
+          document.getElementById('overview-group-skills').textContent = d.groupSkillsEnabledCount;
+        } else {
+          document.getElementById('overview-group-skills').textContent = '—';
+        }
         document.getElementById('overview-model').textContent = d.priorityModelLabel || '—';
         document.getElementById('overview-timezone').textContent = d.timezone || '—';
         document.getElementById('overview-time-format').textContent = d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—');
@@ -734,20 +743,23 @@
         }
       } catch (_) {}
       try {
-        const [cronsRes, skillsRes, groupSkillsRes, configRes] = await Promise.all([
+        const [cronsRes, skillsRes, groupSkillsRes, groupConfigRes, configRes] = await Promise.all([
           fetch(API + '/api/crons'),
           fetch(API + '/api/skills'),
           fetch(API + '/api/group/skills'),
+          fetch(API + '/api/groups/default/config'),
           fetch(API + '/api/config')
         ]);
         const crons = cronsRes.ok ? await cronsRes.json() : {};
         const skills = skillsRes.ok ? await skillsRes.json() : {};
         const groupSkills = groupSkillsRes.ok ? await groupSkillsRes.json() : {};
+        const groupConfig = groupConfigRes.ok ? await groupConfigRes.json() : {};
         const config = configRes.ok ? await configRes.json() : {};
         const jobs = crons.jobs || [];
         const cronCount = jobs.filter(function (j) { return j.enabled !== false; }).length;
         const skillsEnabled = skills.enabled || [];
         const groupSkillsEnabled = groupSkills.enabled || [];
+        const groupSkillsDenied = Array.isArray(groupConfig.skillsDeny) ? groupConfig.skillsDeny : [];
         const models = config.llm && Array.isArray(config.llm.models) ? config.llm.models : [];
         const priorityEntry = models.find(function (m) { return m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true'; }) || models[0];
         const priorityModelLabel = priorityEntry ? (priorityEntry.model || priorityEntry.provider || '—') : '—';
@@ -760,6 +772,7 @@
           cronCount: cronCount,
           skillsEnabledCount: skillsEnabled.length,
           groupSkillsEnabledCount: groupSkillsEnabled.length,
+          groupSkillsDeniedCount: groupSkillsDenied.length,
           priorityModelLabel: priorityModelLabel,
           timezone: tz,
           timeFormat: fmt || '—'
@@ -882,6 +895,11 @@
       document.getElementById('agent-detail-meta').textContent = selectedAgentId === 'main'
         ? 'Default agent created automatically.'
         : 'Custom agent for routing specific groups/chats.';
+      var delBtn = document.getElementById('agent-delete-btn');
+      if (delBtn) {
+        delBtn.disabled = selectedAgentId === 'main';
+        delBtn.title = selectedAgentId === 'main' ? 'Default main agent cannot be deleted' : '';
+      }
       await loadAgentSkills(selectedAgentId);
       await loadAgentMdFiles(selectedAgentId);
     }
@@ -950,6 +968,25 @@
         await fetchAgentsPage();
         await fetchChatAgents();
       }
+    });
+
+    document.getElementById('agent-delete-btn').addEventListener('click', async function () {
+      if (!selectedAgentId || selectedAgentId === 'main') return;
+      var ok = window.confirm('Delete agent "' + selectedAgentId + '"? This removes its config and identity files.');
+      if (!ok) return;
+      var r = await fetch(API + '/api/agents/' + encodeURIComponent(selectedAgentId) + '?confirm=true', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true })
+      });
+      if (!r.ok) {
+        var err = await r.json().catch(function () { return {}; });
+        window.alert('Delete failed: ' + (err.error || r.status));
+        return;
+      }
+      selectedAgentId = 'main';
+      await fetchAgentsPage();
+      await fetchChatAgents();
     });
 
     document.getElementById('agent-skills-save').addEventListener('click', async function () {

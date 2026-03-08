@@ -9,6 +9,7 @@ import { join, dirname, resolve } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { tmpdir, homedir } from 'os';
+import readline from 'readline';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INSTALL_DIR = process.env.COWCODE_INSTALL_DIR
@@ -242,6 +243,46 @@ if (sub === 'moo') {
       process.exit(1);
     }
   })();
+} else if (sub === 'delete') {
+  const kind = (args[1] || '').toLowerCase();
+  const name = args.slice(2).filter((a) => a !== '--yes' && a !== '-y').join(' ').trim();
+  const forceYes = args.includes('--yes') || args.includes('-y');
+  if (kind !== 'agent' || !name) {
+    console.log('Usage: cowcode delete agent <name> [--yes]');
+    console.log('Example: cowcode delete agent alex');
+    process.exit((args[1] || args[2]) ? 1 : 0);
+  }
+  (async () => {
+    try {
+      if (!forceYes) {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const answer = await new Promise((resolve) => {
+          rl.question(`Delete agent "${name}"? Type DELETE to confirm: `, resolve);
+        });
+        rl.close();
+        if (String(answer || '').trim() !== 'DELETE') {
+          console.log('Cancelled.');
+          process.exit(1);
+          return;
+        }
+      }
+      const modPath = join(INSTALL_DIR, 'lib', 'agent-config.js');
+      const mod = await import(pathToFileURL(modPath).href);
+      const result = mod.deleteAgent(name);
+      if (!result.deleted) {
+        console.log('Agent not found:', result.id);
+        process.exit(1);
+        return;
+      }
+      console.log('Deleted agent:', result.id);
+      if (result.reassignedGroups > 0) {
+        console.log('Reassigned', result.reassignedGroups, 'group config(s) to main.');
+      }
+    } catch (err) {
+      console.error('cowCode: failed to delete agent.', err?.message || err);
+      process.exit(1);
+    }
+  })();
 } else if (sub === 'skills' || sub === 'add') {
   const skillSub = args[1];
   const skillArg = sub === 'add' ? args[1] : args[2];
@@ -293,6 +334,7 @@ if (sub === 'moo') {
   console.log('       cowcode index [full] [--source memory] [--source filesystem] [--root <path>] [--limit N]');
   console.log('       cowcode auth [options]');
   console.log('       cowcode create agent <name>');
+  console.log('       cowcode delete agent <name> [--yes]');
   console.log('       cowcode add <skill-id>');
   console.log('       cowcode skills install <skill-id>');
   console.log('       cowcode update [--force]');

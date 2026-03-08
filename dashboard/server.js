@@ -19,7 +19,7 @@ import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
-import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent } from '../lib/agent-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent } from '../lib/agent-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -308,6 +308,21 @@ app.post('/api/agents', (req, res) => {
     const created = createAgent(rawId);
     const config = loadAgentConfig(created.id);
     res.status(created.created ? 201 : 200).json({ id: created.id, created: created.created, config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/agents/:id', (req, res) => {
+  try {
+    const id = req.params.id || '';
+    const confirmed = req.query?.confirm === 'true' || req.body?.confirm === true;
+    if (!confirmed) {
+      res.status(400).json({ error: 'Deletion requires confirmation (confirm=true)' });
+      return;
+    }
+    const result = deleteAgent(id);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
