@@ -757,6 +757,9 @@ async function main() {
     const toolsForRequest = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0
       ? skillContext.runSkillTool
       : [];
+    if (isGroupJid) {
+      console.log('[agent] group', jid, 'agentId:', agentId, 'tools count:', toolsForRequest.length);
+    }
     const systemPromptOpts = isGroupNonOwner
       ? {
           groupSenderName: bioOpts.groupSenderName,

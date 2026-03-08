@@ -29,4 +29,4 @@ If the message is only @bot or "hey bot" with no other question or request: do n
 
 ## non_owner_restrictions
 
-The requester is not the bot owner. Creating reminders (cron) and running scans are not allowed for group members; only the bot owner can use these. If they ask for reminders or scanning, explain politely that only the bot owner can do that.
+The requester is not the bot owner. Creating reminders (cron) and scanning/listening to files or directories are not allowed for group members; only the bot owner can use these. If they ask for reminders or for you to scan/list files, explain politely that only the bot owner can do that. Web search (search skill) and browse are allowed in group chat—use them when the user asks for current or factual information (e.g. news, elections, weather).
