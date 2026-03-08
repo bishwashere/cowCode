@@ -508,7 +508,7 @@ async function main() {
       console.error('[tide] run-tide failed:', getErrorMessageForLog(e));
       return;
     }
-    const rawText = (textToSend || '').trim();
+    const rawText = sanitizeOutboundText((textToSend || '').trim());
     const text = isTelegramChatId(tideJid) ? rawText.replace(/^\[CowCode\]\s*/i, '').trim() : rawText;
     const nothingPhrases = /^(nothing|n\/?a|no(ne)?\s*to\s*do|all\s*good|nothing\s*to\s*report\.?)\s*\.?$/i;
     if (!text || (text.length < 50 && nothingPhrases.test(text))) {
@@ -726,6 +726,15 @@ async function main() {
     return soulContent + identityBlock + timeBlock;
   }
 
+  /** Remove em-dash glyphs from outbound assistant text before sending. */
+  function sanitizeOutboundText(text) {
+    if (text == null) return '';
+    return String(text)
+      .replace(/\s*—\s*/g, ' ')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  }
+
   async function runAgentWithSkills(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts = {}) {
     let skillsCalled = [];
     console.log('[agent] handling:', text.slice(0, 50) + (text.length > 50 ? '…' : ''));
@@ -773,9 +782,11 @@ async function main() {
     });
     const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = turnResult || {};
     if (Array.isArray(called) && called.length) skillsCalled = called;
-    const textForSend = isTelegramChatId(jid) ? textToSend.replace(/^\[CowCode\]\s*/i, '').trim() : textToSend;
+    const cleanedTextToSend = sanitizeOutboundText(textToSend || '');
+    const cleanedVoiceReplyText = sanitizeOutboundText(voiceReplyText || '');
+    const textForSend = isTelegramChatId(jid) ? cleanedTextToSend.replace(/^\[CowCode\]\s*/i, '').trim() : cleanedTextToSend;
     const isGroupNoReply = bioOpts.groupNonOwner && !bioOpts.groupMentioned &&
-      !(voiceReplyText && voiceReplyText.trim()) &&
+      !(cleanedVoiceReplyText && cleanedVoiceReplyText.trim()) &&
       (!textForSend || !textForSend.trim() || /^\[NO_REPLY\]\s*$/i.test(textForSend.trim()));
     if (!isGroupNoReply) {
       let voiceBuffer = null;
@@ -788,8 +799,8 @@ async function main() {
         }
       }
       const forceVoiceReply = !!bioOpts.forceVoiceReply;
-      const textForVoice = (voiceReplyText && voiceReplyText.trim())
-        ? voiceReplyText.trim()
+      const textForVoice = (cleanedVoiceReplyText && cleanedVoiceReplyText.trim())
+        ? cleanedVoiceReplyText.trim()
         : ((forceVoiceReply && textForSend && textForSend.trim()) ? textForSend.trim() : null);
       if (textForVoice && !imageBuffer) {
         try {
@@ -801,7 +812,7 @@ async function main() {
           console.error('[speech] synthesize failed:', err.message);
         }
       }
-      const replyText = (voiceReplyText && voiceReplyText.trim()) ? voiceReplyText.trim() : textForSend;
+      const replyText = (cleanedVoiceReplyText && cleanedVoiceReplyText.trim()) ? cleanedVoiceReplyText.trim() : textForSend;
       const captionForImage = (replyText && replyText.trim()) ? replyText.replace(/^\[CowCode\]\s*/i, '').trim() : (imageReplyCaption || '');
       try {
         let sent;
