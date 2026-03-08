@@ -699,8 +699,10 @@ async function main() {
     const forGroup = !!opts.groupSenderName;
     const groupJid = opts.groupJid || 'default';
     if (forGroup) {
+      console.log('[path] buildSystemPrompt branch=group groupJid=', groupJid, 'agentId=', agentId);
       ensureGroupConfigFor(groupJid);
     } else {
+      console.log('[path] buildSystemPrompt branch=one-on-one agentId=', agentId);
       ensureSoulMd();
       ensureBioPersistedToWhoAmI();
       return buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId));
@@ -714,6 +716,7 @@ async function main() {
       groupMentioned: !!opts.groupMentioned,
       groupNonOwner: !!opts.groupNonOwner,
     });
+    console.log('[path] buildSystemPrompt groupBlockLen=', (groupBlock || '').length, 'soulContentLen=', (soulContent || '').length);
     if (groupBlock) soulContent += '\n\n' + groupBlock;
     let whoAmIContent = readAgentMd(WHO_AM_I_MD, agentId);
     const myHumanContent = readAgentMd(MY_HUMAN_MD, agentId);
@@ -742,6 +745,7 @@ async function main() {
     } catch (_) {}
     const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
     const agentId = isGroupJid ? resolveAgentIdForGroup(jid) : DEFAULT_AGENT_ID;
+    console.log('[path] chat=', isGroupJid ? 'group' : 'one-on-one', 'jid=', jid, 'agentId=', agentId);
     const ctx = {
       storePath: getCronStorePath(),
       jid,
@@ -757,6 +761,8 @@ async function main() {
     const toolsForRequest = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0
       ? skillContext.runSkillTool
       : [];
+    const toolNames = (toolsForRequest || []).map((t) => t?.function?.name).filter(Boolean);
+    console.log('[path] toolsCount=', toolsForRequest.length, toolNames.length ? 'tools=' + toolNames.join(',') : '');
     const systemPromptOpts = isGroupNonOwner
       ? {
           groupSenderName: bioOpts.groupSenderName,
@@ -770,10 +776,12 @@ async function main() {
     const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
       : (inMemoryHistory.length > 0 ? inMemoryHistory : readLastPrivateExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES));
+    const systemPrompt = buildSystemPrompt(systemPromptOpts);
+    console.log('[path] runAgentTurn systemPromptLen=', systemPrompt.length, 'toolsCount=', toolsForRequest.length);
     const turnResult = await runAgentTurn({
       userText: text,
       ctx,
-      systemPrompt: buildSystemPrompt(systemPromptOpts),
+      systemPrompt,
       tools: toolsForRequest,
       historyMessages,
       getFullSkillDoc: skillContext.getFullSkillDoc,
@@ -798,7 +806,7 @@ async function main() {
         const retryResult = await runAgentTurn({
           userText: retryUserText,
           ctx,
-          systemPrompt: buildSystemPrompt(systemPromptOpts),
+          systemPrompt,
           tools: toolsForRequest,
           historyMessages,
           getFullSkillDoc: skillContext.getFullSkillDoc,
