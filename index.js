@@ -707,25 +707,15 @@ async function main() {
       ensureBioPersistedToWhoAmI();
       return buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId));
     }
-    const timeCtx = getSchedulingTimeContext();
-    const timeBlock = `\n\n${timeCtx.timeContextLine}\nCurrent time UTC (for scheduling "at"): ${timeCtx.nowIso}. Examples: "in 1 minute" = ${timeCtx.in1min}; "in 2 minutes" = ${timeCtx.in2min}; "in 3 minutes" = ${timeCtx.in3min}.`;
-    let soulContent = readAgentMd(SOUL_MD, agentId) || readWorkspaceMd(SOUL_MD) || readDefaultSoul();
+    const basePrompt = buildOneOnOneSystemPrompt(getAgentWorkspaceDir(agentId));
     const loaded = loadGroupMd(getWorkspaceDir(), DEFAULT_WORKSPACE_DIR);
     const groupBlock = buildGroupPromptBlock(loaded, {
       groupSenderName: opts.groupSenderName,
       groupMentioned: !!opts.groupMentioned,
       groupNonOwner: !!opts.groupNonOwner,
     });
-    console.log('[path] buildSystemPrompt groupBlockLen=', (groupBlock || '').length, 'soulContentLen=', (soulContent || '').length);
-    if (groupBlock) soulContent += '\n\n' + groupBlock;
-    let whoAmIContent = readAgentMd(WHO_AM_I_MD, agentId);
-    const myHumanContent = readAgentMd(MY_HUMAN_MD, agentId);
-    let identityBlock = '';
-    if (whoAmIContent || myHumanContent) {
-      if (whoAmIContent) identityBlock += '\n\n' + whoAmIContent;
-      if (myHumanContent) identityBlock += '\n\n' + myHumanContent;
-    }
-    return soulContent + identityBlock + timeBlock;
+    console.log('[path] buildSystemPrompt groupBlockLen=', (groupBlock || '').length, 'basePromptLen=', basePrompt.length);
+    return groupBlock ? (basePrompt + '\n\n' + groupBlock) : basePrompt;
   }
 
   /** Remove em-dash glyphs from outbound assistant text before sending. */
