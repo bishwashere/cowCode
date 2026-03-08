@@ -470,6 +470,11 @@
           <span class="soul-tile-title">Memory</span>
           <span class="soul-tile-desc">Edit MEMORY.md</span>
         </a>
+        <a href="#soul/group.md" class="soul-tile-link">
+          <span class="soul-tile-icon">◇</span>
+          <span class="soul-tile-title">Group rules</span>
+          <span class="soul-tile-desc">Edit group.md (applies to all group chats)</span>
+        </a>
       </div>
     </div>
   </div>
@@ -1619,6 +1624,7 @@
       if (id === 'SOUL.md') label = 'Soul';
       else if (id === 'WhoAmI.md') label = 'Who am I';
       else if (id === 'MyHuman.md') label = 'My human';
+      else if (id === 'group.md') label = 'Group rules';
       else if (id === 'MEMORY.md') label = 'Memory';
       titleEl.textContent = label;
       metaEl.textContent = 'File: ' + id;
