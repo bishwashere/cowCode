@@ -509,11 +509,10 @@ async function main() {
       return;
     }
     const rawText = sanitizeOutboundText((textToSend || '').trim());
-    const text = isTelegramChatId(tideJid) ? rawText.replace(/^\[CowCode\]\s*/i, '').trim() : rawText;
+    let text = isTelegramChatId(tideJid) ? rawText.replace(/^\[CowCode\]\s*/i, '').trim() : rawText;
     const nothingPhrases = /^(nothing|n\/?a|no(ne)?\s*to\s*do|all\s*good|nothing\s*to\s*report\.?)\s*\.?$/i;
     if (!text || (text.length < 50 && nothingPhrases.test(text))) {
-      console.log('[tide] Nothing to send for', tideJidShort, '(agent said nothing to do)');
-      return;
+      text = "What would you like to do next?";
     }
     try {
       if (isTgJid && telegramBot) {
@@ -1057,73 +1056,8 @@ async function main() {
       selfJid = selfJid ?? sock.user?.id;
       const jid = m.key.remoteJid;
 
-      // WhatsApp group: respond only when not from us; use group selective-reply (mention or gap/missing info).
-      if (isWhatsAppGroupJid(jid)) {
-        if (m.key.fromMe) continue;
-        const content = extractMessageContent(m.message);
-        let userText = (content?.conversation || content?.extendedTextMessage?.text || '').trim();
-        if (!userText && content?.imageMessage) {
-          try {
-            const buf = await downloadMediaMessage(m, 'buffer', {});
-            const uploadsDir = getUploadsDir();
-            if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-            const msgId = m.key?.id || Date.now();
-            const imagePath = join(uploadsDir, `wa-group-${msgId}.jpg`);
-            writeFileSync(imagePath, buf);
-            const caption = (content.imageMessage.caption || '').trim();
-            userText = `User sent an image. Image file: ${imagePath}. ${caption ? 'Caption: ' + caption : "What's in this image?"}`;
-          } catch (err) {
-            console.error('[image] group download failed:', err.message);
-            continue;
-          }
-        }
-        if (!userText) continue;
-        if (userText.startsWith('[CowCode]')) continue;
-        const msgKey = m.key.id ? `${jid}:${m.key.id}` : null;
-        if (msgKey && repliedIds.has(msgKey)) continue;
-        if (msgKey) {
-          repliedIds.add(msgKey);
-          if (repliedIds.size > MAX_REPLIED_IDS) {
-            const first = repliedIds.values().next().value;
-            if (first) repliedIds.delete(first);
-          }
-        }
-        const participant = m.key.participant || '';
-        const preferredName = participant ? getGroupDisplayName('whatsapp', participant) : null;
-        const senderName = (preferredName && preferredName.trim()) || (m.pushName && String(m.pushName).trim()) || (participant ? participant.split('@')[0] || 'A group member' : 'A group member');
-        const setMyName = parseSetDisplayNameMessage(userText);
-        if (setMyName != null) {
-          if (participant) setGroupDisplayName('whatsapp', participant, setMyName);
-          const confirmText = `[CowCode] Got it, I'll call you ${setMyName} in the group.`;
-          sock.sendMessage(jid, { text: confirmText }).catch(() => pendingReplies.push({ jid, text: confirmText }));
-          continue;
-        }
-        const mentionedJids = content?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-        const groupMentioned = selfJid && Array.isArray(mentionedJids) && mentionedJids.some((id) => id && areJidsSameUser(id, selfJid));
-        const textForAgent = `Message from ${senderName} in the group:\n\n${userText}`;
-        const workspaceDir = getWorkspaceDir();
-        const logExchange = (exchange) => {
-          try {
-            appendGroupExchange(workspaceDir, jid, exchange);
-          } catch (err) {
-            console.error('[group-chat-log] write failed:', err.message);
-          }
-        };
-        console.log('[whatsapp-group]', String(jid), userText.slice(0, 50) + (userText.length > 50 ? '…' : ''));
-        await runPastDueOneShots().catch((e) => console.error('[cron] runPastDueOneShots:', e.message));
-        runAgentWithSkills(sock, jid, textForAgent, lastSentByJid, selfJid ?? sock.user?.id, { current: ourSentMessageIds }, {
-          groupNonOwner: true,
-          groupSenderName: senderName,
-          groupJid: jid,
-          groupMentioned: !!groupMentioned,
-          logExchange,
-        }).catch((err) => {
-          console.error('WhatsApp group agent error:', err.message);
-          const errorText = '[CowCode] Moo — ' + toUserMessage(err);
-          sock.sendMessage(jid, { text: errorText }).catch(() => pendingReplies.push({ jid, text: errorText }));
-        });
-        continue;
-      }
+      // Group handling only on Telegram; ignore WhatsApp group messages.
+      if (isWhatsAppGroupJid(jid)) continue;
 
       // Only respond in self-chat (saved messages): from us and chat is with ourselves. Ignore all other chats.
       if (!m.key.fromMe) continue;

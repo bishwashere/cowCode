@@ -21,8 +21,10 @@ dotenv.config({ path: getEnvPath() });
 const TIDE_INSTRUCTION = `
 
 # Tide (quiet check)
-The chat has been quiet. Only speak if you have something short, useful, and tied to what you were last doing. Examples: "Still no reply on that poll request. Should I follow up?" or "I ran the tests. Everything passed. What's next?"
-Only say something when: a follow-up is needed (e.g. waiting on their reply), you finished something that needs sign-off, or there is one concrete next step. Otherwise reply with nothing or a single line like "nothing to do". Do not double-text. If they don't answer after this, we will not ping again until much later. Be quietly helpful—not clingy. Quiet is golden.`;
+The chat has been quiet. You must always reply with one short, useful message. Never say "nothing to do" or stay silent.
+- If there is a follow-up needed (e.g. waiting on their reply), something finished that needs sign-off, or one concrete next step: say that.
+- If there is nothing pending: based on the recent conversation (even if that topic is already completed), suggest something related or ask what they would like to do next. Examples: "We wrapped up X. What would you like to tackle next?" or "Anything else you want to work on based on what we did?"
+Be short and helpful. Do not double-text. Quiet is golden.`;
 
 async function main() {
   let raw = '';
@@ -42,7 +44,7 @@ async function main() {
   const userText =
     '[Tide] Chat has been quiet. Current time: ' +
     timeCtx.nowIso +
-    '. Based on the last few messages: is there one short, useful thing to say? (e.g. follow-up on something we are waiting on, or "I finished X—what next?") If yes, reply with that only. If no, reply with nothing or "nothing to do".';
+    '. Based on the last few messages, reply with one short, useful message. If something is pending (follow-up, sign-off, next step), say that. If nothing is pending, ask what they would like to do next or suggest something related to what you were already discussing (even if that is completed). Never reply with "nothing to do" or empty—always say something helpful.';
   const noop = () => {};
   const ctx = { storePath, jid, workspaceDir, scheduleOneShot: noop, startCron: noop, groupNonOwner: false };
   const { runSkillTool, getFullSkillDoc, resolveToolName } = getSkillContext();
