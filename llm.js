@@ -209,6 +209,7 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null) 
     model,
     messages,
     ...(isOpenAINew ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+    ...(isOpenAINew ? { reasoning_effort: 'none' } : {}),
     stream: false,
     ...(tools && tools.length > 0 ? { tools } : {}),
   };

@@ -19,7 +19,7 @@ You can pass the command at the top level (`command: "search"`) or inside argume
 
 ```tool-schema
 search_search
-  description: Search the web. Use for current time, weather, news, or any live query.
+  description: Search the web. ALWAYS use this for any question about current events, recent news, election results, sports scores, prices, people, places, or anything that may have changed. Do not answer from memory when this tool is available.
   parameters:
     query: string
 

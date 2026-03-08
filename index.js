@@ -734,7 +734,8 @@ async function main() {
       await sock.sendPresenceUpdate('composing', jid);
     } catch (_) {}
     const isGroupJid = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
-    const agentId = isGroupJid ? resolveAgentIdForGroup(jid) : DEFAULT_AGENT_ID;
+    const agentId = (bioOpts.agentIdOverride && String(bioOpts.agentIdOverride).trim())
+      || (isGroupJid ? resolveAgentIdForGroup(jid) : DEFAULT_AGENT_ID);
     console.log('[path] chat=', isGroupJid ? 'group' : 'one-on-one', 'jid=', jid, 'agentId=', agentId);
     const ctx = {
       storePath: getCronStorePath(),
@@ -922,23 +923,42 @@ async function main() {
   return { skillsCalled: skillsCalled || [] };
   }
 
-  // --test: run main code path once with mock socket (set above), then exit. No WhatsApp auth.
+  // --test / --test-group: run main code path once with mock socket (set above), then exit. No WhatsApp auth.
   // E2E tests capture stdout and parse E2E_REPLY_START...E2E_REPLY_END to assert on the reply.
-  if (process.argv.includes('--test')) {
-    const testIdx = process.argv.indexOf('--test');
+  const testGroupMode = process.argv.includes('--test-group');
+  if (process.argv.includes('--test') || testGroupMode) {
+    const testFlag = testGroupMode ? '--test-group' : '--test';
+    const testIdx = process.argv.indexOf(testFlag);
+    const argValue = (flag, fallback = '') => {
+      const idx = process.argv.indexOf(flag);
+      if (idx === -1) return fallback;
+      const next = process.argv[idx + 1];
+      if (!next || String(next).startsWith('--')) return fallback;
+      return next;
+    };
     const testMsg1 = process.argv[testIdx + 1] || process.env.TEST_MESSAGE || 'Send me hello in 1 minute';
     const testMsg2 = process.env.TEST_MESSAGE_2;
+    const testAgentId = argValue('--test-agent', '');
+    const testJid = testGroupMode
+      ? argValue('--test-jid', '-1003722613696')
+      : argValue('--test-jid', 'test@s.whatsapp.net');
+    const testSender = argValue('--test-sender', 'Test Group User');
     const lastSent = new Map();
     const sentIds = { current: new Set() };
     for (const [i, testMsg] of [testMsg1, testMsg2].filter(Boolean).entries()) {
-      console.log('[test] Running main code path with message', i + 1 + ':', testMsg.slice(0, 60));
+      console.log('[test] Running', testGroupMode ? 'group' : 'one-on-one', 'code path with message', i + 1 + ':', testMsg.slice(0, 60));
       let runRet = { skillsCalled: [] };
       try {
-        runRet = await runAgentWithSkills(sock, 'test@s.whatsapp.net', testMsg, lastSent, 'test@s.whatsapp.net', sentIds) || runRet;
+        runRet = await runAgentWithSkills(sock, testJid, testMsg, lastSent, testJid, sentIds, {
+          ...(testGroupMode
+            ? { groupNonOwner: true, groupSenderName: testSender, groupMentioned: true }
+            : {}),
+          ...(testAgentId ? { agentIdOverride: testAgentId } : {}),
+        }) || runRet;
       } catch (err) {
-        lastSent.set('test@s.whatsapp.net', 'Moo — ' + (err && err.message ? err.message : String(err)));
+        lastSent.set(testJid, 'Moo — ' + (err && err.message ? err.message : String(err)));
       }
-      const reply = lastSent.get('test@s.whatsapp.net');
+      const reply = lastSent.get(testJid);
       if (reply != null && (testMsg2 ? (i === 1) : true)) {
         if (Array.isArray(runRet.skillsCalled) && runRet.skillsCalled.length) {
           console.log('E2E_SKILLS_CALLED: ' + runRet.skillsCalled.join(','));
