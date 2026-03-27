@@ -1,7 +1,7 @@
 ---
 id: go-read
 name: Go read
-description: Read and list from the filesystem only. Commands: ls, cd, pwd, cat, less. Use for listing directories, showing file contents, resolving paths. Enable in config (skills.enabled).
+description: Read and list from the filesystem only. Commands: ls, cd, pwd, cat, less, du. Use for listing directories, disk usage, showing file contents, resolving paths. Enable in config (skills.enabled).
 ---
 
 # Go read
@@ -17,16 +17,17 @@ Call `run_skill` with **skill: "go-read"**. Set **command** or **arguments.actio
 - **pwd** — Print working directory. argv: `[]`
 - **cat** — Output file contents. argv: `["/path/to/file"]`
 - **less** — View file (non-interactive). argv: `["/path/to/file"]` or with flags
+- **du** — Disk usage. argv: e.g. `["-sh", "."]`, `["-d", "1", "path"]`
 
 ## Arguments
 
-- **arguments.command** or **arguments.action** (required) — One of: ls, cd, pwd, cat, less
+- **arguments.command** or **arguments.action** (required) — One of: ls, cd, pwd, cat, less, du
 - **arguments.argv** (required) — Array of strings (flags and paths). Do not include the command name.
 - **arguments.cwd** (optional) — Working directory. Defaults to workspace.
 
 ## When to use
 
-Use when the user asks to list a directory, show file contents (cat/less), or resolve a path. Prefer **read** skill for reading with line ranges; use **go-read** for "list files", "what's in Downloads", "cat this file", etc.
+Use when the user asks to list a directory, show disk usage (du), show file contents (cat/less), or resolve a path. Prefer **read** skill for reading with line ranges; use **go-read** for "list files", "what's in Downloads", "cat this file", "how big is this folder", etc.
 
 ## Example
 
@@ -37,7 +38,7 @@ List Downloads:
 
 ```tool-schema
 go_read_run
-  description: Run a read-only filesystem command. command: ls, cd, pwd, cat, or less. argv: array of args.
+  description: Run a read-only filesystem command. command: ls, cd, pwd, cat, less, or du. argv: array of args.
   parameters:
     command: string
     argv: array

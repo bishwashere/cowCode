@@ -1,7 +1,7 @@
 ---
 id: core
 name: Core
-description: Core shell commands (always available): ls, cd, pwd, cat, less, cp, mv, rm, touch, chmod. Use for listing dirs, reading files, copying, moving, deleting, and permissions. No need to enable—always installed.
+description: Core shell commands (always available): ls, cd, pwd, cat, less, du, cp, mv, rm, touch, chmod, mkdir. Use for listing dirs, disk usage, reading files, copying, moving, deleting, creating dirs/files, and permissions. No need to enable—always installed.
 ---
 
 # Core commands
@@ -17,21 +17,23 @@ Call `run_skill` with **skill: "core"**. Set **command** or **arguments.action**
 - **pwd** — Print working directory. argv: `[]`
 - **cat** — Output file contents. argv: `["/path/to/file"]`
 - **less** — View file (non-interactive, one screen). argv: `["/path/to/file"]` or with flags
+- **du** — Disk usage. argv: e.g. `["-sh", "."]`, `["-d", "1", "path"]`
 - **cp** — Copy. argv: `["source", "dest"]` or `["-r", "source", "dest"]`
 - **mv** — Move/rename. argv: `["source", "dest"]`
 - **rm** — Remove. argv: `["path"]` or `["-r", "path"]`
 - **touch** — Create empty file or update mtime. argv: `["path"]`
 - **chmod** — Change mode. argv: e.g. `["755", "file"]` or `["+x", "file"]`
+- **mkdir** — Create directory. argv: `["path"]` or `["-p", "a/b/c"]`
 
 ## Arguments
 
-- **arguments.command** or **arguments.action** (required) — One of: ls, cd, pwd, cat, less, cp, mv, rm, touch, chmod
+- **arguments.command** or **arguments.action** (required) — One of: ls, cd, pwd, cat, less, du, cp, mv, rm, touch, chmod, mkdir
 - **arguments.argv** (required) — Array of strings (flags and paths). Do not include the command name.
 - **arguments.cwd** (optional) — Working directory for the command. Defaults to workspace.
 
 ## When to use
 
-Use when the user asks to list a directory, read a file (cat/less), copy/move/delete files, create a file (touch), or change permissions (chmod). Prefer **read** skill for reading file contents with line ranges; use **core** cat/less when the user says "cat", "show file", or "list directory" (ls).
+Use when the user asks to list a directory, disk usage (du), read a file (cat/less), copy/move/delete files, create a file (touch) or directory (mkdir), or change permissions (chmod). Prefer **read** skill for reading file contents with line ranges; use **core** cat/less when the user says "cat", "show file", or "list directory" (ls).
 
 ## Example
 
