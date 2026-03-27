@@ -411,6 +411,7 @@
       border-bottom: 1px solid var(--border);
       background: var(--card);
     }
+    /* Outer scrolls; inner uses flex-end + min-height so short threads sit at bottom without breaking overflow. */
     .chat-messages {
       flex: 1 1 0;
       min-height: 0;
@@ -418,15 +419,20 @@
       overflow-x: hidden;
       overscroll-behavior: contain;
       padding: 1rem;
+    }
+    .chat-messages-inner {
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
       gap: 0.75rem;
+      min-height: 100%;
+      box-sizing: border-box;
     }
     .chat-msg { max-width: 85%; width: fit-content; padding: 0.6rem 1rem; border-radius: 12px; font-size: 0.76rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
     .chat-msg.user { align-self: flex-end; background: var(--accent); color: var(--bg); }
     .chat-msg.assistant { align-self: flex-start; background: var(--card); border: 1px solid var(--border); }
     .chat-msg.loading { align-self: flex-start; color: var(--muted); font-style: italic; }
+    .chat-msg.assistant.chat-streaming { color: var(--muted); font-style: italic; }
     .chat-input-area {
       display: flex;
       gap: 0.5rem;
@@ -462,7 +468,9 @@
         <span class="skill-meta" style="margin:0;">Agent</span>
         <select id="chat-agent-select" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.35rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.82rem; min-width:8rem;"></select>
       </div>
-      <div id="chat-messages" class="chat-messages"></div>
+      <div id="chat-messages" class="chat-messages">
+        <div id="chat-messages-inner" class="chat-messages-inner"></div>
+      </div>
       <div class="chat-input-area">
         <textarea id="chat-input" placeholder="Message the LLM…" rows="1"></textarea>
         <button type="button" id="chat-send">Send</button>
@@ -1743,6 +1751,7 @@
     var chatMessages = [];
     var chatMessagesByAgent = {};
     var chatLoading = false;
+    var chatStreamActive = false;
 
     function setChatAgent(agentId) {
       selectedChatAgentId = agentId || 'main';
@@ -1774,13 +1783,14 @@
     }
 
     function renderChatMessages() {
-      var el = document.getElementById('chat-messages');
+      var el = document.getElementById('chat-messages-inner');
       if (!el) return;
-      el.innerHTML = chatMessages.map(function (m) {
+      el.innerHTML = chatMessages.map(function (m, idx) {
         var c = escapeHtml(m.content || '');
-        return '<div class="chat-msg ' + (m.role === 'user' ? 'user' : 'assistant') + '">' + c + '</div>';
+        var streamClass = (chatStreamActive && m.role === 'assistant' && idx === chatMessages.length - 1 && (m.content || '') === 'Thinking…') ? ' chat-streaming' : '';
+        return '<div class="chat-msg ' + (m.role === 'user' ? 'user' : 'assistant') + streamClass + '">' + c + '</div>';
       }).join('');
-      if (chatLoading) {
+      if (chatLoading && !chatStreamActive) {
         el.innerHTML += '<div class="chat-msg loading">Thinking…</div>';
       }
       scrollChatToBottom();
@@ -1799,37 +1809,102 @@
       });
     }
 
-    function chatHistoryForApi() {
-      return chatMessages.slice(-20).map(function (m) { return { role: m.role, content: m.content }; });
-    }
-
     async function sendChatMessage() {
       var input = document.getElementById('chat-input');
       if (!input) return;
       var text = (input.value || '').trim();
       if (!text || chatLoading) return;
       chatMessages.push({ role: 'user', content: text });
+      var historyPayload = chatMessages.slice(0, -1).slice(-20).map(function (m) { return { role: m.role, content: m.content }; });
+      chatMessages.push({ role: 'assistant', content: 'Thinking…' });
+      var assistantIndex = chatMessages.length - 1;
       chatMessagesByAgent[selectedChatAgentId] = chatMessages;
       input.value = '';
       chatLoading = true;
+      chatStreamActive = true;
       renderChatMessages();
+      function setAssistantBody(body) {
+        chatMessages[assistantIndex].content = body;
+        chatMessagesByAgent[selectedChatAgentId] = chatMessages;
+        renderChatMessages();
+      }
       try {
         var r = await fetch(API + '/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history: chatHistoryForApi().slice(0, -1), agentId: selectedChatAgentId })
+          body: JSON.stringify({ message: text, history: historyPayload, agentId: selectedChatAgentId })
         });
-        var d = await r.json().catch(function () { return {}; });
+        var ct = (r.headers.get('content-type') || '').toLowerCase();
         if (!r.ok) {
-          chatMessages.push({ role: 'assistant', content: 'Error: ' + (d.error || r.status) });
+          var errJson = await r.json().catch(function () { return {}; });
+          setAssistantBody('Error: ' + (errJson.error || r.status));
+        } else if (ct.indexOf('ndjson') !== -1 || ct.indexOf('x-ndjson') !== -1) {
+          var reader = r.body && r.body.getReader ? r.body.getReader() : null;
+          if (!reader) {
+            setAssistantBody('Error: streaming not supported in this browser');
+          } else {
+            var decoder = new TextDecoder();
+            var lineBuf = '';
+            var progressLines = [];
+            var finalReply = '';
+            var streamError = '';
+            while (true) {
+              var read = await reader.read();
+              if (read.done) break;
+              lineBuf += decoder.decode(read.value, { stream: true });
+              var nl;
+              while ((nl = lineBuf.indexOf('\n')) >= 0) {
+                var line = lineBuf.slice(0, nl).trim();
+                lineBuf = lineBuf.slice(nl + 1);
+                if (!line) continue;
+                var obj;
+                try {
+                  obj = JSON.parse(line);
+                } catch (e) {
+                  continue;
+                }
+                if (obj.type === 'progress' && obj.message) {
+                  progressLines.push(String(obj.message));
+                  var stepsOnly = progressLines.map(function (s) { return '• ' + s; }).join('\n');
+                  setAssistantBody(stepsOnly + (finalReply ? '\n\n' + finalReply : ''));
+                } else if (obj.type === 'done') {
+                  finalReply = (obj.reply != null ? String(obj.reply) : '').trim() || '(No reply)';
+                  var st = progressLines.map(function (s) { return '• ' + s; }).join('\n');
+                  setAssistantBody((st ? st + '\n\n' : '') + finalReply);
+                } else if (obj.type === 'error') {
+                  streamError = obj.error != null ? String(obj.error) : 'Error';
+                  setAssistantBody('Error: ' + streamError);
+                }
+              }
+            }
+            var tail = lineBuf.trim();
+            if (tail) {
+              try {
+                var last = JSON.parse(tail);
+                if (last.type === 'done') {
+                  finalReply = (last.reply != null ? String(last.reply) : '').trim() || '(No reply)';
+                } else if (last.type === 'error') {
+                  streamError = last.error != null ? String(last.error) : 'Error';
+                }
+              } catch (e2) {}
+            }
+            if (streamError) {
+              setAssistantBody('Error: ' + streamError);
+            } else {
+              var st2 = progressLines.map(function (s) { return '• ' + s; }).join('\n');
+              setAssistantBody((st2 ? st2 + '\n\n' : '') + (finalReply || '(No reply)'));
+            }
+          }
         } else {
-          chatMessages.push({ role: 'assistant', content: (d.reply || '').trim() || '(No reply)' });
+          var d = await r.json().catch(function () { return {}; });
+          setAssistantBody((d.reply || '').trim() || '(No reply)');
         }
         chatMessagesByAgent[selectedChatAgentId] = chatMessages;
       } catch (e) {
-        chatMessages.push({ role: 'assistant', content: 'Error: ' + (e.message || 'Network error') });
+        setAssistantBody('Error: ' + (e.message || 'Network error'));
         chatMessagesByAgent[selectedChatAgentId] = chatMessages;
       }
+      chatStreamActive = false;
       chatLoading = false;
       renderChatMessages();
     }

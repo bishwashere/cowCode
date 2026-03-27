@@ -18,7 +18,7 @@ Call `run_skill` with **skill: "core"**. Set **command** or **arguments.action**
 - **cat** — Output file contents. argv: `["/path/to/file"]`
 - **less** — View file (non-interactive, one screen). argv: `["/path/to/file"]` or with flags
 - **du** — Disk usage. argv: e.g. `["-sh", "."]`, `["-d", "1", "path"]`
-- **cp** — Copy. argv: `["source", "dest"]` or `["-r", "source", "dest"]`
+- **cp** — Copy. argv: `["source", "dest"]` or `["-r", "source", "dest"]`. Recursive **directory** copies skip `node_modules`, `.git`, typical caches/build outputs, etc., unless the user explicitly wants a full clone—then use **`fullCopy: true`** in arguments or **`--cowcode-full-copy`** as the first `argv` entry.
 - **mv** — Move/rename. argv: `["source", "dest"]`
 - **rm** — Remove. argv: `["path"]` or `["-r", "path"]`
 - **touch** — Create empty file or update mtime. argv: `["path"]`
@@ -30,6 +30,7 @@ Call `run_skill` with **skill: "core"**. Set **command** or **arguments.action**
 - **arguments.command** or **arguments.action** (required) — One of: ls, cd, pwd, cat, less, du, cp, mv, rm, touch, chmod, mkdir
 - **arguments.argv** (required) — Array of strings (flags and paths). Do not include the command name.
 - **arguments.cwd** (optional) — Working directory for the command. Defaults to workspace.
+- **arguments.fullCopy** (optional) — Same as go-write: full tree copy for recursive `cp` when true.
 
 ## When to use
 

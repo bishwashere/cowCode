@@ -630,26 +630,63 @@ app.post('/api/chat', (req, res) => {
     stdio: ['pipe', 'pipe', 'inherit'],
     env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR, COWCODE_INSTALL_DIR: INSTALL_DIR },
   });
-  let out = '';
+  let streamHeadersSent = false;
+  function beginNdjsonStream() {
+    if (streamHeadersSent) return;
+    streamHeadersSent = true;
+    res.status(200);
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+  }
+
+  let buf = '';
+  let sawTerminalLine = false;
   child.stdout.setEncoding('utf8');
-  child.stdout.on('data', (chunk) => { out += chunk; });
-  child.on('error', (err) => {
-    res.status(500).json({ error: err.message || String(err) });
-  });
-  child.on('exit', (code, signal) => {
-    const lastLine = out.trim().split('\n').filter(Boolean).pop() || '';
-    try {
-      const parsed = JSON.parse(lastLine);
-      if (parsed.error) {
-        res.status(500).json({ error: parsed.error });
-        return;
+  child.stdout.on('data', (chunk) => {
+    beginNdjsonStream();
+    buf += chunk;
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl);
+      buf = buf.slice(nl + 1);
+      const t = line.trim();
+      if (!t) continue;
+      try {
+        const o = JSON.parse(t);
+        if (o && (o.type === 'done' || o.type === 'error')) sawTerminalLine = true;
+      } catch (_) {
+        /* forward raw line anyway */
       }
-      let reply = parsed.textToSend != null ? String(parsed.textToSend) : '';
-      reply = reply.replace(/(^|\n)\s*\[CowCode\]\s*/gi, '$1').trim();
-      res.json({ reply });
-    } catch (_) {
-      res.status(500).json({ error: lastLine.slice(0, 200) || 'Chat script produced invalid output' });
+      res.write(t + '\n');
     }
+  });
+  child.on('error', (err) => {
+    if (!streamHeadersSent) {
+      res.status(500).json({ error: err.message || String(err) });
+      return;
+    }
+    res.write(`${JSON.stringify({ type: 'error', error: err.message || String(err) })}\n`);
+    res.end();
+  });
+  child.on('exit', (code) => {
+    beginNdjsonStream();
+    const rest = buf.trim();
+    if (rest) {
+      try {
+        const o = JSON.parse(rest);
+        if (o && (o.type === 'done' || o.type === 'error')) sawTerminalLine = true;
+      } catch (_) {
+        /* still forward */
+      }
+      res.write(`${rest}\n`);
+      buf = '';
+    }
+    if (code !== 0 && !sawTerminalLine) {
+      res.write(`${JSON.stringify({ type: 'error', error: `Chat process exited (${code})` })}\n`);
+    }
+    res.end();
   });
   child.stdin.end(payload, 'utf8');
 });

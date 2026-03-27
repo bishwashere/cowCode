@@ -19,6 +19,7 @@ import { executeGoWrite } from '../lib/executors/go-write.js';
 import { executeSpeech } from '../lib/executors/speech.js';
 import { executeHomeAssistant } from '../lib/executors/home-assistant.js';
 import { executeMe } from '../lib/executors/me.js';
+import { executeCore } from '../lib/executors/core.js';
 
 const EXECUTORS = {
   cron: executeCron,
@@ -34,6 +35,7 @@ const EXECUTORS = {
   'apply-patch': executeApplyPatch,
   'go-read': executeGoRead,
   'go-write': executeGoWrite,
+  core: executeCore,
   'home-assistant': executeHomeAssistant,
   me: executeMe,
 };

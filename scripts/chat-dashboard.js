@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 /**
  * One-off agent run for the dashboard chat UI.
- * Reads JSON from stdin: { "message": "...", "history": [ { "role": "user"|"assistant", "content": "..." } ] }
- * Writes one JSON line to stdout: { "textToSend": "..." } or { "error": "..." }
+ * Reads JSON from stdin: { "message": "...", "history": [...], "agentId": "..." }
+ * Writes NDJSON to stdout (line-delimited JSON):
+ *   { "type": "progress", "message": "..." } — filesystem / shell steps as they run
+ *   { "type": "done", "reply": "..." } — final assistant text
+ *   { "type": "error", "error": "..." } — failure
  * Uses same soul/identity and skills as main app (workspace SOUL.md, WhoAmI.md, MyHuman.md).
  */
 
+import { writeSync } from 'fs';
 import { getEnvPath, getCronStorePath, getWorkspaceDir, getAgentWorkspaceDir } from '../lib/paths.js';
 import dotenv from 'dotenv';
 import { getSkillContext } from '../skills/loader.js';
@@ -14,6 +18,25 @@ import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
 import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig } from '../lib/agent-config.js';
 
 dotenv.config({ path: getEnvPath() });
+
+function writeNdjsonLine(obj) {
+  const line = JSON.stringify(obj) + '\n';
+  try {
+    if (process.stdout.isTTY) {
+      process.stdout.write(line);
+    } else {
+      writeSync(process.stdout.fd, line);
+    }
+  } catch (_) {
+    process.stdout.write(line);
+  }
+}
+
+function formatDashboardReply(textToSend) {
+  let reply = textToSend != null ? String(textToSend) : '';
+  reply = reply.replace(/(^|\n)\s*\[CowCode\]\s*/gi, '$1').trim();
+  return reply;
+}
 
 async function main() {
   let raw = '';
@@ -25,7 +48,7 @@ async function main() {
   const agentId = requestedAgentId || DEFAULT_AGENT_ID;
   loadAgentConfig(agentId);
   if (!message) {
-    process.stdout.write(JSON.stringify({ error: 'message is required' }) + '\n');
+    writeNdjsonLine({ type: 'error', error: 'message is required' });
     process.exit(1);
   }
   const history = Array.isArray(payload.history) ? payload.history : [];
@@ -55,10 +78,14 @@ async function main() {
       historyMessages,
       getFullSkillDoc: skillContext.getFullSkillDoc,
       resolveToolName: skillContext.resolveToolName,
+      onToolProgress: (msg) => {
+        const m = msg != null ? String(msg).trim() : '';
+        if (m) writeNdjsonLine({ type: 'progress', message: m });
+      },
     });
-    process.stdout.write(JSON.stringify({ textToSend: textToSend || '' }) + '\n');
+    writeNdjsonLine({ type: 'done', reply: formatDashboardReply(textToSend) });
   } catch (err) {
-    process.stdout.write(JSON.stringify({ error: err.message || String(err) }) + '\n');
+    writeNdjsonLine({ type: 'error', error: err.message || String(err) });
     process.exit(1);
   }
 }
