@@ -781,14 +781,16 @@ async function main() {
     let resultToUse = turnResult;
     let skillsCalledFromTurn = Array.isArray(turnResult?.skillsCalled) && turnResult.skillsCalled.length ? turnResult.skillsCalled : [];
     const hasSearchOrBrowse = (arr) => Array.isArray(arr) && (arr.includes('search') || arr.includes('browse'));
-    const UNCERTAINTY_PATTERN = /I don't know|I'm not sure|I don't have|I'm unable to|my knowledge (doesn't|isn't|might not)|I cannot find|I can't find|outside my knowledge|not in my training|I have no information|I don't have that|I'm not able to|I do not have|I couldn't find|I could not find/i;
+    const hasSearchOrBrowseTool = toolsForRequest.some(
+      (t) => t?.function?.name?.startsWith('search_') || t?.function?.name === 'browse_navigate',
+    );
     const firstReply = sanitizeOutboundText((turnResult?.textToSend || '').trim());
     const firstTextForSend = isTelegramChatId(jid) ? firstReply.replace(/^\[CowCode\]\s*/i, '').trim() : firstReply;
     if (
-      toolsForRequest.length > 0 &&
+      hasSearchOrBrowseTool &&
       !hasSearchOrBrowse(skillsCalledFromTurn) &&
-      firstTextForSend &&
-      UNCERTAINTY_PATTERN.test(firstTextForSend)
+      skillsCalledFromTurn.length === 0 &&
+      firstTextForSend
     ) {
       console.log('[agent] uncertainty reply without search/browse, retrying with search instruction');
       const retryUserText =
