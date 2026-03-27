@@ -1,7 +1,7 @@
 ---
 id: core
 name: Core
-description: Core shell commands (always available): ls, cd, pwd, cat, less, du, cp, mv, rm, touch, chmod, mkdir. Use for listing dirs, disk usage, reading files, copying, moving, deleting, creating dirs/files, and permissions. No need to enable—always installed.
+description: Core shell commands (always available): ls, cd, pwd, cat, less, du, cp, mv, rm, touch, chmod, mkdir, rsync (local filtered copy). Use for listing dirs, disk usage, reading files, copying, moving, deleting, creating dirs/files, and permissions. No need to enable—always installed.
 ---
 
 # Core commands
@@ -24,10 +24,11 @@ Call `run_skill` with **skill: "core"**. Set **command** or **arguments.action**
 - **touch** — Create empty file or update mtime. argv: `["path"]`
 - **chmod** — Change mode. argv: e.g. `["755", "file"]` or `["+x", "file"]`
 - **mkdir** — Create directory. argv: `["path"]` or `["-p", "a/b/c"]`
+- **rsync** — Same as **go-write** `rsync`: local copy with `-a`/`-av`/`-n` and `--exclude=PATTERN` rules, then source and destination. Use when the user needs to skip media files, caches by name, or other globs anywhere in the tree.
 
 ## Arguments
 
-- **arguments.command** or **arguments.action** (required) — One of: ls, cd, pwd, cat, less, du, cp, mv, rm, touch, chmod, mkdir
+- **arguments.command** or **arguments.action** (required) — One of: ls, cd, pwd, cat, less, du, cp, mv, rm, touch, chmod, mkdir, rsync
 - **arguments.argv** (required) — Array of strings (flags and paths). Do not include the command name.
 - **arguments.cwd** (optional) — Working directory for the command. Defaults to workspace.
 - **arguments.fullCopy** (optional) — Same as go-write: full tree copy for recursive `cp` when true.
