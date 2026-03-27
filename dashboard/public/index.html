@@ -445,6 +445,16 @@
     .chat-input-area textarea { flex: 1; min-height: 2.5rem; max-height: 8rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: inherit; font-size: 0.76rem; resize: none; }
     .chat-input-area textarea:focus { outline: none; border-color: var(--accent); }
     .chat-input-area button { flex-shrink: 0; }
+    #chat-send.chat-btn-stop {
+      background: var(--red);
+      color: #fff;
+      min-width: 2.75rem;
+      padding: 0.5rem 0.65rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #chat-send.chat-btn-stop:hover { filter: brightness(1.08); }
   </style>
 </head>
 <body>
@@ -1752,6 +1762,23 @@
     var chatMessagesByAgent = {};
     var chatLoading = false;
     var chatStreamActive = false;
+    var chatAbortController = null;
+
+    function syncChatSendButton() {
+      var btn = document.getElementById('chat-send');
+      if (!btn) return;
+      if (chatLoading) {
+        btn.classList.add('chat-btn-stop');
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
+        btn.setAttribute('aria-label', 'Stop');
+        btn.title = 'Stop';
+      } else {
+        btn.classList.remove('chat-btn-stop');
+        btn.textContent = 'Send';
+        btn.removeAttribute('aria-label');
+        btn.title = '';
+      }
+    }
 
     function setChatAgent(agentId) {
       selectedChatAgentId = agentId || 'main';
@@ -1809,6 +1836,11 @@
       });
     }
 
+    function applyStoppedAssistant(progressLines) {
+      var st = (progressLines || []).map(function (s) { return '• ' + s; }).join('\n');
+      return (st ? st + '\n\n' : '') + 'Stopped.';
+    }
+
     async function sendChatMessage() {
       var input = document.getElementById('chat-input');
       if (!input) return;
@@ -1822,17 +1854,21 @@
       input.value = '';
       chatLoading = true;
       chatStreamActive = true;
+      chatAbortController = new AbortController();
+      syncChatSendButton();
       renderChatMessages();
       function setAssistantBody(body) {
         chatMessages[assistantIndex].content = body;
         chatMessagesByAgent[selectedChatAgentId] = chatMessages;
         renderChatMessages();
       }
+      var progressLines = [];
       try {
         var r = await fetch(API + '/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history: historyPayload, agentId: selectedChatAgentId })
+          body: JSON.stringify({ message: text, history: historyPayload, agentId: selectedChatAgentId }),
+          signal: chatAbortController.signal
         });
         var ct = (r.headers.get('content-type') || '').toLowerCase();
         if (!r.ok) {
@@ -1845,54 +1881,68 @@
           } else {
             var decoder = new TextDecoder();
             var lineBuf = '';
-            var progressLines = [];
             var finalReply = '';
             var streamError = '';
-            while (true) {
-              var read = await reader.read();
-              if (read.done) break;
-              lineBuf += decoder.decode(read.value, { stream: true });
-              var nl;
-              while ((nl = lineBuf.indexOf('\n')) >= 0) {
-                var line = lineBuf.slice(0, nl).trim();
-                lineBuf = lineBuf.slice(nl + 1);
-                if (!line) continue;
-                var obj;
+            try {
+              while (true) {
+                var read;
                 try {
-                  obj = JSON.parse(line);
-                } catch (e) {
-                  continue;
+                  read = await reader.read();
+                } catch (re) {
+                  if (re && re.name === 'AbortError') {
+                    setAssistantBody(applyStoppedAssistant(progressLines));
+                    throw re;
+                  }
+                  throw re;
                 }
-                if (obj.type === 'progress' && obj.message) {
-                  progressLines.push(String(obj.message));
-                  var stepsOnly = progressLines.map(function (s) { return '• ' + s; }).join('\n');
-                  setAssistantBody(stepsOnly + (finalReply ? '\n\n' + finalReply : ''));
-                } else if (obj.type === 'done') {
-                  finalReply = (obj.reply != null ? String(obj.reply) : '').trim() || '(No reply)';
-                  var st = progressLines.map(function (s) { return '• ' + s; }).join('\n');
-                  setAssistantBody((st ? st + '\n\n' : '') + finalReply);
-                } else if (obj.type === 'error') {
-                  streamError = obj.error != null ? String(obj.error) : 'Error';
-                  setAssistantBody('Error: ' + streamError);
+                if (read.done) break;
+                lineBuf += decoder.decode(read.value, { stream: true });
+                var nl;
+                while ((nl = lineBuf.indexOf('\n')) >= 0) {
+                  var line = lineBuf.slice(0, nl).trim();
+                  lineBuf = lineBuf.slice(nl + 1);
+                  if (!line) continue;
+                  var obj;
+                  try {
+                    obj = JSON.parse(line);
+                  } catch (e) {
+                    continue;
+                  }
+                  if (obj.type === 'progress' && obj.message) {
+                    progressLines.push(String(obj.message));
+                    var stepsOnly = progressLines.map(function (s) { return '• ' + s; }).join('\n');
+                    setAssistantBody(stepsOnly + (finalReply ? '\n\n' + finalReply : ''));
+                  } else if (obj.type === 'done') {
+                    finalReply = (obj.reply != null ? String(obj.reply) : '').trim() || '(No reply)';
+                    var st = progressLines.map(function (s) { return '• ' + s; }).join('\n');
+                    setAssistantBody((st ? st + '\n\n' : '') + finalReply);
+                  } else if (obj.type === 'error') {
+                    streamError = obj.error != null ? String(obj.error) : 'Error';
+                    setAssistantBody('Error: ' + streamError);
+                  }
                 }
               }
-            }
-            var tail = lineBuf.trim();
-            if (tail) {
-              try {
-                var last = JSON.parse(tail);
-                if (last.type === 'done') {
-                  finalReply = (last.reply != null ? String(last.reply) : '').trim() || '(No reply)';
-                } else if (last.type === 'error') {
-                  streamError = last.error != null ? String(last.error) : 'Error';
-                }
-              } catch (e2) {}
-            }
-            if (streamError) {
-              setAssistantBody('Error: ' + streamError);
-            } else {
-              var st2 = progressLines.map(function (s) { return '• ' + s; }).join('\n');
-              setAssistantBody((st2 ? st2 + '\n\n' : '') + (finalReply || '(No reply)'));
+              var tail = lineBuf.trim();
+              if (tail) {
+                try {
+                  var last = JSON.parse(tail);
+                  if (last.type === 'done') {
+                    finalReply = (last.reply != null ? String(last.reply) : '').trim() || '(No reply)';
+                  } else if (last.type === 'error') {
+                    streamError = last.error != null ? String(last.error) : 'Error';
+                  }
+                } catch (e2) {}
+              }
+              if (streamError) {
+                setAssistantBody('Error: ' + streamError);
+              } else {
+                var st2 = progressLines.map(function (s) { return '• ' + s; }).join('\n');
+                setAssistantBody((st2 ? st2 + '\n\n' : '') + (finalReply || '(No reply)'));
+              }
+            } catch (streamEnd) {
+              if (!streamEnd || streamEnd.name !== 'AbortError') {
+                throw streamEnd;
+              }
             }
           }
         } else {
@@ -1901,15 +1951,30 @@
         }
         chatMessagesByAgent[selectedChatAgentId] = chatMessages;
       } catch (e) {
-        setAssistantBody('Error: ' + (e.message || 'Network error'));
+        if (e && e.name === 'AbortError') {
+          if ((chatMessages[assistantIndex].content || '').indexOf('Stopped.') === -1) {
+            setAssistantBody(applyStoppedAssistant(progressLines));
+          }
+        } else {
+          setAssistantBody('Error: ' + (e.message || 'Network error'));
+        }
         chatMessagesByAgent[selectedChatAgentId] = chatMessages;
+      } finally {
+        chatAbortController = null;
+        chatStreamActive = false;
+        chatLoading = false;
+        syncChatSendButton();
+        renderChatMessages();
       }
-      chatStreamActive = false;
-      chatLoading = false;
-      renderChatMessages();
     }
 
-    document.getElementById('chat-send').addEventListener('click', sendChatMessage);
+    document.getElementById('chat-send').addEventListener('click', function () {
+      if (chatLoading && chatAbortController) {
+        chatAbortController.abort();
+        return;
+      }
+      sendChatMessage();
+    });
     document.getElementById('chat-input').addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
     });

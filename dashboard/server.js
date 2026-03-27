@@ -630,6 +630,13 @@ app.post('/api/chat', (req, res) => {
     stdio: ['pipe', 'pipe', 'inherit'],
     env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR, COWCODE_INSTALL_DIR: INSTALL_DIR },
   });
+  let childExited = false;
+  req.on('close', () => {
+    if (childExited) return;
+    try {
+      child.kill('SIGKILL');
+    } catch (_) {}
+  });
   let streamHeadersSent = false;
   function beginNdjsonStream() {
     if (streamHeadersSent) return;
@@ -670,23 +677,32 @@ app.post('/api/chat', (req, res) => {
     res.write(`${JSON.stringify({ type: 'error', error: err.message || String(err) })}\n`);
     res.end();
   });
-  child.on('exit', (code) => {
+  child.on('exit', (code, signal) => {
+    childExited = true;
     beginNdjsonStream();
     const rest = buf.trim();
-    if (rest) {
-      try {
-        const o = JSON.parse(rest);
-        if (o && (o.type === 'done' || o.type === 'error')) sawTerminalLine = true;
-      } catch (_) {
-        /* still forward */
+    try {
+      if (rest) {
+        try {
+          const o = JSON.parse(rest);
+          if (o && (o.type === 'done' || o.type === 'error')) sawTerminalLine = true;
+        } catch (_) {
+          /* still forward */
+        }
+        res.write(`${rest}\n`);
+        buf = '';
       }
-      res.write(`${rest}\n`);
-      buf = '';
+      if (signal === 'SIGKILL' && !sawTerminalLine) {
+        res.write(`${JSON.stringify({ type: 'error', error: 'Stopped.' })}\n`);
+      } else if (code !== 0 && !sawTerminalLine) {
+        res.write(`${JSON.stringify({ type: 'error', error: `Chat process exited (${code})` })}\n`);
+      }
+      res.end();
+    } catch (_) {
+      try {
+        res.end();
+      } catch (_2) {}
     }
-    if (code !== 0 && !sawTerminalLine) {
-      res.write(`${JSON.stringify({ type: 'error', error: `Chat process exited (${code})` })}\n`);
-    }
-    res.end();
   });
   child.stdin.end(payload, 'utf8');
 });
