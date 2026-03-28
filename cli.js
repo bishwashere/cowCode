@@ -297,18 +297,21 @@ if (sub === 'moo') {
 
       if (serverSub === 'add') {
         const host = args[2];
-        if (!host) {
-          console.log('Usage: cowcode server add <host> [user] [name]');
+        const nameArg = (args[3] && !args[3].startsWith('--')) ? args[3] : undefined;
+        if (!host || !nameArg) {
+          console.log('Usage: cowcode server add <host> <name> [--user <user>]');
           console.log('  user defaults to: root');
-          console.log('  name defaults to: prod');
-          console.log('Example: cowcode server add 203.0.113.5 ubuntu prod');
-          console.log('         cowcode server add 203.0.113.5');
+          console.log('Example: cowcode server add 203.0.113.5 prod');
+          console.log('         cowcode server add 203.0.113.5 staging --user ubuntu');
           process.exit(1);
           return;
         }
-        const user = args[3] || 'root';
-        const name = args[4] || 'prod';
-        const result = mod.registerServer(name, host, { user });
+        const userIdx = args.indexOf('--user');
+        const keyIdx = args.indexOf('--key');
+        const name = nameArg;
+        const user = userIdx >= 0 ? args[userIdx + 1] : 'root';
+        const key = keyIdx >= 0 ? args[keyIdx + 1] : undefined;
+        const result = mod.registerServer(name, host, { user, key });
         if (!result.ok) { console.error('cowCode:', result.message); process.exit(1); return; }
         console.log('✓', result.message);
 
@@ -338,7 +341,7 @@ if (sub === 'moo') {
         console.log('✓', result.message);
 
       } else {
-        console.log('Usage: cowcode server add <host> [user] [name]');
+        console.log('Usage: cowcode server add <host> <name> [--user <user>]');
         console.log('       cowcode server list');
         console.log('       cowcode server remove <name>');
         process.exit(serverSub ? 1 : 0);
@@ -402,7 +405,7 @@ if (sub === 'moo') {
   console.log('       cowcode delete agent <name> [--yes]');
   console.log('       cowcode add <skill-id>');
   console.log('       cowcode skills install <skill-id>');
-  console.log('       cowcode server add <host> [user] [name]');
+  console.log('       cowcode server add <host> <name> [--user <user>]');
   console.log('       cowcode server list');
   console.log('       cowcode server remove <name>');
   console.log('       cowcode update [--force]');

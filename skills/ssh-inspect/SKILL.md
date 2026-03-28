@@ -67,11 +67,10 @@ Entries are stored in `~/.cowcode/config.json` under `skills["ssh-inspect"].host
 
 **Register a server:**
 ```
-cowcode server add 203.0.113.5
-cowcode server add 203.0.113.5 ubuntu
-cowcode server add 203.0.113.5 ubuntu prod
+cowcode server add 203.0.113.5 prod
+cowcode server add 203.0.113.5 staging --user ubuntu
 ```
-Positional args: `<host> [user] [name]`. Defaults: user = `root`, name = `prod`.
+`host` and `name` are required. User defaults to `root`; override with `--user`.
 
 **List registered servers:**
 ```
