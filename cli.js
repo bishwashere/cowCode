@@ -283,6 +283,71 @@ if (sub === 'moo') {
       process.exit(1);
     }
   })();
+} else if (sub === 'server') {
+  /**
+   * cowcode server add <host> [user] [name]   — defaults: user=root, name=prod
+   * cowcode server list
+   * cowcode server remove <name>
+   */
+  const serverSub = (args[1] || '').toLowerCase();
+  (async () => {
+    try {
+      const regPath = join(INSTALL_DIR, 'lib', 'server-registry.js');
+      const mod = await import(pathToFileURL(regPath).href);
+
+      if (serverSub === 'add') {
+        const host = args[2];
+        if (!host) {
+          console.log('Usage: cowcode server add <host> [user] [name]');
+          console.log('  user defaults to: root');
+          console.log('  name defaults to: prod');
+          console.log('Example: cowcode server add 203.0.113.5 ubuntu prod');
+          console.log('         cowcode server add 203.0.113.5');
+          process.exit(1);
+          return;
+        }
+        const user = args[3] || 'root';
+        const name = args[4] || 'prod';
+        const result = mod.registerServer(name, host, { user });
+        if (!result.ok) { console.error('cowCode:', result.message); process.exit(1); return; }
+        console.log('✓', result.message);
+
+      } else if (serverSub === 'list') {
+        const servers = mod.listServers();
+        if (!servers.length) {
+          console.log('No servers registered yet.');
+          console.log('Run: cowcode server add <host> [user] [name]');
+        } else {
+          console.log('Registered servers:');
+          for (const s of servers) {
+            const parts = [`  ${s.name.padEnd(16)} → ${s.hostname}`];
+            if (s.user) parts.push(`(user: ${s.user})`);
+            if (s.key) parts.push(`(key: ${s.key})`);
+            console.log(parts.join(' '));
+          }
+        }
+
+      } else if (serverSub === 'remove') {
+        const name = args[2];
+        if (!name) {
+          console.log('Usage: cowcode server remove <name>');
+          process.exit(1); return;
+        }
+        const result = mod.removeServer(name);
+        if (!result.ok) { console.error('cowCode:', result.message); process.exit(1); return; }
+        console.log('✓', result.message);
+
+      } else {
+        console.log('Usage: cowcode server add <host> [user] [name]');
+        console.log('       cowcode server list');
+        console.log('       cowcode server remove <name>');
+        process.exit(serverSub ? 1 : 0);
+      }
+    } catch (err) {
+      console.error('cowCode: server command failed.', err?.message || err);
+      process.exit(1);
+    }
+  })();
 } else if (sub === 'skills' || sub === 'add') {
   const skillSub = args[1];
   const skillArg = sub === 'add' ? args[1] : args[2];
@@ -337,6 +402,9 @@ if (sub === 'moo') {
   console.log('       cowcode delete agent <name> [--yes]');
   console.log('       cowcode add <skill-id>');
   console.log('       cowcode skills install <skill-id>');
+  console.log('       cowcode server add <host> [user] [name]');
+  console.log('       cowcode server list');
+  console.log('       cowcode server remove <name>');
   console.log('       cowcode update [--force]');
   console.log('       cowcode uninstall');
   process.exit(sub ? 1 : 0);
