@@ -1,7 +1,10 @@
+# --- Secrets & local config (any path in the repo) ---
 node_modules/
 auth_info/
 credentials/
 .env
+.env.*
+!.env.example
 config.json
 *.log
 package-lock.json
@@ -9,6 +12,18 @@ pnpm-lock.yaml
 cron/jobs.e2e.json
 scripts/test/.tmp-cron-e2e-*
 .cowcode-test
+
+# --- If someone sets COWCODE_STATE_DIR inside this clone (default state is ~/.cowcode) ---
+/agents/
+/groups/
+/group/
+/memory/
+/uploads/
+*.db
+
+# Cursor / local verification scratch (root of repo only; avoids accidental git push)
+/verify/
+.cursor/verify/
 
 # Generated reports (e.g. node scripts/test/test-cron-e2e.js --report)
 *report*

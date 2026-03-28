@@ -56,6 +56,10 @@ Your control.
 
 Everything stays on your computer.
 
+**WhatsApp** session files live under `~/.cowcode/auth_info`. **Telegram** bot tokens and settings live in `~/.cowcode/config.json` (and `.env` there), not next to the program files.
+
+**Git / clones:** If you develop from a `git clone` of this repo, runtime data still defaults to **`~/.cowcode`**—so a normal `git push` does **not** upload your chats, auth, or API keys. If you deliberately set **`COWCODE_STATE_DIR`** to a folder **inside** the clone, treat that folder like secrets; this repo’s `.gitignore` also ignores common state layout names at the **repository root** (`/agents/`, `/memory/`, etc.) so they are harder to commit by mistake.
+
 ---
 
 # 🧠 What You Can Say
