@@ -29,17 +29,19 @@ Run **read-only** commands on a remote host from the cowCode machine via `ssh`. 
 
 ## Allowlisted remote commands
 
-| User intent | command | argv examples |
-|---|---|---|
-| Disk free / filesystem usage | `df` | `["-h"]`, `["-h", "/"]` |
-| Folder / tree disk usage | `du` | `["-sh", "/var/log"]`, `["-xh", "--max-depth=1", "/"]` |
-| List directory | `ls` | `["-la", "/path"]` |
-| Print working dir | `pwd` | `[]` |
-| Show file contents | `cat` | `["/path/to/file"]` |
-| File/dir metadata | `stat` | `["/path"]` |
-| Find files (read-only) | `find` | `["/var", "-name", "*.log", "-maxdepth", "3"]` |
+| Category | commands |
+|---|---|
+| Disk & filesystem | `df`, `du`, `ls`, `find`, `lsblk`, `mount`, `findmnt` |
+| File contents | `cat`, `head`, `tail`, `grep`, `wc`, `stat`, `file`, `readlink`, `realpath` |
+| Processes | `ps`, `top`, `pgrep`, `pmap` |
+| Network & ports | `netstat`, `ss`, `lsof`, `ifconfig`, `ip` |
+| System info | `uname`, `hostname`, `whoami`, `id`, `uptime`, `free`, `dmesg`, `sysctl` |
+| Performance | `vmstat`, `iostat`, `mpstat`, `sar` |
+| Services & logs | `systemctl`, `journalctl`, `service` |
+| Environment | `env`, `printenv`, `which`, `whereis`, `pwd` |
+| Users & sessions | `last`, `lastlog`, `who`, `w` |
 
-**Never request:** `rm`, `dd`, `mkfs`, `chmod`, `sudo`, arbitrary `bash -c` with user-controlled strings, or any write/destructive operations.
+**Never request:** `rm`, `dd`, `mkfs`, `kill`, `pkill`, `chmod`, `chown`, `sudo`, `bash -c`, `sh -c`, or any write/destructive/privilege-escalation operations.
 
 ## Examples
 
@@ -99,7 +101,7 @@ If the name is not in the registry, it is used directly as a hostname/IP (passth
 
 ```tool-schema
 ssh_inspect_run
-  description: Run one read-only command on a remote host via SSH. command must be df, du, ls, pwd, cat, stat, or find. argv contains only the flags and paths for that command. host is optional — infer from conversation history or omit to use the active server.
+  description: Run one read-only/inspection command on a remote host via SSH. Allowed commands include df, du, ls, find, cat, head, tail, grep, ps, top, netstat, ss, lsof, ip, free, uname, uptime, systemctl, journalctl, and more (see SKILL.md). argv contains only the flags and paths for that command. host is optional — infer from conversation history or omit to use the active server.
   parameters:
     host: string (optional)
     command: string
