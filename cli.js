@@ -285,7 +285,8 @@ if (sub === 'moo') {
   })();
 } else if (sub === 'server') {
   /**
-   * cowcode server add <host> [user] [name]   — defaults: user=root, name=prod
+   * cowcode server add <host> <name> [--user <user>]
+   * cowcode server use <name>
    * cowcode server list
    * cowcode server remove <name>
    */
@@ -295,7 +296,18 @@ if (sub === 'moo') {
       const regPath = join(INSTALL_DIR, 'lib', 'server-registry.js');
       const mod = await import(pathToFileURL(regPath).href);
 
-      if (serverSub === 'add') {
+      if (serverSub === 'use') {
+        const name = args[2];
+        if (!name) {
+          console.log('Usage: cowcode server use <name>');
+          console.log('Example: cowcode server use prod');
+          process.exit(1); return;
+        }
+        const result = mod.setActiveServer(name);
+        if (!result.ok) { console.error('cowCode:', result.message); process.exit(1); return; }
+        console.log('✓', result.message);
+
+      } else if (serverSub === 'add') {
         const host = args[2];
         const nameArg = (args[3] && !args[3].startsWith('--')) ? args[3] : undefined;
         if (!host || !nameArg) {
@@ -342,6 +354,7 @@ if (sub === 'moo') {
 
       } else {
         console.log('Usage: cowcode server add <host> <name> [--user <user>]');
+        console.log('       cowcode server use <name>');
         console.log('       cowcode server list');
         console.log('       cowcode server remove <name>');
         process.exit(serverSub ? 1 : 0);
@@ -406,6 +419,7 @@ if (sub === 'moo') {
   console.log('       cowcode add <skill-id>');
   console.log('       cowcode skills install <skill-id>');
   console.log('       cowcode server add <host> <name> [--user <user>]');
+  console.log('       cowcode server use <name>');
   console.log('       cowcode server list');
   console.log('       cowcode server remove <name>');
   console.log('       cowcode update [--force]');
