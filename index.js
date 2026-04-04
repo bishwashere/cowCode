@@ -24,7 +24,7 @@ const {
   areJidsSameUser,
   downloadMediaMessage,
 } = Baileys;
-import { loadConfig } from './llm.js';
+import { loadConfig, chat as llmChat } from './llm.js';
 import { runAgentTurn, stripThinking } from './lib/agent.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -792,25 +792,46 @@ async function main() {
       skillsCalledFromTurn.length === 0 &&
       firstTextForSend
     ) {
-      console.log('[agent] uncertainty reply without search/browse, retrying with search instruction');
-      const retryUserText =
-        `[Retry with search] The user asked: "${text.slice(0, 500)}${text.length > 500 ? '…' : ''}". Your previous reply indicated you don't have this information. Use the search skill (or browse if they gave a URL) to look up current information, then reply with what you find.`;
+      // Ask the LLM whether the answer is actually complete before deciding to retry.
+      // This replaces the old structural check (no tools called = uncertain) which fired
+      // for greetings, jokes, and any direct answer that legitimately needed no tools.
+      let needsSearch = false;
       try {
-        const retryResult = await runAgentTurn({
-          userText: retryUserText,
-          ctx,
-          systemPrompt,
-          tools: toolsForRequest,
-          historyMessages,
-          getFullSkillDoc: skillContext.getFullSkillDoc,
-          resolveToolName: skillContext.resolveToolName,
-        });
-        if (retryResult?.textToSend?.trim()) {
-          resultToUse = retryResult;
-          skillsCalledFromTurn = Array.isArray(retryResult.skillsCalled) ? retryResult.skillsCalled : skillsCalledFromTurn;
+        const probeReply = await llmChat([
+          { role: 'system', content: 'You are a quality checker. Answer only with valid JSON, no prose.' },
+          {
+            role: 'user',
+            content:
+              `User asked: "${text.slice(0, 300)}"\n\nAssistant answered: "${firstTextForSend.slice(0, 300)}"\n\n` +
+              `Does the answer fully address the user's question, or does it need real-time / current information from a web search to be complete?\n` +
+              `Reply with exactly one of:\n{ "complete": true }\n{ "complete": false }`,
+          },
+        ], llmOptions);
+        const probe = JSON.parse(stripThinking(probeReply || '').trim());
+        needsSearch = probe?.complete === false;
+      } catch (_) {}
+
+      if (needsSearch) {
+        console.log('[agent] LLM probe: answer incomplete, retrying with search instruction');
+        const retryUserText =
+          `[Retry with search] The user asked: "${text.slice(0, 500)}${text.length > 500 ? '…' : ''}". Use the search skill (or browse if they gave a URL) to look up current information, then reply with what you find.`;
+        try {
+          const retryResult = await runAgentTurn({
+            userText: retryUserText,
+            ctx,
+            systemPrompt,
+            tools: toolsForRequest,
+            historyMessages,
+            getFullSkillDoc: skillContext.getFullSkillDoc,
+            resolveToolName: skillContext.resolveToolName,
+          });
+          if (retryResult?.textToSend?.trim() && hasSearchOrBrowse(retryResult.skillsCalled)) {
+            resultToUse = retryResult;
+            skillsCalledFromTurn = Array.isArray(retryResult.skillsCalled) ? retryResult.skillsCalled : skillsCalledFromTurn;
+          }
+        } catch (err) {
+          console.error('[agent] retry with search failed:', getErrorMessageForLog(err));
         }
-      } catch (err) {
-        console.error('[agent] retry with search failed:', getErrorMessageForLog(err));
       }
     }
     const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = resultToUse || {};
