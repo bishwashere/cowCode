@@ -1,7 +1,7 @@
 ---
 id: home-assistant
 name: Home Assistant
-description: Control and query Home Assistant via simple commands. Uses HA_URL and HA_TOKEN from ~/.cowcode/.env. Use command: "list lights", "search kitchen", "on light.xyz", "list automations", "search temperature", "state sensor.indoor_temp", etc. For indoor temperature/humidity/sensors always use this skill, not web search. See SKILL.md.
+description: Control and query home appliances and sensors via Home Assistant. Uses HA_URL and HA_TOKEN from ~/.cowcode/.env. Use for anything inside the home (devices, appliances, sensors, automations). For outdoor/weather info use web search. Commands: "list lights", "search kitchen", "on light.xyz", "list automations", "search <name>", "state <entity_id>", etc.
 ---
 
 # Home Assistant
@@ -22,8 +22,8 @@ Set **`arguments.command`** to one of the commands below. The user can speak nat
 | `list automation` | List all automations | "List my automations", "Show thermostat automations" |
 | `list switch` | List switches | "What switches are there?" |
 | `list` | List all entities | "List all devices" |
-| `search <word>` | Find entities by name/type | "Find kitchen lights" → `search kitchen`; "indoor temp" → `search temperature` |
-| `state <entity_id>` | Get one entity's state/value | "Is the living room light on?" → `state light.living_room`; indoor temp → `state sensor.indoor_temperature` |
+| `search <word>` | Find home devices/appliances/sensors by name | "Find kitchen lights" → `search kitchen`; "dining room sensor" → `search dining` |
+| `state <entity_id>` | Get current state/reading of a home device or sensor | "Is the living room light on?" → `state light.living_room` |
 | `on <entity_id>` | Turn on a light/switch | "Turn on the living room light" → `on light.living_room` |
 | `on <entity_id> <0-255>` | Turn on with brightness | "Set kitchen light to 50%" → `on light.kitchen 128` |
 | `off <entity_id>` | Turn off | "Turn off the bedroom light" → `off light.bedroom` |
@@ -31,7 +31,7 @@ Set **`arguments.command`** to one of the commands below. The user can speak nat
 | `scene <entity_id>` | Activate a scene | "Movie mode" → `scene scene.movie_night` |
 | `script <entity_id>` | Run a script | "Run good night script" → `script script.good_night` |
 | `automation <entity_id>` | Trigger an automation | "Run my morning automation" → `automation automation.morning` |
-| `climate <entity_id> <temp>` | Set thermostat temperature | "Set thermostat to 22" → `climate climate.thermostat 22` |
+| `climate <entity_id> <temp>` | Set thermostat | "Set thermostat to 22" → `climate climate.thermostat 22` |
 | `help` | List all commands | When the user asks how to use Home Assistant |
 
 ## User says → command (translate intent)
@@ -39,16 +39,16 @@ Set **`arguments.command`** to one of the commands below. The user can speak nat
 | User says | Use command |
 |-----------|-------------|
 | List my lights / What lights do I have? | `list lights` |
-| Show my automations / Thermostat automations | `list automation` |
-| Find something (e.g. kitchen, thermostat) | `search kitchen` or `search thermostat` |
+| Show my automations | `list automation` |
+| Find a device or appliance by name | `search <name>` |
 | Turn on the living room light | `on light.living_room` |
 | Turn off the bedroom light | `off light.bedroom` |
 | Is the garage door open? | `state cover.garage_door` |
+| What are my home sensors reading? | `search <sensor name>` then `state <entity_id>` |
 | Run my "good night" script | `script script.good_night` |
 | Trigger morning automation | `automation automation.morning` |
-| Set temperature to 21 | `climate climate.thermostat 21` (use the correct thermostat entity_id from a prior list/search) |
-| What is the indoor temperature? | `search temperature` → pick the sensor entity_id → `state sensor.indoor_temperature` |
-| Indoor temperature / humidity / air quality | `search temperature` (or `search humidity`) to find sensor entity_id, then `state <entity_id>` |
+| Set thermostat to 21 | `climate climate.thermostat 21` |
+| Anything about outdoor / weather | Do NOT use this skill — use web search instead |
 
 ## Finding entity IDs
 
@@ -65,7 +65,7 @@ If the user mentions a room or device by name and you don't know the entity_id:
 
 ```tool-schema
 home_assistant_run
-  description: Run a Home Assistant command. Use command string e.g. "list lights", "on light.xyz", "search kitchen", "state light.living_room", "search temperature", "state sensor.indoor_temperature". Always use this tool for indoor temperature, humidity, or any sensor query — never use web search for those.
+  description: Control and query home appliances and sensors inside the home (lights, switches, plugs, fans, thermostats, home sensors, automations, scenes, scripts). Use command string e.g. "list lights", "on light.xyz", "search kitchen", "state light.living_room". Do NOT use for outdoor or weather queries — use web search for those.
   parameters:
     command: string
 ```
