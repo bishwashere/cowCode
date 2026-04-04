@@ -40,8 +40,32 @@ Run **read-only** commands on a remote host from the cowCode machine via `ssh`. 
 | Services & logs | `systemctl`, `journalctl`, `service` |
 | Environment | `env`, `printenv`, `which`, `whereis`, `pwd` |
 | Users & sessions | `last`, `lastlog`, `who`, `w` |
+| Docker inspection | `docker-ps`, `docker-images`, `docker-logs`, `docker-inspect`, `docker-stats`, `docker-top`, `docker-diff`, `docker-port`, `docker-network-ls`, `docker-network-inspect`, `docker-volume-ls`, `docker-volume-inspect`, `docker-info`, `docker-version`, `docker-system-df`, `docker-image-history` |
 
-**Never request:** `rm`, `dd`, `mkfs`, `kill`, `pkill`, `chmod`, `chown`, `sudo`, `bash -c`, `sh -c`, or any write/destructive/privilege-escalation operations.
+Docker commands use a virtual name (e.g. `docker-ps`) as `command`; the executor expands it to the real `docker` invocation on the remote. `docker-stats` automatically appends `--no-stream` so it never hangs.
+
+**Docker command → real remote call:**
+
+| command value | runs on remote |
+|---|---|
+| `docker-ps` | `docker ps <argv>` |
+| `docker-images` | `docker images <argv>` |
+| `docker-logs` | `docker logs <argv>` |
+| `docker-inspect` | `docker inspect <argv>` |
+| `docker-stats` | `docker stats --no-stream <argv>` |
+| `docker-top` | `docker top <argv>` |
+| `docker-diff` | `docker diff <argv>` |
+| `docker-port` | `docker port <argv>` |
+| `docker-network-ls` | `docker network ls <argv>` |
+| `docker-network-inspect` | `docker network inspect <argv>` |
+| `docker-volume-ls` | `docker volume ls <argv>` |
+| `docker-volume-inspect` | `docker volume inspect <argv>` |
+| `docker-info` | `docker info <argv>` |
+| `docker-version` | `docker version <argv>` |
+| `docker-system-df` | `docker system df <argv>` |
+| `docker-image-history` | `docker image history <argv>` |
+
+**Never request:** `rm`, `dd`, `mkfs`, `kill`, `pkill`, `chmod`, `chown`, `sudo`, `bash -c`, `sh -c`, `docker exec`, `docker run`, `docker stop`, `docker rm`, `docker rmi`, `docker pull`, `docker push`, `docker build`, or any write/destructive/privilege-escalation operations.
 
 ## Examples
 
@@ -52,6 +76,22 @@ Disk usage (server inferred from history — no host needed):
 Top folders on prod (explicit):
 
 `run_skill` with skill: `"ssh-inspect"`, arguments: `{ "host": "prod", "command": "du", "argv": ["-xh", "--max-depth=1", "/"] }`
+
+List all running containers on atlas:
+
+`run_skill` with skill: `"ssh-inspect"`, arguments: `{ "host": "atlas", "command": "docker-ps", "argv": ["-a"] }`
+
+Get logs for a container:
+
+`run_skill` with skill: `"ssh-inspect"`, arguments: `{ "host": "atlas", "command": "docker-logs", "argv": ["--tail", "100", "my-container"] }`
+
+Docker disk usage:
+
+`run_skill` with skill: `"ssh-inspect"`, arguments: `{ "host": "atlas", "command": "docker-system-df", "argv": [] }`
+
+Inspect a container:
+
+`run_skill` with skill: `"ssh-inspect"`, arguments: `{ "host": "atlas", "command": "docker-inspect", "argv": ["my-container"] }`
 
 ## Configuration
 
@@ -75,8 +115,9 @@ Entries are stored in `~/.cowcode/config.json` under `skills["ssh-inspect"].host
 ```
 cowcode server add 203.0.113.5 prod
 cowcode server add 203.0.113.5 staging --user ubuntu
+cowcode server add 192.168.1.166 atlas --user root --alias "home assistant"
 ```
-`host` and `name` are required. User defaults to `root`; override with `--user`.
+`host` and `name` are required. User defaults to `root`; override with `--user`. `--alias` sets a human-readable label shown alongside the server name in replies (e.g. `atlas (home assistant)`).
 
 **Set the active server (default for all SSH commands):**
 ```
@@ -97,11 +138,15 @@ cowcode server remove staging
 The executor resolves the name → hostname (and user/key) from the registry before connecting.
 If the name is not in the registry, it is used directly as a hostname/IP (passthrough).
 
+## Server label in replies
+
+When a server has an alias, the executor prefixes every result with `[name (alias)]` — for example `[atlas (home assistant)]`. When you summarise results in your reply, naturally include this label so the user sees both the server name and the alias, e.g.: *"Atlas (Home Assistant) has 12 GB free on /"*. Do not force it into every sentence — use it where it reads naturally.
+
 ## Tool schema
 
 ```tool-schema
 ssh_inspect_run
-  description: Run one read-only/inspection command on a remote host via SSH. Allowed commands include df, du, ls, find, cat, head, tail, grep, ps, top, netstat, ss, lsof, ip, free, uname, uptime, systemctl, journalctl, and more (see SKILL.md). argv contains only the flags and paths for that command. host is optional — infer from conversation history or omit to use the active server.
+  description: Run one read-only/inspection command on a remote host via SSH. Allowed commands include df, du, ls, find, cat, head, tail, grep, ps, top, netstat, ss, lsof, ip, free, uname, uptime, systemctl, journalctl, and Docker inspection commands (docker-ps, docker-images, docker-logs, docker-inspect, docker-stats, docker-top, docker-diff, docker-port, docker-network-ls, docker-network-inspect, docker-volume-ls, docker-volume-inspect, docker-info, docker-version, docker-system-df, docker-image-history). argv contains only the flags and paths for that command. host is optional — infer from conversation history or omit to use the active server.
   parameters:
     host: string (optional)
     command: string

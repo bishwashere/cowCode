@@ -285,7 +285,7 @@ if (sub === 'moo') {
   })();
 } else if (sub === 'server') {
   /**
-   * cowcode server add <host> <name> [--user <user>]
+   * cowcode server add <host> <name> [--user <user>] [--alias <alias>]
    * cowcode server use <name>
    * cowcode server list
    * cowcode server remove <name>
@@ -311,19 +311,22 @@ if (sub === 'moo') {
         const host = args[2];
         const nameArg = (args[3] && !args[3].startsWith('--')) ? args[3] : undefined;
         if (!host || !nameArg) {
-          console.log('Usage: cowcode server add <host> <name> [--user <user>]');
+          console.log('Usage: cowcode server add <host> <name> [--user <user>] [--alias <alias>]');
           console.log('  user defaults to: root');
           console.log('Example: cowcode server add 203.0.113.5 prod');
           console.log('         cowcode server add 203.0.113.5 staging --user ubuntu');
+          console.log('         cowcode server add 192.168.1.166 atlas --user root --alias "home assistant"');
           process.exit(1);
           return;
         }
         const userIdx = args.indexOf('--user');
         const keyIdx = args.indexOf('--key');
+        const aliasIdx = args.indexOf('--alias');
         const name = nameArg;
         const user = userIdx >= 0 ? args[userIdx + 1] : 'root';
         const key = keyIdx >= 0 ? args[keyIdx + 1] : undefined;
-        const result = mod.registerServer(name, host, { user, key });
+        const alias = aliasIdx >= 0 ? args[aliasIdx + 1] : undefined;
+        const result = mod.registerServer(name, host, { user, key, alias });
         if (!result.ok) { console.error('cowCode:', result.message); process.exit(1); return; }
         console.log('✓', result.message);
 
@@ -338,6 +341,7 @@ if (sub === 'moo') {
             const parts = [`  ${s.name.padEnd(16)} → ${s.hostname}`];
             if (s.user) parts.push(`(user: ${s.user})`);
             if (s.key) parts.push(`(key: ${s.key})`);
+            if (s.alias) parts.push(`[alias: ${s.alias}]`);
             console.log(parts.join(' '));
           }
         }
@@ -418,7 +422,7 @@ if (sub === 'moo') {
   console.log('       cowcode delete agent <name> [--yes]');
   console.log('       cowcode add <skill-id>');
   console.log('       cowcode skills install <skill-id>');
-  console.log('       cowcode server add <host> <name> [--user <user>]');
+  console.log('       cowcode server add <host> <name> [--user <user>] [--alias <alias>]');
   console.log('       cowcode server use <name>');
   console.log('       cowcode server list');
   console.log('       cowcode server remove <name>');
