@@ -1,7 +1,7 @@
 ---
 id: ssh-inspect
 name: SSH inspect
-description: Read-only inspection of a remote Linux/Unix host over SSH. Commands: df, du, ls, pwd, cat, stat, find. Use when the user asks about disk space, folder sizes, directory layout, largest folders, or file contents on a remote server. Requires ssh-inspect in skills.enabled and SSH key access to the host.
+description: Read-only inspection of a remote Linux/Unix host over SSH. Use when the user asks about disk space, folder sizes, directory layout, file contents, server health, uptime, memory, load, running processes, services, Docker containers, or anything about a named or active remote server. Requires ssh-inspect in skills.enabled and SSH key access to the host.
 ---
 
 # SSH inspect
@@ -22,10 +22,24 @@ Run **read-only** commands on a remote host from the cowCode machine via `ssh`. 
 
 **Do not ask the user to repeat the server name on every message.** Use this priority order to determine `host`:
 
-1. If the user mentions a server name or IP in the current message → use it.
-2. If the current message has no server name but **recent conversation history** shows a server being used → use that same server. Pass it as `host` in the tool call.
-3. If no server can be inferred from context → omit `host` entirely; the executor will use the active server set via `cowcode server use`.
-4. Only ask for clarification if truly ambiguous (e.g. multiple servers mentioned and it's unclear which applies).
+1. If the user mentions a server name or alias anywhere in the message (e.g. "atlas", "prod", "server1", "home assistant") → extract it and pass as `host`. Do this even when the name appears naturally, e.g. "what is the health of atlas" → `host: "atlas"`, "check atlas disk" → `host: "atlas"`.
+2. If the current message has no server name but **recent conversation history** shows a server being used AND the current message is still clearly about that server or servers in general → use that same server. Pass it as `host` in the tool call.
+3. If the conversation has clearly moved to a **non-server topic** (e.g. reminders, recipes, general questions, home automation, weather) — do **not** carry forward a server name from history. Treat the context as fresh; omit `host` and let the executor resolve the default.
+4. If no server can be inferred from context → omit `host` entirely; the executor will auto-select the only registered server if there is one, or use the active server.
+5. Only ask for clarification if truly ambiguous (e.g. multiple servers mentioned and it's unclear which applies).
+
+**Never** respond saying the server isn't configured or ask the user to run `cowcode server use` — always attempt the tool call first with the inferred host. The executor will return a clear error if the server genuinely isn't registered.
+
+## Health checks
+
+When the user asks about "health", "status", "how is X doing", or similar — run **multiple commands in sequence** to give a full picture:
+
+1. `uptime` — load average and how long it's been running
+2. `free` with `argv: ["-h"]` — memory usage
+3. `df` with `argv: ["-h", "--total"]` — disk usage
+4. `ps` with `argv: ["aux", "--sort=-%cpu"]` and `argv: ["--no-headers", "-o", "pid,comm,%cpu,%mem"]` — top processes (optional, use if relevant)
+
+Summarise all results in one reply. Do not run them one at a time and ask the user between each.
 
 ## Allowlisted remote commands
 
