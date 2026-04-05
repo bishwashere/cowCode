@@ -16,9 +16,9 @@ Semantic search over your **notes** (`MEMORY.md`, `memory/*.md`) and optional **
 
 ## Tools (pass `tool` in arguments: "memory_search", "memory_get", or "memory_save")
 
-- **memory_search** — Set `tool: "memory_search"`, `query` (required). Optional: `maxResults`, `minScore`, `date`, **`dateFrom`**, **`dateTo`**, **`dateRange`**. Searches notes (and chat when the user asks about past conversations). **Date range** — When the user asks for notes or activity in a time window (e.g. "What did I note last week?", "notes from February", "yesterday's notes"), set **`dateFrom`** and **`dateTo`** as `YYYY-MM-DD`, or use **`dateRange`**: `"yesterday"`, `"last_week"` / `"last_7_days"`, or `"last_month"`. Results are restricted to chunks whose date falls in that range (not only semantic match). For "yesterday" chat, `date: "yesterday"` still includes that day's chat-log; combining with `dateRange: "yesterday"` narrows both notes and chat to that day. Returns snippets with path and line range (paths may be `MEMORY.md`, `memory/2025-02-15.md`, `chat-log/2025-02-16.jsonl`, or `filesystem/` / `filesystem/rel/path` for directory listings). Only search chat when the user explicitly mentions it.
+- **memory_search** — Set `tool: "memory_search"`, `query` (required). Optional: `maxResults`, `minScore`, `date`, **`dateFrom`**, **`dateTo`**, **`dateRange`**, **`type`**. Searches notes (and chat when the user asks about past conversations). **Date range** — When the user asks for notes or activity in a time window (e.g. "What did I note last week?", "notes from February", "yesterday's notes"), set **`dateFrom`** and **`dateTo`** as `YYYY-MM-DD`, or use **`dateRange`**: `"yesterday"`, `"last_week"` / `"last_7_days"`, or `"last_month"`. Results are restricted to chunks whose date falls in that range (not only semantic match). For "yesterday" chat, `date: "yesterday"` still includes that day's chat-log; combining with `dateRange: "yesterday"` narrows both notes and chat to that day. **Type filter** — Set `type` to restrict results to a specific category (e.g. `"chat"`, `"filesystem"`, or any custom type used when saving). Returns snippets with path, line range, and `type` field (paths may be `MEMORY.md`, `memory/2025-02-15.md`, `chat-log/2025-02-16.jsonl`, or `filesystem/` / `filesystem/rel/path` for directory listings). Only search chat when the user explicitly mentions it.
 - **memory_get** — Set `tool: "memory_get"`, `path` (required, from memory_search). Optional: `from`, `lines`. Read a snippet by path (including chat-log/*.jsonl when the user explicitly asked about past conversations).
-- **memory_save** — Set `tool: "memory_save"`, `text` (required): the note to save. Optional: `file` (default: `MEMORY.md`; use `memory/notes.md` or any `.md` path inside the workspace). Appends the note with today's date prefix and immediately re-indexes so it is searchable at once. Use when the user says "remember that…", "note this down", "save this for later", "add to my notes", etc.
+- **memory_save** — Set `tool: "memory_save"`, `text` (required): the note to save. Optional: `file` (default: `MEMORY.md`; use `memory/notes.md` or any `.md` path inside the workspace), `type` (a short category label, e.g. `"preference"`, `"project"`, `"task"`). Appends the note with today's date (and type tag if given) and immediately re-indexes so it is searchable at once. Use when the user says "remember that…", "note this down", "save this for later", "add to my notes", etc.
 
 ## Tool schema
 
@@ -30,6 +30,7 @@ memory_search
     dateFrom: string
     dateTo: string
     dateRange: string
+    type: string
     maxResults: number
     minScore: number
 
@@ -45,6 +46,7 @@ memory_save
   parameters:
     text: string
     file: string
+    type: string
 ```
 
 ## Config
