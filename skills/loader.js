@@ -211,12 +211,18 @@ export function getSkillsEnabled() {
  * @param {{ groupNonOwner?: boolean, groupJid?: string }} [options] - When groupNonOwner true, use group config; groupJid = that group's id for per-group skills.
  * @returns {{ compactList: string, runSkillTool: Array, getFullSkillDoc: (skillId: string) => string, toolNameToSkill: (name: string) => { skillId: string, action: string } | null }}
  */
+/** Skills never exposed to the LLM in group chats (mirrors executor.js BLOCKED_IN_GROUP). */
+const ALWAYS_HIDDEN_IN_GROUP = new Set(['go-read', 'go-write', 'ssh-inspect']);
+
 export function getSkillContext(options = {}) {
   const { groupJid, agentId = DEFAULT_AGENT_ID } = options;
   const agentConfig = loadAgentConfig(agentId);
   const baseSkills = normalizeEnabledList(agentConfig?.skills?.enabled);
   const restrictions = groupJid ? getGroupRestrictions(groupJid) : null;
   const deny = new Set(Array.isArray(restrictions?.skillsDeny) ? restrictions.skillsDeny : []);
+  if (groupJid) {
+    for (const id of ALWAYS_HIDDEN_IN_GROUP) deny.add(id);
+  }
   const enabled = baseSkills.filter((id) => !deny.has(id));
   const idsToLoad = enabled;
   const compactEntries = [];
