@@ -31,6 +31,16 @@ const app = express();
 app.use(express.json({ limit: '2mb' }));
 ensureMainAgentInitialized();
 
+// Block dashboard UI when accessed via Tailscale (*.ts.net) — API only over Tailscale.
+app.use((req, res, next) => {
+  const host = req.headers.host || '';
+  if (host.includes('.ts.net') && !req.path.startsWith('/api/')) {
+    res.status(403).json({ error: 'Dashboard UI is not available over Tailscale. Use /api/* endpoints.' });
+    return;
+  }
+  next();
+});
+
 const DAEMON_SCRIPT = join(INSTALL_DIR, 'scripts', 'daemon.sh');
 const SKILLS_DIR = join(INSTALL_DIR, 'skills');
 
@@ -134,6 +144,21 @@ function getDaemonUptimeSeconds() {
   } catch {
     return null;
   }
+}
+
+// ---- API key auth (optional) ----
+// Set COWCODE_API_KEY in ~/.cowcode/.env to require Bearer token on all /api/* routes.
+const API_KEY = process.env.COWCODE_API_KEY || '';
+if (API_KEY) {
+  app.use('/api', (req, res, next) => {
+    const auth = req.headers['authorization'] || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (token !== API_KEY) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    next();
+  });
 }
 
 // ---- API ----
@@ -631,7 +656,7 @@ app.post('/api/chat', (req, res) => {
     env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR, COWCODE_INSTALL_DIR: INSTALL_DIR },
   });
   let childExited = false;
-  req.on('close', () => {
+  res.on('close', () => {
     if (childExited) return;
     try {
       child.kill('SIGKILL');

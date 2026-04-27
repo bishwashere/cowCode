@@ -12,10 +12,21 @@
 import { writeSync } from 'fs';
 import { getEnvPath, getCronStorePath, getWorkspaceDir, getAgentWorkspaceDir } from '../lib/paths.js';
 import dotenv from 'dotenv';
-import { getSkillContext } from '../skills/loader.js';
+import { getSkillContext, getEnabledSkillIds } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent.js';
+import { planIntent, intentPlanToSystemBlock } from '../lib/intent-planner.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
 import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig } from '../lib/agent-config.js';
+import { appendExchange, readLastPrivateExchanges } from '../lib/chat-log.js';
+import { getOwnerLogJid } from '../lib/owner-config.js';
+import { getMemoryConfig } from '../lib/memory-config.js';
+import { indexChatExchange } from '../lib/memory-index.js';
+
+// Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
+const DASHBOARD_HISTORY_EXCHANGES = Math.max(
+  1,
+  Math.floor(Number(process.env.COWCODE_DASHBOARD_HISTORY)) || 5
+);
 
 dotenv.config({ path: getEnvPath() });
 
@@ -51,12 +62,15 @@ async function main() {
     writeNdjsonLine({ type: 'error', error: 'message is required' });
     process.exit(1);
   }
-  const history = Array.isArray(payload.history) ? payload.history : [];
-  const historyMessages = history
-    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-    .map((m) => ({ role: m.role, content: String(m.content) }));
-
   const workspaceDir = getAgentWorkspaceDir(agentId) || getWorkspaceDir();
+  // Single super-admin model: the dashboard chat is always the owner talking to
+  // their own AI. Use the unified owner log jid so this conversation shares the
+  // same chat-log file and memory index as the owner's Telegram/WhatsApp DMs.
+  const dashboardJid = getOwnerLogJid();
+  // Server-managed history, same pattern as Telegram private chats. Any `payload.history`
+  // sent by the client is intentionally ignored — context lives on disk on the server.
+  const historyMessages = readLastPrivateExchanges(workspaceDir, dashboardJid, DASHBOARD_HISTORY_EXCHANGES);
+
   const noop = () => {};
   const ctx = {
     storePath: getCronStorePath(),
@@ -66,24 +80,71 @@ async function main() {
     scheduleOneShot: noop,
     startCron: noop,
   };
-  const skillContext = getSkillContext({ agentId });
-  const toolsToUse = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0 ? skillContext.runSkillTool : [];
+  // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
+  const enabledSkillIds = getEnabledSkillIds({ agentId });
+  // Step 2: intent planner — one small LLM call before loading any tool schemas.
+  const intentPlan = enabledSkillIds.length > 0
+    ? await planIntent({ userText: message, availableSkillIds: enabledSkillIds, agentId })
+    : null;
+  if (intentPlan) process.stderr.write('[intent-planner] ' + JSON.stringify(intentPlan) + '\n');
+  // Step 3: load tool schemas based on what the planner returned.
+  //   intentPlan === null      → planner failed  → full tools (safe fallback)
+  //   intentPlan.skills = []   → planner: chat   → skip schema loading entirely, no tools
+  //   intentPlan.skills = [...] → planner: tools  → load only selected schemas
+  const plannerSaysNoTools = intentPlan !== null && Array.isArray(intentPlan.skills) && intentPlan.skills.length === 0;
+  let skillContext = null;
+  let toolsToUse = [];
+  if (!plannerSaysNoTools) {
+    skillContext = getSkillContext({ agentId, hintSkills: intentPlan?.skills ?? null });
+    toolsToUse = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0 ? skillContext.runSkillTool : [];
+  }
+  const toolNames = toolsToUse.map((t) => t?.function?.name).filter(Boolean);
+  const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir);
+  const planBlock = intentPlanToSystemBlock(intentPlan);
+  const systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
 
   try {
     const { textToSend } = await runAgentTurn({
       userText: message,
       ctx,
-      systemPrompt: buildOneOnOneSystemPrompt(workspaceDir),
+      systemPrompt,
       tools: toolsToUse,
       historyMessages,
-      getFullSkillDoc: skillContext.getFullSkillDoc,
-      resolveToolName: skillContext.resolveToolName,
+      getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
+      resolveToolName: skillContext?.resolveToolName ?? (() => null),
       onToolProgress: (msg) => {
         const m = msg != null ? String(msg).trim() : '';
         if (m) writeNdjsonLine({ type: 'progress', message: m });
       },
     });
-    writeNdjsonLine({ type: 'done', reply: formatDashboardReply(textToSend) });
+    const reply = formatDashboardReply(textToSend);
+    const exchange = {
+      user: message,
+      assistant: reply,
+      timestampMs: Date.now(),
+      jid: dashboardJid,
+    };
+    // Always file-log so readLastPrivateExchanges works on the next turn.
+    try {
+      appendExchange(workspaceDir, exchange);
+    } catch (logErr) {
+      try {
+        process.stderr.write(`[chat-dashboard] chat-log append failed: ${logErr?.message || logErr}\n`);
+      } catch (_) {}
+    }
+    // Also index into vector memory when configured, so "remember what we said"
+    // works across surfaces — same behavior as Telegram private DMs.
+    try {
+      const memoryConfig = getMemoryConfig();
+      if (memoryConfig) {
+        await indexChatExchange(memoryConfig, exchange);
+      }
+    } catch (memErr) {
+      try {
+        process.stderr.write(`[chat-dashboard] memory index failed: ${memErr?.message || memErr}\n`);
+      } catch (_) {}
+    }
+    writeNdjsonLine({ type: 'done', reply });
   } catch (err) {
     writeNdjsonLine({ type: 'error', error: err.message || String(err) });
     process.exit(1);

@@ -26,13 +26,14 @@ const {
 } = Baileys;
 import { loadConfig, chat as llmChat } from './llm.js';
 import { runAgentTurn, stripThinking } from './lib/agent.js';
+import { planIntent, intentPlanToSystemBlock } from './lib/intent-planner.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
 import { spawn } from 'child_process';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
-import { getSkillsEnabled, getSkillContext, DEFAULT_ENABLED } from './skills/loader.js';
+import { getSkillsEnabled, getSkillContext, getEnabledSkillIds, DEFAULT_ENABLED } from './skills/loader.js';
 import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid, sendLongText } from './lib/telegram.js';
 import { isWhatsAppGroupJid } from './lib/whatsapp.js';
 import { addPending as addPendingTelegram, clearPending as clearPendingTelegram, flushPending } from './lib/pending-telegram.js';
@@ -44,6 +45,7 @@ import { isTelegramGroup } from './lib/group-guard.js';
 import { getMemoryConfig } from './lib/memory-config.js';
 import { indexChatExchange } from './lib/memory-index.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
+import { toLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
 import { ensureGroupConfigFor } from './lib/group-config.js';
@@ -524,7 +526,10 @@ async function main() {
     } catch (e) {
       console.error('[tide] Send failed:', getErrorMessageForLog(e));
     }
-    const exchange = { user: 'Tide check', assistant: text, timestampMs: Date.now(), jid: tideJid };
+    // Group: keep tideJid (group log). Private DM: collapse owner DMs into the
+    // unified owner log so Tide check-ins live alongside the rest of the convo.
+    const tideLogJid = isTgGroup ? tideJid : toLogJid(tideJid);
+    const exchange = { user: 'Tide check', assistant: text, timestampMs: Date.now(), jid: tideLogJid };
     try {
       if (isTgGroup) {
         appendGroupExchange(getWorkspaceDir(), tideJid, exchange);
@@ -748,12 +753,33 @@ async function main() {
       isGroup: isGroupJid,
     };
     const isGroupNonOwner = !!bioOpts.groupNonOwner;
-    const skillContext = getSkillContext({ groupJid: isGroupJid ? jid : undefined, agentId });
-    const toolsForRequest = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0
-      ? skillContext.runSkillTool
-      : [];
-    const toolNames = (toolsForRequest || []).map((t) => t?.function?.name).filter(Boolean);
-    console.log('[path] toolsCount=', toolsForRequest.length, toolNames.length ? 'tools=' + toolNames.join(',') : '');
+    // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
+    const groupJidForSkills = isGroupJid ? jid : undefined;
+    const enabledSkillIds = getEnabledSkillIds({ groupJid: groupJidForSkills, agentId });
+    // Step 2: intent planner — one small LLM call before loading any tool schemas.
+    const intentPlan = enabledSkillIds.length > 0
+      ? await planIntent({ userText: text, availableSkillIds: enabledSkillIds, agentId })
+      : null;
+    if (intentPlan) console.log('[intent-planner]', JSON.stringify(intentPlan));
+    // Step 3: load tool schemas based on what the planner returned.
+    //   intentPlan === null      → planner failed  → full tools (safe fallback)
+    //   intentPlan.skills = []   → planner: chat   → skip schema loading entirely, no tools
+    //   intentPlan.skills = [...] → planner: tools  → load only selected schemas
+    const plannerSaysNoTools = intentPlan !== null && Array.isArray(intentPlan.skills) && intentPlan.skills.length === 0;
+    let skillContext = null;
+    let toolsForRequest = [];
+    if (!plannerSaysNoTools) {
+      skillContext = getSkillContext({ groupJid: groupJidForSkills, agentId, hintSkills: intentPlan?.skills ?? null });
+      toolsForRequest = Array.isArray(skillContext.runSkillTool) && skillContext.runSkillTool.length > 0
+        ? skillContext.runSkillTool
+        : [];
+    }
+    const toolNames = toolsForRequest.map((t) => t?.function?.name).filter(Boolean);
+    console.log(
+      '[path] plannerMode=', intentPlan?.mode ?? 'fallback',
+      plannerSaysNoTools ? 'noTools(chat)' : ('toolsCount=' + toolsForRequest.length),
+      toolNames.length ? 'tools=' + toolNames.join(',') : '',
+    );
     const systemPromptOpts = isGroupNonOwner
       ? {
           groupSenderName: bioOpts.groupSenderName,
@@ -764,19 +790,25 @@ async function main() {
         }
       : { groupSenderName: bioOpts.groupSenderName, agentId };
     const inMemoryHistory = getLast5Exchanges(jid);
+    // Single super-admin model: when this DM is from the owner (Telegram or
+    // WhatsApp), unify with the owner's shared chat-log + memory under one jid.
+    // Group jids are never remapped — groups always read from group-chat-log.
+    const logJid = isGroupJid ? jid : toLogJid(jid);
     const historyMessages = isGroupJid
       ? readLastGroupExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES)
-      : (inMemoryHistory.length > 0 ? inMemoryHistory : readLastPrivateExchanges(getWorkspaceDir(), jid, MAX_CHAT_HISTORY_EXCHANGES));
+      : (inMemoryHistory.length > 0 ? inMemoryHistory : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES));
     const systemPrompt = buildSystemPrompt(systemPromptOpts);
-    console.log('[path] runAgentTurn systemPromptLen=', systemPrompt.length, 'toolsCount=', toolsForRequest.length);
+    const planBlock = intentPlanToSystemBlock(intentPlan);
+    const systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
+    console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     const turnResult = await runAgentTurn({
       userText: text,
       ctx,
-      systemPrompt,
+      systemPrompt: systemPromptWithPlan,
       tools: toolsForRequest,
       historyMessages,
-      getFullSkillDoc: skillContext.getFullSkillDoc,
-      resolveToolName: skillContext.resolveToolName,
+      getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
+      resolveToolName: skillContext?.resolveToolName ?? (() => null),
     });
     let resultToUse = turnResult;
     let skillsCalledFromTurn = Array.isArray(turnResult?.skillsCalled) && turnResult.skillsCalled.length ? turnResult.skillsCalled : [];
@@ -787,7 +819,7 @@ async function main() {
     const firstReply = sanitizeOutboundText((turnResult?.textToSend || '').trim());
     const firstTextForSend = isTelegramChatId(jid) ? firstReply.replace(/^\[CowCode\]\s*/i, '').trim() : firstReply;
     if (
-      hasSearchOrBrowseTool &&
+      (hasSearchOrBrowseTool || plannerSaysNoTools) &&
       !hasSearchOrBrowse(skillsCalledFromTurn) &&
       skillsCalledFromTurn.length === 0 &&
       firstTextForSend
@@ -812,25 +844,32 @@ async function main() {
       } catch (_) {}
 
       if (needsSearch) {
-        console.log('[agent] LLM probe: answer incomplete, retrying with search instruction');
-        const retryUserText =
-          `[Retry with search] The user asked: "${text.slice(0, 500)}${text.length > 500 ? '…' : ''}". Use the search skill (or browse if they gave a URL) to look up current information, then reply with what you find.`;
+        // For plannerSaysNoTools: lazily load the full skill context now so the retry has all tools.
+        // For normal path: reuse existing skillContext with the already-loaded tools.
+        const retrySkillContext = skillContext ?? getSkillContext({ groupJid: groupJidForSkills, agentId });
+        const retryTools = Array.isArray(retrySkillContext?.runSkillTool) ? retrySkillContext.runSkillTool : toolsForRequest;
+        const retryLabel = plannerSaysNoTools ? '[Retry with tools]' : '[Retry with search]';
+        const retryInstruction = plannerSaysNoTools
+          ? `${retryLabel} The user asked: "${text.slice(0, 500)}${text.length > 500 ? '…' : ''}". Use available tools to look up the specific or current information needed, then reply with what you find.`
+          : `${retryLabel} The user asked: "${text.slice(0, 500)}${text.length > 500 ? '…' : ''}". Use the search skill (or browse if they gave a URL) to look up current information, then reply with what you find.`;
+        console.log('[agent] LLM probe: answer incomplete, retrying —', retryLabel);
         try {
           const retryResult = await runAgentTurn({
-            userText: retryUserText,
+            userText: retryInstruction,
             ctx,
-            systemPrompt,
-            tools: toolsForRequest,
+            systemPrompt: systemPromptWithPlan,
+            tools: retryTools,
             historyMessages,
-            getFullSkillDoc: skillContext.getFullSkillDoc,
-            resolveToolName: skillContext.resolveToolName,
+            getFullSkillDoc: retrySkillContext?.getFullSkillDoc ?? (() => ''),
+            resolveToolName: retrySkillContext?.resolveToolName ?? (() => null),
           });
-          if (retryResult?.textToSend?.trim() && hasSearchOrBrowse(retryResult.skillsCalled)) {
+          const retryUsedTools = Array.isArray(retryResult?.skillsCalled) && retryResult.skillsCalled.length > 0;
+          if (retryResult?.textToSend?.trim() && (hasSearchOrBrowse(retryResult.skillsCalled) || (plannerSaysNoTools && retryUsedTools))) {
             resultToUse = retryResult;
-            skillsCalledFromTurn = Array.isArray(retryResult.skillsCalled) ? retryResult.skillsCalled : skillsCalledFromTurn;
+            skillsCalledFromTurn = retryResult.skillsCalled ?? skillsCalledFromTurn;
           }
         } catch (err) {
-          console.error('[agent] retry with search failed:', getErrorMessageForLog(err));
+          console.error('[agent] retry failed:', getErrorMessageForLog(err));
         }
       }
     }
@@ -889,7 +928,8 @@ async function main() {
         lastSentByJidMap.set(jid, replyText);
         pushExchange(jid, text, replyText);
         const ts = Date.now();
-        const exchange = { user: text, assistant: replyText, timestampMs: ts, jid };
+        // Storage uses logJid (owner-unified for owner DMs); routing already used `jid`.
+        const exchange = { user: text, assistant: replyText, timestampMs: ts, jid: logJid };
         if (bioOpts.logExchange) {
           bioOpts.logExchange(exchange);
         } else {

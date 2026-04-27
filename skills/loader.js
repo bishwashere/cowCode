@@ -205,6 +205,26 @@ export function getSkillsEnabled() {
 }
 
 /**
+ * Return the filtered list of enabled skill IDs for an agent/group without
+ * reading any SKILL.md files — config reads only, very cheap.
+ * Use this to feed the intent planner before loading full tool schemas.
+ *
+ * @param {{ groupJid?: string, agentId?: string }} [options]
+ * @returns {string[]}
+ */
+export function getEnabledSkillIds(options = {}) {
+  const { groupJid, agentId = DEFAULT_AGENT_ID } = options;
+  const agentConfig = loadAgentConfig(agentId);
+  const baseSkills = normalizeEnabledList(agentConfig?.skills?.enabled);
+  const restrictions = groupJid ? getGroupRestrictions(groupJid) : null;
+  const deny = new Set(Array.isArray(restrictions?.skillsDeny) ? restrictions.skillsDeny : []);
+  if (groupJid) {
+    for (const id of ALWAYS_HIDDEN_IN_GROUP) deny.add(id);
+  }
+  return baseSkills.filter((id) => !deny.has(id));
+}
+
+/**
  * Load skill folders (SKILL.md with optional YAML front matter and optional tool-schema block).
  * If a skill defines a tool-schema in the same SKILL.md, one tool per action is built (explicit parameters).
  * Otherwise the skill is exposed via the single run_skill tool. No separate JS for actions.
@@ -215,7 +235,7 @@ export function getSkillsEnabled() {
 const ALWAYS_HIDDEN_IN_GROUP = new Set(['go-read', 'go-write', 'ssh-inspect']);
 
 export function getSkillContext(options = {}) {
-  const { groupJid, agentId = DEFAULT_AGENT_ID } = options;
+  const { groupJid, agentId = DEFAULT_AGENT_ID, hintSkills } = options;
   const agentConfig = loadAgentConfig(agentId);
   const baseSkills = normalizeEnabledList(agentConfig?.skills?.enabled);
   const restrictions = groupJid ? getGroupRestrictions(groupJid) : null;
@@ -224,7 +244,13 @@ export function getSkillContext(options = {}) {
     for (const id of ALWAYS_HIDDEN_IN_GROUP) deny.add(id);
   }
   const enabled = baseSkills.filter((id) => !deny.has(id));
-  const idsToLoad = enabled;
+  // When the intent planner provided skill hints, restrict to only those skills.
+  // Fall back to the full enabled list if the intersection is empty (safety net).
+  const hinted =
+    Array.isArray(hintSkills) && hintSkills.length > 0
+      ? enabled.filter((id) => hintSkills.includes(id))
+      : [];
+  const idsToLoad = hinted.length > 0 ? hinted : enabled;
   const compactEntries = [];
   const fullDocsById = Object.create(null);
   const available = [];

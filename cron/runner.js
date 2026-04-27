@@ -13,6 +13,8 @@ import { addPending as addPendingTelegram } from '../lib/pending-telegram.js';
 import { getCronStorePath, getWorkspaceDir } from '../lib/paths.js';
 import { toUserMessage, getErrorMessageForLog } from '../lib/user-error.js';
 import { appendExchange } from '../lib/chat-log.js';
+import { toLogJid } from '../lib/owner-config.js';
+import { isTelegramGroupJid } from '../lib/telegram.js';
 import { getMemoryConfig } from '../lib/memory-config.js';
 import { indexChatExchange } from '../lib/memory-index.js';
 
@@ -112,7 +114,11 @@ async function runJobOnce({ job, sock, selfJid }) {
   if (text) {
     await sendCronReply(jid, text);
     const workspaceDir = getWorkspaceDir();
-    const exchange = { user: job.message || '', assistant: text, timestampMs: Date.now(), jid };
+    // Group jids stay as-is (cron jobs to groups log into the group's main file
+    // via the regular exchange path). Owner DM jids collapse into the unified
+    // owner log so cron-driven check-ins live alongside the rest of the convo.
+    const cronLogJid = isTelegramGroupJid(jid) ? jid : toLogJid(jid);
+    const exchange = { user: job.message || '', assistant: text, timestampMs: Date.now(), jid: cronLogJid };
     try {
       const memoryConfig = getMemoryConfig();
       if (memoryConfig) {
