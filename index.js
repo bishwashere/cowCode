@@ -800,6 +800,7 @@ async function main() {
     const systemPrompt = buildSystemPrompt(systemPromptOpts);
     const planBlock = intentPlanToSystemBlock(intentPlan);
     const systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
+    const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
     const turnResult = await runAgentTurn({
       userText: text,
