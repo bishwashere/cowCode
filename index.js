@@ -34,7 +34,7 @@ import { spawn } from 'child_process';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
 import { getSkillsEnabled, getSkillContext, getEnabledSkillIds, DEFAULT_ENABLED } from './skills/loader.js';
-import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid, sendLongText } from './lib/telegram.js';
+import { initBot, createTelegramSock, isTelegramChatId, isTelegramGroupJid, sendLongText, ensurePollingAlive } from './lib/telegram.js';
 import { isWhatsAppGroupJid } from './lib/whatsapp.js';
 import { addPending as addPendingTelegram, clearPending as clearPendingTelegram, flushPending } from './lib/pending-telegram.js';
 import { getChannelsConfig } from './lib/channels-config.js';
@@ -460,89 +460,107 @@ async function main() {
     const waSock = whatsappSockRef.current;
     if (isTgJid && !telegramBot) return;
     if (!isTgJid && !waSock?.sendMessage) return;
+    // Polling watchdog: runs on every Tide cycle regardless of whether a follow-up is sent.
+    // This is how Tide acts as a self-healing heartbeat — not just a quiet-chat nudge.
+    if (isTgJid && telegramBot) {
+      await ensurePollingAlive(telegramBot).catch((e) =>
+        console.error('[tide] polling health check error:', getErrorMessageForLog(e))
+      );
+    }
     const isTgGroup = isTelegramGroupJid(tideJid);
     const historyMessages = isTgGroup
       ? readLastGroupExchanges(getWorkspaceDir(), tideJid, 5)
       : readLastPrivateExchanges(getWorkspaceDir(), tideJid, 5);
-    if (historyMessages.length >= 2) {
-      const lastUserMsg = historyMessages[historyMessages.length - 2];
-      if (lastUserMsg.role === 'user' && lastUserMsg.content === 'Tide check') return;
-    }
-    const payload = JSON.stringify({
-      jid: tideJid,
-      storePath: getCronStorePath(),
-      workspaceDir: getWorkspaceDir(),
-      historyMessages,
-    });
-    let textToSend = '';
-    try {
-      textToSend = await new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, ['cron/run-tide.js'], {
-          cwd: __dirname,
-          stdio: ['pipe', 'pipe', 'inherit'],
-          env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR },
-        });
-        let out = '';
-        child.stdout.setEncoding('utf8');
-        child.stdout.on('data', (chunk) => { out += chunk; });
-        child.on('exit', (code, signal) => {
-          if (code !== 0 && code != null) {
-            reject(new Error(`run-tide exited with code ${code}`));
-            return;
-          }
-          if (signal) {
-            reject(new Error(`run-tide killed: ${signal}`));
-            return;
-          }
-          const lastLine = out.trim().split('\n').filter(Boolean).pop() || '';
-          try {
-            const parsed = JSON.parse(lastLine);
-            if (parsed.error) reject(new Error(parsed.error));
-            else resolve(parsed.textToSend || '');
-          } catch (e) {
-            reject(new Error(lastLine.slice(0, 100) || e.message || 'run-tide invalid output'));
-          }
-        });
-        child.on('error', reject);
-        child.stdin.end(payload, 'utf8');
+    // Old UX preserved: only send one follow-up per "round". Once we've sent a Tide message,
+    // don't send another until the user replies. The health check above still runs every cycle.
+    const lastUserMsg = historyMessages.length >= 2 ? historyMessages[historyMessages.length - 2] : null;
+    const alreadySentTide = lastUserMsg?.role === 'user' && lastUserMsg?.content === 'Tide check';
+    if (!alreadySentTide) {
+      const payload = JSON.stringify({
+        jid: tideJid,
+        storePath: getCronStorePath(),
+        workspaceDir: getWorkspaceDir(),
+        historyMessages,
       });
-    } catch (e) {
-      console.error('[tide] run-tide failed:', getErrorMessageForLog(e));
-      return;
-    }
-    const rawText = sanitizeOutboundText((textToSend || '').trim());
-    let text = isTelegramChatId(tideJid) ? rawText.replace(/^\[CowCode\]\s*/i, '').trim() : rawText;
-    const nothingPhrases = /^(nothing|n\/?a|no(ne)?\s*to\s*do|all\s*good|nothing\s*to\s*report\.?)\s*\.?$/i;
-    if (!text || (text.length < 50 && nothingPhrases.test(text))) {
-      text = "What would you like to do next?";
-    }
-    try {
-      if (isTgJid && telegramBot) {
-        await sendLongText(telegramBot, Number(tideJid), text);
-      } else if (waSock?.sendMessage) {
-        await waSock.sendMessage(tideJid, { text });
+      let textToSend = '';
+      let sendOk = false;
+      try {
+        textToSend = await new Promise((resolve, reject) => {
+          const child = spawn(process.execPath, ['cron/run-tide.js'], {
+            cwd: __dirname,
+            stdio: ['pipe', 'pipe', 'inherit'],
+            env: { ...process.env, COWCODE_STATE_DIR: process.env.COWCODE_STATE_DIR },
+          });
+          let out = '';
+          child.stdout.setEncoding('utf8');
+          child.stdout.on('data', (chunk) => { out += chunk; });
+          child.on('exit', (code, signal) => {
+            if (code !== 0 && code != null) {
+              reject(new Error(`run-tide exited with code ${code}`));
+              return;
+            }
+            if (signal) {
+              reject(new Error(`run-tide killed: ${signal}`));
+              return;
+            }
+            const lastLine = out.trim().split('\n').filter(Boolean).pop() || '';
+            try {
+              const parsed = JSON.parse(lastLine);
+              if (parsed.error) reject(new Error(parsed.error));
+              else resolve(parsed.textToSend || '');
+            } catch (e) {
+              reject(new Error(lastLine.slice(0, 100) || e.message || 'run-tide invalid output'));
+            }
+          });
+          child.on('error', reject);
+          child.stdin.end(payload, 'utf8');
+        });
+        sendOk = true;
+      } catch (e) {
+        console.error('[tide] run-tide failed:', getErrorMessageForLog(e));
       }
-      console.log('[tide] Follow-up sent to', tideJidShort);
-    } catch (e) {
-      console.error('[tide] Send failed:', getErrorMessageForLog(e));
-    }
-    // Group: keep tideJid (group log). Private DM: collapse owner DMs into the
-    // unified owner log so Tide check-ins live alongside the rest of the convo.
-    const tideLogJid = isTgGroup ? tideJid : toLogJid(tideJid);
-    const exchange = { user: 'Tide check', assistant: text, timestampMs: Date.now(), jid: tideLogJid };
-    try {
-      if (isTgGroup) {
-        appendGroupExchange(getWorkspaceDir(), tideJid, exchange);
-      } else {
-        const memoryConfig = getMemoryConfig();
-        if (memoryConfig) {
-          await indexChatExchange(memoryConfig, exchange);
-        } else {
-          appendExchange(getWorkspaceDir(), exchange);
+      if (sendOk) {
+        const rawText = sanitizeOutboundText((textToSend || '').trim());
+        let text = isTelegramChatId(tideJid) ? rawText.replace(/^\[CowCode\]\s*/i, '').trim() : rawText;
+        const nothingPhrases = /^(nothing|n\/?a|no(ne)?\s*to\s*do|all\s*good|nothing\s*to\s*report\.?)\s*\.?$/i;
+        if (!text || (text.length < 50 && nothingPhrases.test(text))) {
+          text = "What would you like to do next?";
+        }
+        try {
+          if (isTgJid && telegramBot) {
+            await sendLongText(telegramBot, Number(tideJid), text);
+          } else if (waSock?.sendMessage) {
+            await waSock.sendMessage(tideJid, { text });
+          }
+          console.log('[tide] Follow-up sent to', tideJidShort);
+        } catch (e) {
+          console.error('[tide] Send failed:', getErrorMessageForLog(e));
+        }
+        // Group: keep tideJid (group log). Private DM: collapse owner DMs into the
+        // unified owner log so Tide check-ins live alongside the rest of the convo.
+        const tideLogJid = isTgGroup ? tideJid : toLogJid(tideJid);
+        const exchange = { user: 'Tide check', assistant: text, timestampMs: Date.now(), jid: tideLogJid };
+        try {
+          if (isTgGroup) {
+            appendGroupExchange(getWorkspaceDir(), tideJid, exchange);
+          } else {
+            const memoryConfig = getMemoryConfig();
+            if (memoryConfig) {
+              await indexChatExchange(memoryConfig, exchange);
+            } else {
+              appendExchange(getWorkspaceDir(), exchange);
+            }
+          }
+        } catch (err) {
+          console.error('[tide] Chat log write failed:', err.message);
         }
       }
-    } catch (err) {
-      console.error('[tide] Chat log write failed:', err.message);
+    }
+    // Heartbeat re-schedule: keep the watchdog cycle alive even when no message was sent.
+    // If the user responded during this cycle, scheduleTideFollowUp already set a fresh
+    // timer — don't override it. Otherwise re-queue for the next health check.
+    if (!tideTimerByJid.has(tideJid)) {
+      scheduleTideFollowUp(tideJid);
     }
   }
   function scheduleTideFollowUp(jid) {
