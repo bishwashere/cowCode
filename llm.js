@@ -101,7 +101,13 @@ function loadConfig(options = {}) {
       const baseUrl = isLocal
         ? (fromEnv(entry.baseUrl) || entry.baseUrl || (provider && PRESETS[provider]))
         : (entry.provider && PRESETS[provider]);
-      const apiKey = fromEnv(entry.apiKey) ?? (i === 0 ? fromEnv('LLM_API_KEY') : undefined);
+      // Resolve apiKey: if the config value is an env var name that isn't set, treat as absent.
+      const rawApiKey = entry.apiKey != null ? String(entry.apiKey).trim() : null;
+      const isEnvVarName = rawApiKey && /^[A-Z][A-Z0-9_]{2,}$/.test(rawApiKey);
+      const resolvedApiKey = isEnvVarName
+        ? (process.env[rawApiKey] || null)              // env var name not set → null
+        : (rawApiKey || null);                          // literal value (e.g. "not-needed", "sk-...")
+      const apiKey = resolvedApiKey ?? (i === 0 ? fromEnv('LLM_API_KEY') : undefined);
       const modelRaw = entry.model != null ? fromEnv(entry.model) : undefined;
       let model = modelRaw || (isLocal ? 'local' : fromEnv(cloudModelEnv(provider))) || (i === 0 ? fromEnv('LLM_MODEL') : undefined);
       if (!isLocal && (!model || model === cloudModelEnv(provider))) {
@@ -118,14 +124,14 @@ function loadConfig(options = {}) {
         priority,
       };
     });
-    // Drop cloud models whose API key resolved to nothing — don't attempt and fail with 401.
+    // Drop cloud models whose API key is missing — don't attempt and get a 401.
+    // Local models (lmstudio/ollama on 127.x) are always kept; they don't need a key.
     models = models.filter((m) => {
-      if (m.apiKey && m.apiKey !== 'not-needed' && String(m.apiKey).trim() !== '') return true;
-      // Local providers (lmstudio, ollama) legitimately need no key.
       const isLocal = m.baseUrl && /127\.0\.0\.1|localhost/i.test(m.baseUrl);
       if (isLocal) return true;
-      console.log('[LLM] skipping model (no API key):', m.model || m.baseUrl);
-      return false;
+      const hasKey = m.apiKey && m.apiKey !== 'not-needed' && String(m.apiKey).trim() !== '';
+      if (!hasKey) console.log('[LLM] skipping model (API key not set):', m.model || m.baseUrl);
+      return hasKey;
     });
     // When any model has priority, try it first regardless of position in config.
     const priorityIndex = models.findIndex((m) => m.priority);
