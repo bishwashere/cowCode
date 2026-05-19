@@ -508,6 +508,289 @@
     }
     .chat-history-item:hover .chat-history-delete { opacity: 1; }
     .chat-history-delete:hover { color: var(--red); background: rgba(239,68,68,0.1); filter: none; }
+
+    /* ── Projects page ────────────────────────────────────────────────── */
+    #page-projects { padding: 1.5rem; }
+    .proj-login { max-width: 340px; margin: 4rem auto; }
+    .proj-login h2 { font-size: 1.1rem; margin-bottom: 1.25rem; color: var(--text); }
+    .proj-login input { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.55rem 0.75rem; border-radius: 6px; font: inherit; font-size: 0.9rem; margin-bottom: 0.6rem; }
+    .proj-login button { width: 100%; }
+    .proj-login .proj-default-hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; text-align: center; }
+
+    .proj-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .proj-header h2 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; flex: 1; }
+
+    /* New project form */
+    .proj-new-form { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-start; }
+    .proj-new-form input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.45rem 0.65rem; border-radius: 6px; font: inherit; font-size: 0.85rem; }
+    .proj-new-form input:focus { outline: none; border-color: var(--accent); }
+    .proj-new-form input.proj-name-input { width: 160px; }
+    .proj-new-form input.proj-desc-input { width: 260px; }
+
+    /* Canvas: scrollable area that holds project rows */
+    .proj-canvas { overflow-x: auto; overflow-y: visible; padding-bottom: 2rem; }
+
+    /* One full project row */
+    .proj-row { margin-bottom: 2.5rem; }
+    .proj-row-inner { display: flex; align-items: flex-start; gap: 0; }
+
+    /* Project card (left, sticky) */
+    .proj-card {
+      flex-shrink: 0;
+      width: 180px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      position: relative;
+    }
+    .proj-card-name { font-size: 0.9rem; font-weight: 600; color: var(--accent); margin-bottom: 0.3rem; word-break: break-word; }
+    .proj-card-desc { font-size: 0.77rem; color: var(--muted); word-break: break-word; line-height: 1.4; }
+    .proj-card-actions { display: flex; gap: 0.35rem; margin-top: 0.7rem; }
+    .proj-card-actions button { background: none; border: 1px solid var(--border); color: var(--muted); font: inherit; font-size: 0.72rem; padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; }
+    .proj-card-actions button:hover { color: var(--text); border-color: var(--accent); }
+    .proj-card-actions .btn-del:hover { color: var(--red); border-color: var(--red); }
+
+    /* Track container: main track + branches stacked vertically */
+    .proj-tracks { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    /* One horizontal track (main or branch) */
+    .proj-track { display: flex; align-items: center; gap: 0; }
+    .proj-track-label {
+      flex-shrink: 0;
+      font-size: 0.7rem;
+      color: var(--muted);
+      width: 90px;
+      text-align: right;
+      padding-right: 0.5rem;
+      font-style: italic;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .proj-track-nodes { display: flex; align-items: center; gap: 0; }
+
+    /* Arrow connector between nodes */
+    .proj-arrow {
+      width: 28px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--border);
+      font-size: 1rem;
+      user-select: none;
+    }
+
+    /* First arrow (from project card to first node) */
+    .proj-first-arrow {
+      width: 28px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--border);
+      font-size: 1rem;
+      user-select: none;
+    }
+
+    /* Update node */
+    .proj-node {
+      flex-shrink: 0;
+      width: 200px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.7rem 0.85rem;
+      position: relative;
+    }
+    .proj-node-time { font-size: 0.68rem; color: var(--muted); margin-bottom: 0.35rem; }
+    .proj-node-text { font-size: 0.82rem; color: var(--text); line-height: 1.45; word-break: break-word; white-space: pre-wrap; }
+    .proj-node-actions { display: flex; gap: 0.3rem; margin-top: 0.55rem; flex-wrap: wrap; }
+    .proj-node-actions button {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.68rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .proj-node-actions button:hover { color: var(--text); border-color: var(--accent); }
+    .proj-node-actions .btn-del:hover { color: var(--red); border-color: var(--red); }
+
+    /* Placeholder "add update" node */
+    .proj-node-add {
+      flex-shrink: 0;
+      width: 160px;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      background: transparent;
+      cursor: text;
+    }
+    .proj-node-add textarea {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.82rem;
+      resize: none;
+      outline: none;
+      width: 100%;
+      min-height: 3rem;
+      placeholder-color: var(--muted);
+    }
+    .proj-node-add textarea::placeholder { color: var(--muted); }
+    .proj-node-add .proj-add-save {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      font: inherit;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      cursor: pointer;
+      align-self: flex-end;
+    }
+    .proj-node-add .proj-add-save:hover { filter: brightness(1.1); }
+
+    /* Branch spawner row under a node */
+    .proj-branch-add {
+      font-size: 0.7rem;
+      color: var(--muted);
+      cursor: pointer;
+      margin-top: 0.35rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .proj-branch-add:hover { color: var(--accent); }
+
+    /* Branch origin line (vertical connector from update to branch label) */
+    .proj-branch-connector {
+      padding-left: calc(180px + 28px); /* project card + first arrow */
+    }
+
+    /* Inline edit state */
+    .proj-node.editing .proj-node-text { display: none; }
+    .proj-node .proj-node-edit-area { display: none; }
+    .proj-node.editing .proj-node-edit-area { display: flex; flex-direction: column; gap: 0.4rem; }
+    .proj-node .proj-node-edit-area textarea {
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.82rem;
+      resize: vertical;
+      border-radius: 4px;
+      padding: 0.4rem;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 3rem;
+    }
+    .proj-node .proj-node-edit-area .save-edit {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      font: inherit;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      align-self: flex-end;
+    }
+
+    /* Inline branch name input */
+    .proj-branch-name-input {
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.78rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      width: 120px;
+    }
+
+    /* ── Projects page ── */
+    #page-projects { padding: 0; }
+    .proj-login { max-width: 340px; margin: 4rem auto; }
+    .proj-login h2 { margin: 0 0 1.25rem; font-size: 1.1rem; color: var(--text); }
+    .proj-login input { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.55rem 0.7rem; border-radius: 6px; font: inherit; font-size: 0.9rem; margin-bottom: 0.65rem; }
+    .proj-login input:focus { outline: none; border-color: var(--accent); }
+    .proj-login button { width: 100%; background: var(--accent); color: #fff; border: none; padding: 0.6rem; border-radius: 6px; font: inherit; font-size: 0.9rem; cursor: pointer; }
+    .proj-login button:hover { filter: brightness(1.12); }
+    .proj-login .proj-login-err { color: var(--red); font-size: 0.82rem; margin-bottom: 0.5rem; }
+    .proj-default-hint { font-size: 0.77rem; color: var(--muted); margin-top: 0.6rem; text-align: center; }
+
+    .proj-workspace { display: flex; flex-direction: column; gap: 0; height: calc(100vh - 90px); overflow: hidden; }
+    .proj-toolbar { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); background: var(--card); flex-shrink: 0; }
+    .proj-toolbar input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.45rem 0.65rem; border-radius: 6px; font: inherit; font-size: 0.85rem; }
+    .proj-toolbar input:focus { outline: none; border-color: var(--accent); }
+    .proj-toolbar input#proj-new-name { width: 180px; }
+    .proj-toolbar input#proj-new-desc { width: 260px; }
+    .proj-toolbar button { background: var(--accent); color: #fff; border: none; padding: 0.45rem 0.9rem; border-radius: 6px; font: inherit; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
+    .proj-toolbar button:hover { filter: brightness(1.12); }
+    .proj-toolbar .proj-logout { background: none; color: var(--muted); border: 1px solid var(--border); margin-left: auto; }
+    .proj-toolbar .proj-logout:hover { color: var(--red); border-color: var(--red); filter: none; }
+
+    .proj-canvas { flex: 1; overflow: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 2rem; }
+
+    /* Each project row */
+    .proj-row { display: flex; flex-direction: column; gap: 0.75rem; }
+    .proj-track { display: flex; align-items: flex-start; gap: 0; position: relative; }
+
+    /* Project root box */
+    .proj-root { flex-shrink: 0; width: 200px; background: var(--card); border: 1px solid var(--accent); border-radius: 10px; padding: 0.85rem 1rem; position: relative; z-index: 1; }
+    .proj-root-name { font-weight: 600; font-size: 0.95rem; color: var(--text); margin-bottom: 0.2rem; word-break: break-word; }
+    .proj-root-desc { font-size: 0.78rem; color: var(--muted); word-break: break-word; }
+    .proj-root-actions { display: flex; gap: 0.4rem; margin-top: 0.55rem; }
+    .proj-root-actions button { background: none; border: none; color: var(--muted); font-size: 0.72rem; cursor: pointer; padding: 0.15rem 0.3rem; border-radius: 3px; }
+    .proj-root-actions button:hover { color: var(--red); background: rgba(239,68,68,0.08); }
+
+    /* Connector arrow between nodes */
+    .proj-arrow { flex-shrink: 0; display: flex; align-items: center; width: 36px; }
+    .proj-arrow::after { content: ''; display: block; width: 100%; height: 2px; background: var(--border); position: relative; }
+    .proj-arrow-head { width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--border); flex-shrink: 0; margin-right: 2px; }
+
+    /* Update node */
+    .proj-update { flex-shrink: 0; width: 210px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 0.9rem; position: relative; }
+    .proj-update-ts { font-size: 0.7rem; color: var(--muted); margin-bottom: 0.35rem; }
+    .proj-update-text { font-size: 0.83rem; color: var(--text); word-break: break-word; line-height: 1.45; }
+    .proj-update-actions { display: flex; gap: 0.35rem; margin-top: 0.5rem; flex-wrap: wrap; }
+    .proj-update-actions button { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 0.7rem; cursor: pointer; padding: 0.15rem 0.45rem; border-radius: 3px; white-space: nowrap; }
+    .proj-update-actions button:hover { color: var(--accent); border-color: var(--accent); }
+    .proj-update-actions button.danger:hover { color: var(--red); border-color: var(--red); }
+
+    /* Add-update placeholder */
+    .proj-add-update { flex-shrink: 0; width: 200px; border: 2px dashed var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; min-height: 70px; cursor: pointer; color: var(--muted); font-size: 0.82rem; transition: border-color 0.15s, color 0.15s; }
+    .proj-add-update:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Inline edit textarea */
+    .proj-inline-edit { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 0.45rem 0.6rem; border-radius: 5px; font: inherit; font-size: 0.82rem; resize: vertical; min-height: 60px; }
+    .proj-inline-edit:focus { outline: none; }
+    .proj-inline-save { background: var(--accent); color: #fff; border: none; padding: 0.3rem 0.7rem; border-radius: 4px; font: inherit; font-size: 0.78rem; cursor: pointer; margin-top: 0.35rem; }
+    .proj-inline-cancel { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.3rem 0.6rem; border-radius: 4px; font: inherit; font-size: 0.78rem; cursor: pointer; margin-top: 0.35rem; margin-left: 0.3rem; }
+
+    /* Branch sub-tracks */
+    .proj-branches { display: flex; flex-direction: column; gap: 0.5rem; margin-left: 236px; }
+    .proj-branch-row { display: flex; align-items: flex-start; gap: 0; }
+    .proj-branch-label { flex-shrink: 0; width: 130px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 0.5rem 0.7rem; font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; }
+    .proj-branch-label span { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .proj-branch-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.68rem; padding: 0; flex-shrink: 0; }
+    .proj-branch-del:hover { color: var(--red); }
+
+    /* Add-branch button inside update */
+    .proj-add-branch-btn { font-size: 0.68rem !important; border-color: var(--border) !important; color: var(--muted) !important; }
+    .proj-add-branch-btn:hover { color: var(--green) !important; border-color: var(--green) !important; }
+
+    /* Empty state */
+    .proj-empty { color: var(--muted); font-size: 0.88rem; padding: 3rem; text-align: center; }
   </style>
 </head>
 <body>
@@ -523,6 +806,7 @@
     <a href="#llm" data-page="llm">LLM</a>
     <a href="#config" data-page="config">Config</a>
     <a href="#test" data-page="test">Test</a>
+    <a href="#projects" data-page="projects">Projects</a>
   </nav>
 
   <div id="page-chat" class="page active">
@@ -763,9 +1047,40 @@
     </div>
   </div>
 
+  <!-- Projects page -->
+  <div id="page-projects" class="page">
+    <!-- Login screen (shown when not authenticated) -->
+    <div id="proj-login-screen" style="display:none; padding:1rem;">
+      <div class="proj-login card">
+        <h2>Projects — Sign In</h2>
+        <div id="proj-login-err" class="proj-login-err" style="display:none;"></div>
+        <input type="text" id="proj-user" placeholder="Username" autocomplete="username" />
+        <input type="password" id="proj-pass" placeholder="Password" autocomplete="current-password" />
+        <button id="proj-login-btn">Sign In</button>
+        <p id="proj-default-hint" class="proj-default-hint" style="display:none;">
+          Default credentials: <strong>admin</strong> / <strong>cowcode</strong>
+        </p>
+      </div>
+    </div>
+    <!-- Main workspace (shown when authenticated) -->
+    <div id="proj-main" style="display:none;">
+      <div class="proj-workspace">
+        <div class="proj-toolbar">
+          <input id="proj-new-name" type="text" placeholder="Project name…" />
+          <input id="proj-new-desc" type="text" placeholder="Description (optional)…" />
+          <button id="proj-add-btn">+ Add Project</button>
+          <button class="proj-logout" id="proj-logout-btn">Sign out</button>
+        </div>
+        <div class="proj-canvas" id="proj-canvas">
+          <div class="proj-empty" id="proj-empty">No projects yet. Add one above.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API = '';
-    var validPages = ['chat', 'status', 'crons', 'skills', 'agents', 'groups', 'llm', 'config', 'soul', 'test'];
+    var validPages = ['chat', 'status', 'crons', 'skills', 'agents', 'groups', 'llm', 'config', 'soul', 'test', 'projects'];
     function setPage(name, soulFileId) {
       if (!name || !validPages.includes(name)) name = 'chat';
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -2198,6 +2513,412 @@
     (function () {
       var p = parseHash();
       setPage(p.name, p.soulFile);
+    })();
+
+    // ── Projects ────────────────────────────────────────────────────────────
+    (function () {
+      var TOKEN_KEY = 'proj_token';
+      var token = sessionStorage.getItem(TOKEN_KEY) || '';
+      var projData = {}; // projectId -> graph { project, updates, branches }
+
+      function projHeaders() {
+        return { 'Content-Type': 'application/json', 'x-projects-token': token };
+      }
+
+      async function projFetch(path, opts) {
+        var res = await fetch('/api' + path, Object.assign({ headers: projHeaders() }, opts));
+        if (res.status === 401) { projLogout(); return null; }
+        return res;
+      }
+
+      function projLogout() {
+        token = '';
+        sessionStorage.removeItem(TOKEN_KEY);
+        showProjLogin();
+      }
+
+      async function showProjLogin() {
+        document.getElementById('proj-main').style.display = 'none';
+        document.getElementById('proj-login-screen').style.display = 'block';
+        // show default creds hint if not customised
+        try {
+          var r = await fetch('/api/projects/credentials-info');
+          var d = await r.json();
+          document.getElementById('proj-default-hint').style.display = d.isDefault ? 'block' : 'none';
+        } catch (_) {}
+      }
+
+      function showProjMain() {
+        document.getElementById('proj-login-screen').style.display = 'none';
+        document.getElementById('proj-main').style.display = 'block';
+        loadProjects();
+      }
+
+      async function initProjectsPage() {
+        if (!token) { showProjLogin(); return; }
+        var r = await projFetch('/projects');
+        if (!r) return; // 401 → redirected to login
+        showProjMain();
+      }
+
+      // ── Login ──
+      document.getElementById('proj-login-btn').addEventListener('click', async function () {
+        var u = document.getElementById('proj-user').value.trim();
+        var p = document.getElementById('proj-pass').value;
+        var err = document.getElementById('proj-login-err');
+        err.style.display = 'none';
+        var res = await fetch('/api/projects/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: u, password: p }),
+        });
+        if (!res.ok) { err.textContent = 'Invalid credentials.'; err.style.display = 'block'; return; }
+        var d = await res.json();
+        token = d.token;
+        sessionStorage.setItem(TOKEN_KEY, token);
+        showProjMain();
+      });
+      document.getElementById('proj-pass').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('proj-login-btn').click();
+      });
+      document.getElementById('proj-logout-btn').addEventListener('click', projLogout);
+
+      // ── Load + render all projects ──
+      async function loadProjects() {
+        var r = await projFetch('/projects');
+        if (!r) return;
+        var projects = await r.json();
+        var canvas = document.getElementById('proj-canvas');
+        canvas.innerHTML = '';
+        if (!projects.length) {
+          canvas.innerHTML = '<div class="proj-empty">No projects yet. Add one above.</div>';
+          return;
+        }
+        for (var proj of projects) {
+          await loadAndRenderProject(proj.id, canvas);
+        }
+      }
+
+      async function loadAndRenderProject(pid, container) {
+        var r = await projFetch('/projects/' + pid + '/graph');
+        if (!r) return;
+        var graph = await r.json();
+        projData[pid] = graph;
+        var existing = document.getElementById('proj-row-' + pid);
+        if (existing) { existing.replaceWith(renderProjectRow(graph)); }
+        else if (container) { container.appendChild(renderProjectRow(graph)); }
+      }
+
+      function fmtTs(ms) {
+        var d = new Date(ms);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+          + '  ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      }
+
+      // ── Render one project row ──
+      function renderProjectRow(graph) {
+        var { project, updates, branches } = graph;
+        var pid = project.id;
+
+        var row = document.createElement('div');
+        row.className = 'proj-row card';
+        row.id = 'proj-row-' + pid;
+
+        // ── Main track (branch_id == null) ──
+        var mainTrack = document.createElement('div');
+        mainTrack.className = 'proj-track';
+
+        // Root box
+        var root = document.createElement('div');
+        root.className = 'proj-root';
+        root.innerHTML = '<div class="proj-root-name">' + esc(project.name) + '</div>'
+          + (project.description ? '<div class="proj-root-desc">' + esc(project.description) + '</div>' : '');
+        var rootActions = document.createElement('div');
+        rootActions.className = 'proj-root-actions';
+        var delProjBtn = document.createElement('button');
+        delProjBtn.textContent = '🗑 Delete project';
+        delProjBtn.title = 'Delete this project and all its data';
+        delProjBtn.addEventListener('click', function () { deleteProject(pid); });
+        rootActions.appendChild(delProjBtn);
+        root.appendChild(rootActions);
+        mainTrack.appendChild(root);
+
+        // Build main-track chain (updates with branch_id == null), ordered by created_at
+        var mainUpdates = updates.filter(function (u) { return u.branch_id == null; })
+          .sort(function (a, b) { return a.created_at - b.created_at; });
+
+        var lastMainUpdate = null;
+        for (var upd of mainUpdates) {
+          mainTrack.appendChild(makeArrow());
+          mainTrack.appendChild(makeUpdateNode(upd, pid, branches));
+          lastMainUpdate = upd;
+        }
+
+        // Add-update placeholder for main track
+        mainTrack.appendChild(makeArrow());
+        mainTrack.appendChild(makeAddUpdatePlaceholder(pid, null, lastMainUpdate ? lastMainUpdate.id : null));
+
+        row.appendChild(mainTrack);
+
+        // ── Branch rows ──
+        var branchesDiv = document.createElement('div');
+        branchesDiv.className = 'proj-branches';
+
+        for (var branch of branches) {
+          var branchUpdates = updates.filter(function (u) { return u.branch_id === branch.id; })
+            .sort(function (a, b) { return a.created_at - b.created_at; });
+
+          var branchRow = document.createElement('div');
+          branchRow.className = 'proj-branch-row';
+
+          var label = document.createElement('div');
+          label.className = 'proj-branch-label';
+          label.innerHTML = '<span>' + esc(branch.name) + '</span>';
+          var delBranchBtn = document.createElement('button');
+          delBranchBtn.className = 'proj-branch-del';
+          delBranchBtn.textContent = '✕';
+          delBranchBtn.title = 'Delete branch';
+          delBranchBtn.addEventListener('click', (function (bid) {
+            return function () { deleteBranch(bid, pid); };
+          })(branch.id));
+          label.appendChild(delBranchBtn);
+          branchRow.appendChild(label);
+
+          var lastBranchUpdate = null;
+          for (var bu of branchUpdates) {
+            branchRow.appendChild(makeArrow());
+            branchRow.appendChild(makeUpdateNode(bu, pid, branches));
+            lastBranchUpdate = bu;
+          }
+          branchRow.appendChild(makeArrow());
+          branchRow.appendChild(makeAddUpdatePlaceholder(pid, branch.id, lastBranchUpdate ? lastBranchUpdate.id : null));
+          branchesDiv.appendChild(branchRow);
+        }
+
+        if (branches.length) row.appendChild(branchesDiv);
+        return row;
+      }
+
+      function makeArrow() {
+        var wrap = document.createElement('div');
+        wrap.className = 'proj-arrow';
+        var head = document.createElement('div');
+        head.className = 'proj-arrow-head';
+        wrap.appendChild(head);
+        return wrap;
+      }
+
+      function makeUpdateNode(upd, pid, branches) {
+        var node = document.createElement('div');
+        node.className = 'proj-update';
+        node.id = 'proj-upd-' + upd.id;
+
+        var ts = document.createElement('div');
+        ts.className = 'proj-update-ts';
+        ts.textContent = fmtTs(upd.created_at);
+
+        var txt = document.createElement('div');
+        txt.className = 'proj-update-text';
+        txt.textContent = upd.text;
+
+        var actions = document.createElement('div');
+        actions.className = 'proj-update-actions';
+
+        var editBtn = document.createElement('button');
+        editBtn.textContent = '✏ Edit';
+        editBtn.addEventListener('click', function () { showInlineEdit(node, upd, pid); });
+
+        var addBranchBtn = document.createElement('button');
+        addBranchBtn.className = 'proj-add-branch-btn';
+        addBranchBtn.textContent = '+ Branch';
+        addBranchBtn.title = 'Add a sub-track branching from this update';
+        addBranchBtn.addEventListener('click', function () { showAddBranch(node, upd.id, pid); });
+
+        var delBtn = document.createElement('button');
+        delBtn.textContent = '🗑';
+        delBtn.className = 'danger';
+        delBtn.title = 'Delete update';
+        delBtn.addEventListener('click', function () { deleteUpdate(upd.id, pid); });
+
+        actions.append(editBtn, addBranchBtn, delBtn);
+        node.append(ts, txt, actions);
+        return node;
+      }
+
+      function makeAddUpdatePlaceholder(pid, branchId, parentUpdateId) {
+        var ph = document.createElement('div');
+        ph.className = 'proj-add-update';
+        ph.textContent = '+ Add update';
+        ph.addEventListener('click', function () {
+          showAddUpdateInline(ph, pid, branchId, parentUpdateId);
+        });
+        return ph;
+      }
+
+      // ── Inline add-update form (replaces placeholder) ──
+      function showAddUpdateInline(placeholder, pid, branchId, parentUpdateId) {
+        var wrap = document.createElement('div');
+        wrap.className = 'proj-update';
+        wrap.style.width = '210px';
+
+        var ta = document.createElement('textarea');
+        ta.className = 'proj-inline-edit';
+        ta.placeholder = 'What was done?';
+
+        var saveBtn = document.createElement('button');
+        saveBtn.className = 'proj-inline-save';
+        saveBtn.textContent = 'Save';
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'proj-inline-cancel';
+        cancelBtn.textContent = 'Cancel';
+
+        saveBtn.addEventListener('click', async function () {
+          var text = ta.value.trim();
+          if (!text) return;
+          var r = await projFetch('/projects/' + pid + '/updates', {
+            method: 'POST',
+            body: JSON.stringify({ branch_id: branchId, parent_update_id: parentUpdateId, text }),
+          });
+          if (!r) return;
+          await refreshProject(pid);
+        });
+        cancelBtn.addEventListener('click', function () { wrap.replaceWith(placeholder); });
+        ta.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveBtn.click();
+        });
+
+        wrap.append(ta, saveBtn, cancelBtn);
+        placeholder.replaceWith(wrap);
+        ta.focus();
+      }
+
+      // ── Inline edit update ──
+      function showInlineEdit(node, upd, pid) {
+        var ta = document.createElement('textarea');
+        ta.className = 'proj-inline-edit';
+        ta.value = upd.text;
+
+        var saveBtn = document.createElement('button');
+        saveBtn.className = 'proj-inline-save';
+        saveBtn.textContent = 'Save';
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'proj-inline-cancel';
+        cancelBtn.textContent = 'Cancel';
+
+        var orig = node.innerHTML;
+        node.innerHTML = '';
+        node.append(ta, saveBtn, cancelBtn);
+        ta.focus();
+
+        saveBtn.addEventListener('click', async function () {
+          var text = ta.value.trim();
+          if (!text) return;
+          var r = await projFetch('/projects/updates/' + upd.id, {
+            method: 'PATCH',
+            body: JSON.stringify({ text }),
+          });
+          if (!r) return;
+          await refreshProject(pid);
+        });
+        cancelBtn.addEventListener('click', function () { node.innerHTML = orig; });
+      }
+
+      // ── Inline add-branch form inside an update node ──
+      function showAddBranch(node, updateId, pid) {
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.placeholder = 'Branch name (e.g. Marketing)';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--accent);color:var(--text);padding:0.35rem 0.5rem;border-radius:4px;font:inherit;font-size:0.8rem;margin-top:0.4rem;';
+        var saveBtn = document.createElement('button');
+        saveBtn.className = 'proj-inline-save';
+        saveBtn.textContent = 'Create';
+        saveBtn.style.marginTop = '0.3rem';
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'proj-inline-cancel';
+        cancelBtn.textContent = 'Cancel';
+
+        node.appendChild(inp);
+        node.appendChild(document.createElement('br'));
+        node.appendChild(saveBtn);
+        node.appendChild(cancelBtn);
+        inp.focus();
+
+        saveBtn.addEventListener('click', async function () {
+          var name = inp.value.trim();
+          if (!name) return;
+          var r = await projFetch('/projects/' + pid + '/branches', {
+            method: 'POST',
+            body: JSON.stringify({ parent_update_id: updateId, name }),
+          });
+          if (!r) return;
+          await refreshProject(pid);
+        });
+        cancelBtn.addEventListener('click', function () { inp.remove(); saveBtn.remove(); cancelBtn.remove(); });
+        inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') saveBtn.click(); });
+      }
+
+      async function deleteProject(pid) {
+        if (!confirm('Delete this project and all its data?')) return;
+        await projFetch('/projects/' + pid, { method: 'DELETE' });
+        document.getElementById('proj-row-' + pid)?.remove();
+        var canvas = document.getElementById('proj-canvas');
+        if (!canvas.querySelector('.proj-row')) {
+          canvas.innerHTML = '<div class="proj-empty">No projects yet. Add one above.</div>';
+        }
+      }
+
+      async function deleteUpdate(uid, pid) {
+        if (!confirm('Delete this update?')) return;
+        await projFetch('/projects/updates/' + uid, { method: 'DELETE' });
+        await refreshProject(pid);
+      }
+
+      async function deleteBranch(bid, pid) {
+        if (!confirm('Delete this branch and all its updates?')) return;
+        await projFetch('/projects/branches/' + bid, { method: 'DELETE' });
+        await refreshProject(pid);
+      }
+
+      async function refreshProject(pid) {
+        var canvas = document.getElementById('proj-canvas');
+        await loadAndRenderProject(pid, canvas);
+      }
+
+      // ── Add project ──
+      document.getElementById('proj-add-btn').addEventListener('click', async function () {
+        var name = document.getElementById('proj-new-name').value.trim();
+        var desc = document.getElementById('proj-new-desc').value.trim();
+        if (!name) { document.getElementById('proj-new-name').focus(); return; }
+        var r = await projFetch('/projects', {
+          method: 'POST',
+          body: JSON.stringify({ name, description: desc }),
+        });
+        if (!r) return;
+        var proj = await r.json();
+        document.getElementById('proj-new-name').value = '';
+        document.getElementById('proj-new-desc').value = '';
+        var canvas = document.getElementById('proj-canvas');
+        var empty = canvas.querySelector('.proj-empty');
+        if (empty) empty.remove();
+        await loadAndRenderProject(proj.id, canvas);
+      });
+      document.getElementById('proj-new-name').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('proj-add-btn').click();
+      });
+
+      function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      }
+
+      // Init when Projects page is opened
+      var origSetPage = window._projSetPageHooked;
+      document.querySelector('nav a[data-page="projects"]').addEventListener('click', function () {
+        initProjectsPage();
+      });
+      // Also init if navigated directly
+      if (location.hash === '#projects') initProjectsPage();
     })();
   </script>
 </body>

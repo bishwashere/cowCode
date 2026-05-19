@@ -20,6 +20,12 @@ import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
 import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent } from '../lib/agent-config.js';
+import {
+  listProjects, getProject, createProject, updateProject, deleteProject,
+  getProjectGraph, createUpdate, editUpdate, deleteUpdate,
+  createBranch, deleteBranch,
+  projectsLogin, validateProjectsToken, getProjectsCredentials,
+} from '../lib/projects-db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -1063,6 +1069,114 @@ app.get('/api/groups/:id/md/:key', (req, res) => {
 
 app.patch('/api/groups/:id/md/:key', (req, res) => {
   res.status(410).json({ error: 'Per-group identity files are removed. Use agent identity files instead.' });
+});
+
+// ── Projects API ──────────────────────────────────────────────────────────────
+
+function requireProjectsAuth(req, res, next) {
+  const token = req.headers['x-projects-token'] || '';
+  if (!validateProjectsToken(token)) {
+    res.status(401).json({ error: 'Projects auth required' });
+    return;
+  }
+  next();
+}
+
+function loadDashboardConfig() {
+  try {
+    return JSON.parse(readFileSync(getConfigPath(), 'utf8'));
+  } catch (_) { return {}; }
+}
+
+app.post('/api/projects/auth', (req, res) => {
+  const { username, password } = req.body || {};
+  const config = loadDashboardConfig();
+  const token = projectsLogin(username, password, config);
+  if (!token) { res.status(401).json({ error: 'Invalid credentials' }); return; }
+  res.json({ token });
+});
+
+app.get('/api/projects/credentials-info', (_req, res) => {
+  // Returns whether credentials are customised (not the actual values).
+  const config = loadDashboardConfig();
+  const creds = getProjectsCredentials(config);
+  const isDefault = creds.username === 'admin' && creds.password === 'cowcode';
+  res.json({ isDefault });
+});
+
+app.get('/api/projects', requireProjectsAuth, (_req, res) => {
+  try { res.json(listProjects()); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/projects', requireProjectsAuth, (req, res) => {
+  const { name, description } = req.body || {};
+  if (!name || !String(name).trim()) { res.status(400).json({ error: 'name required' }); return; }
+  try { res.status(201).json(createProject({ name: String(name).trim(), description: String(description || '').trim() })); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/projects/:id', requireProjectsAuth, (req, res) => {
+  const { name, description } = req.body || {};
+  try {
+    const p = updateProject(Number(req.params.id), { name: String(name || '').trim(), description: String(description || '').trim() });
+    if (!p) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(p);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/projects/:id', requireProjectsAuth, (req, res) => {
+  try { deleteProject(Number(req.params.id)); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/projects/:id/graph', requireProjectsAuth, (req, res) => {
+  try {
+    const g = getProjectGraph(Number(req.params.id));
+    if (!g) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(g);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/projects/:id/updates', requireProjectsAuth, (req, res) => {
+  const { branch_id, parent_update_id, text } = req.body || {};
+  if (!text || !String(text).trim()) { res.status(400).json({ error: 'text required' }); return; }
+  try {
+    res.status(201).json(createUpdate({
+      project_id: Number(req.params.id),
+      branch_id: branch_id != null ? Number(branch_id) : null,
+      parent_update_id: parent_update_id != null ? Number(parent_update_id) : null,
+      text: String(text).trim(),
+    }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/projects/updates/:id', requireProjectsAuth, (req, res) => {
+  const { text } = req.body || {};
+  if (!text || !String(text).trim()) { res.status(400).json({ error: 'text required' }); return; }
+  try { res.json(editUpdate(Number(req.params.id), { text: String(text).trim() })); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/projects/updates/:id', requireProjectsAuth, (req, res) => {
+  try { deleteUpdate(Number(req.params.id)); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/projects/:id/branches', requireProjectsAuth, (req, res) => {
+  const { parent_update_id, name } = req.body || {};
+  if (!name || !String(name).trim()) { res.status(400).json({ error: 'name required' }); return; }
+  try {
+    res.status(201).json(createBranch({
+      project_id: Number(req.params.id),
+      parent_update_id: parent_update_id != null ? Number(parent_update_id) : null,
+      name: String(name).trim(),
+    }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/projects/branches/:id', requireProjectsAuth, (req, res) => {
+  try { deleteBranch(Number(req.params.id)); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Static files
