@@ -1080,6 +1080,138 @@ app.patch('/api/workspace-md/:key', (req, res) => {
   }
 });
 
+// ---- Chat logs (chat-log/*.jsonl, group-chat-log/*/*.jsonl) ----
+
+const CHAT_LOG_DIR_NAME = 'chat-log';
+const GROUP_CHAT_LOG_DIR_NAME = 'group-chat-log';
+
+function normalizeWorkspaceLogKey(key) {
+  return String(key || '').replace(/\\/g, '/').replace(/^\/+/, '');
+}
+
+function isAllowedWorkspaceLogKey(key) {
+  const k = normalizeWorkspaceLogKey(key);
+  if (!k.endsWith('.jsonl')) return false;
+  if (k.startsWith(`${CHAT_LOG_DIR_NAME}/`)) {
+    const rest = k.slice(CHAT_LOG_DIR_NAME.length + 1);
+    if (/^\d{4}-\d{2}-\d{2}\.jsonl$/.test(rest)) return true;
+    if (/^private\/[a-zA-Z0-9_.-]+\.jsonl$/.test(rest)) return true;
+    return false;
+  }
+  if (k.startsWith(`${GROUP_CHAT_LOG_DIR_NAME}/`)) {
+    const rest = k.slice(GROUP_CHAT_LOG_DIR_NAME.length + 1);
+    return /^[^/]+\/\d{4}-\d{2}-\d{2}\.jsonl$/.test(rest);
+  }
+  return false;
+}
+
+function getWorkspaceLogPath(key) {
+  return join(getWorkspaceDir(), normalizeWorkspaceLogKey(key));
+}
+
+function formatChatLogForDisplay(raw) {
+  const lines = String(raw || '').split('\n').filter((l) => l.trim());
+  const blocks = [];
+  for (const line of lines) {
+    try {
+      const row = JSON.parse(line);
+      const ts = row.ts ? new Date(row.ts).toISOString().replace('T', ' ').slice(0, 19) : '';
+      let block = ts ? `[${ts}]\n` : '';
+      if (row.jid) block += `Chat: ${row.jid}\n`;
+      if (row.sessionId) block += `Session: ${row.sessionId}\n`;
+      if (row.user) block += `User: ${row.user}\n`;
+      if (row.assistant) block += `Assistant: ${row.assistant}\n`;
+      blocks.push(block.trim());
+    } catch (_) {
+      blocks.push(line);
+    }
+  }
+  return blocks.join('\n\n');
+}
+
+function listWorkspaceLogFiles(workspaceDir) {
+  const list = [];
+  const chatLogDir = join(workspaceDir, CHAT_LOG_DIR_NAME);
+  if (existsSync(chatLogDir) && statSync(chatLogDir).isDirectory()) {
+    for (const name of readdirSync(chatLogDir)) {
+      if (/^\d{4}-\d{2}-\d{2}\.jsonl$/.test(name)) {
+        const full = join(chatLogDir, name);
+        if (existsSync(full) && statSync(full).isFile()) {
+          list.push({
+            id: `${CHAT_LOG_DIR_NAME}/${name}`,
+            label: name.replace(/\.jsonl$/, ''),
+            category: 'chat',
+            readOnly: true,
+            exists: true,
+          });
+        }
+      }
+    }
+    const privateDir = join(chatLogDir, 'private');
+    if (existsSync(privateDir) && statSync(privateDir).isDirectory()) {
+      for (const name of readdirSync(privateDir)) {
+        if (!name.endsWith('.jsonl')) continue;
+        const full = join(privateDir, name);
+        if (existsSync(full) && statSync(full).isFile()) {
+          list.push({
+            id: `${CHAT_LOG_DIR_NAME}/private/${name}`,
+            label: `private/${name.replace(/\.jsonl$/, '')}`,
+            category: 'chat',
+            readOnly: true,
+            exists: true,
+          });
+        }
+      }
+    }
+  }
+  const groupDir = join(workspaceDir, GROUP_CHAT_LOG_DIR_NAME);
+  if (existsSync(groupDir) && statSync(groupDir).isDirectory()) {
+    for (const groupId of readdirSync(groupDir)) {
+      const groupPath = join(groupDir, groupId);
+      if (!existsSync(groupPath) || !statSync(groupPath).isDirectory()) continue;
+      for (const name of readdirSync(groupPath)) {
+        if (!/^\d{4}-\d{2}-\d{2}\.jsonl$/.test(name)) continue;
+        const full = join(groupPath, name);
+        if (existsSync(full) && statSync(full).isFile()) {
+          list.push({
+            id: `${GROUP_CHAT_LOG_DIR_NAME}/${groupId}/${name}`,
+            label: `group ${groupId}/${name.replace(/\.jsonl$/, '')}`,
+            category: 'chat',
+            readOnly: true,
+            exists: true,
+          });
+        }
+      }
+    }
+  }
+  list.sort((a, b) => (a.id === b.id ? 0 : a.id < b.id ? 1 : -1));
+  return list;
+}
+
+app.get('/api/workspace-logs', (_req, res) => {
+  try {
+    const workspaceDir = getWorkspaceDir();
+    res.json({ files: listWorkspaceLogFiles(workspaceDir) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/workspace-logs/:key', (req, res) => {
+  try {
+    const key = decodeURIComponent(req.params.key || '');
+    if (!isAllowedWorkspaceLogKey(key)) {
+      res.status(400).json({ error: 'Invalid log file key' });
+      return;
+    }
+    const path = getWorkspaceLogPath(key);
+    const raw = existsSync(path) ? readFileSync(path, 'utf8') : '';
+    res.json({ id: key, label: key, content: formatChatLogForDisplay(raw), readOnly: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---- Agent identity files ----
 
 const AGENT_FILE_IDS = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md', 'MEMORY.md'];

@@ -562,6 +562,18 @@
     .soul-tile-title { font-weight: 600; font-size: 1rem; }
     .soul-tile-desc { font-size: 0.8rem; color: var(--muted); }
     #memory-editor-textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.9rem; resize: vertical; }
+    #memory-editor-textarea.read-only { color: var(--muted); }
+    .memory-sidebar-section { margin-bottom: 1rem; }
+    .memory-sidebar-section:last-child { margin-bottom: 0; }
+    .memory-sidebar-heading {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .memory-sidebar-section .skill-meta { margin: 0 0 0.4rem 0; font-size: 0.75rem; line-height: 1.35; }
     .chat-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #page-home .chat-layout.card { margin-bottom: 0; }
     .chat-toolbar {
@@ -1195,28 +1207,7 @@
           </div>
           <div class="home-soul-section">
             <span class="overview-label">Identity & memory</span>
-            <div class="soul-tiles-grid">
-              <button type="button" class="soul-tile-link identity-tile-btn" data-file-id="WhoAmI.md" data-label="Who am I">
-                <span class="soul-tile-icon">◇</span>
-                <span class="soul-tile-title">Who am I</span>
-                <span class="soul-tile-desc">Edit WhoAmI.md</span>
-              </button>
-              <button type="button" class="soul-tile-link identity-tile-btn" data-file-id="MyHuman.md" data-label="My human">
-                <span class="soul-tile-icon">◇</span>
-                <span class="soul-tile-title">My human</span>
-                <span class="soul-tile-desc">Edit MyHuman.md</span>
-              </button>
-              <button type="button" class="soul-tile-link identity-tile-btn" data-file-id="group.md" data-label="Group rules">
-                <span class="soul-tile-icon">◇</span>
-                <span class="soul-tile-title">Group rules</span>
-                <span class="soul-tile-desc">Edit group.md</span>
-              </button>
-              <a href="#memory" class="soul-tile-link">
-                <span class="soul-tile-icon">◇</span>
-                <span class="soul-tile-title">Memory</span>
-                <span class="soul-tile-desc">Edit MEMORY.md</span>
-              </a>
-            </div>
+            <div class="soul-tiles-grid" id="home-identity-tiles"></div>
           </div>
         </div>
         <div class="chat-upper-right card">
@@ -1253,9 +1244,24 @@
   <div id="page-memory" class="page">
     <div class="groups-layout">
       <div class="groups-sidebar card">
-        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Memory</h2>
-        <p class="skill-meta" style="margin:0 0 0.75rem 0;">Click a file to view or edit. Changes are saved to your workspace.</p>
-        <ul id="memory-files-list" class="groups-ul"></ul>
+        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Memory & logs</h2>
+        <p class="skill-meta" style="margin:0 0 0.75rem 0;">Notes and daily activity are editable. Chat logs are read-only conversation history.</p>
+        <div id="memory-sidebar-sections">
+          <div class="memory-sidebar-section">
+            <div class="memory-sidebar-heading">Notes</div>
+            <ul id="memory-notes-list" class="groups-ul"></ul>
+          </div>
+          <div class="memory-sidebar-section">
+            <div class="memory-sidebar-heading">Daily activity</div>
+            <p class="skill-meta">Reminders and saved notes per day (<code>memory/YYYY-MM-DD.md</code>).</p>
+            <ul id="memory-daily-list" class="groups-ul"></ul>
+          </div>
+          <div class="memory-sidebar-section">
+            <div class="memory-sidebar-heading">Chat logs</div>
+            <p class="skill-meta">Everyday conversations (<code>chat-log/*.jsonl</code>).</p>
+            <ul id="memory-chat-list" class="groups-ul"></ul>
+          </div>
+        </div>
       </div>
       <div class="groups-main">
         <div id="memory-editor-card" class="groups-detail card">
@@ -1263,7 +1269,7 @@
           <p class="skill-meta" id="memory-editor-meta" style="margin:0 0 0.75rem 0;"></p>
           <div id="memory-editor-area" style="display:none;">
             <textarea id="memory-editor-textarea" class="skill-doc-inline skill-doc-textarea" spellcheck="false" style="display:block; width:100%; min-height:20rem; margin-bottom:0.75rem;"></textarea>
-            <div><button id="memory-editor-save">Save</button><span id="memory-editor-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div>
+            <div id="memory-editor-actions"><button id="memory-editor-save">Save</button><span id="memory-editor-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div>
           </div>
         </div>
       </div>
@@ -1486,10 +1492,25 @@
   <script>
     const API = '';
     var validPages = ['home', 'chat', 'crons', 'skills', 'agents', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects'];
-    var IDENTITY_FILE_LABELS = { 'WhoAmI.md': 'Who am I', 'MyHuman.md': 'My human', 'group.md': 'Group rules' };
+    var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
+    var IDENTITY_FILE_LABELS = {
+      'SOUL.md': 'Soul',
+      'WhoAmI.md': 'Who am I',
+      'MyHuman.md': 'My human',
+      'group.md': 'Group rules',
+    };
     var tideChecklistCache = null;
+    function isMemoryNotesFile(id) {
+      return id === 'MEMORY.md';
+    }
+    function isMemoryDailyFile(id) {
+      return id && id.indexOf('memory/') === 0 && id.endsWith('.md') && id !== 'MEMORY.md';
+    }
+    function isMemoryChatLogFile(id) {
+      return id && (id.indexOf('chat-log/') === 0 || id.indexOf('group-chat-log/') === 0);
+    }
     function isMemoryWorkspaceFile(id) {
-      return id === 'MEMORY.md' || (id && id.indexOf('memory/') === 0);
+      return isMemoryNotesFile(id) || isMemoryDailyFile(id) || isMemoryChatLogFile(id);
     }
     function setPage(name, memoryFileId, openIdentityFileId) {
       if (name === 'chat' || name === 'status') name = 'home';
@@ -1512,7 +1533,7 @@
       if (name === 'test') fetchTests();
       if (name === 'memory') {
         fetchMemoryFiles().then(function () {
-          if (memoryFileId) selectMemoryFile(memoryFileId);
+          if (memoryFileId) selectMemoryFile(memoryFileId, isMemoryChatLogFile(memoryFileId));
         });
       }
       if (openIdentityFileId) openIdentityEditor(openIdentityFileId);
@@ -1525,7 +1546,7 @@
       if (name === 'chat' || name === 'status') name = 'home';
       if (name === 'soul') {
         if (!subFile || subFile === 'SOUL.md') {
-          return { name: 'home', memoryFile: null, openIdentity: null };
+          return { name: 'home', memoryFile: null, openIdentity: 'SOUL.md' };
         }
         if (isMemoryWorkspaceFile(subFile)) {
           return { name: 'memory', memoryFile: subFile, openIdentity: null };
@@ -1798,7 +1819,7 @@
     async function loadAgentMdFiles(agentId) {
       var r = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/md');
       var d = await r.json();
-      var files = (d.files || []).filter(function (f) { return f.id !== 'SOUL.md'; });
+      var files = d.files || [];
       var filesEl = document.getElementById('agent-md-files');
       filesEl.innerHTML = files.map(function (f) {
         return '<button type="button" class="agent-md-btn" data-agent-file="' + escapeHtml(f.id) + '" style="background:var(--card); border:1px solid var(--border); color:var(--muted); font:inherit; font-size:0.85rem; padding:0.35rem 0.75rem; border-radius:4px; cursor:pointer; margin-top:0;">' + escapeHtml(f.label) + '</button>';
@@ -2867,54 +2888,100 @@
     document.getElementById('test-run-all').addEventListener('click', function () { runAllTests(); });
 
     var selectedMemoryFileId = null;
+    var selectedMemoryFileReadOnly = false;
     var identityEditorFileId = null;
+
+    function memoryFileLabel(id) {
+      if (id === 'MEMORY.md') return 'MEMORY.md';
+      if (isMemoryDailyFile(id)) return id.replace(/^memory\//, '');
+      if (isMemoryChatLogFile(id)) return id.replace(/^chat-log\//, '').replace(/^group-chat-log\//, 'group /');
+      return id;
+    }
+    function renderMemorySidebarList(ul, files, emptyText) {
+      if (!ul) return;
+      if (!files.length) {
+        ul.innerHTML = '<li class="skill-meta">' + escapeHtml(emptyText) + '</li>';
+        return;
+      }
+      ul.innerHTML = files.map(function (f) {
+        return '<li class="' + (selectedMemoryFileId === f.id ? 'selected' : '') + '"><button type="button" class="link memory-file-btn" data-id="' + escapeHtml(f.id) + '" data-readonly="' + (f.readOnly ? '1' : '0') + '">' + escapeHtml(f.label) + '</button></li>';
+      }).join('');
+      ul.querySelectorAll('.memory-file-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          selectMemoryFile(btn.getAttribute('data-id'), btn.getAttribute('data-readonly') === '1');
+        });
+      });
+    }
+    function syncMemorySidebarSelection() {
+      document.querySelectorAll('.memory-file-btn').forEach(function (btn) {
+        var li = btn.closest('li');
+        if (li) li.classList.toggle('selected', btn.getAttribute('data-id') === selectedMemoryFileId);
+      });
+    }
 
     async function fetchMemoryFiles() {
       try {
-        const r = await fetch(API + '/api/workspace-md');
-        const d = await r.json();
-        const files = (d.files || []).filter(function (f) { return isMemoryWorkspaceFile(f.id); });
-        const ul = document.getElementById('memory-files-list');
-        ul.innerHTML = files.map(function (f) {
-          return '<li class="' + (selectedMemoryFileId === f.id ? 'selected' : '') + '"><button type="button" class="link memory-file-btn" data-id="' + escapeHtml(f.id) + '">' + escapeHtml(f.label) + '</button></li>';
-        }).join('');
-        if (files.length === 0) ul.innerHTML = '<li class="empty">No memory files yet.</li>';
-        ul.querySelectorAll('.memory-file-btn').forEach(function (btn) {
-          btn.addEventListener('click', function () { selectMemoryFile(btn.getAttribute('data-id')); });
-        });
+        const [mdRes, logRes] = await Promise.all([
+          fetch(API + '/api/workspace-md'),
+          fetch(API + '/api/workspace-logs'),
+        ]);
+        const mdData = await mdRes.json();
+        const logData = await logRes.json();
+        const notes = (mdData.files || []).filter(function (f) { return isMemoryNotesFile(f.id); });
+        const daily = (mdData.files || []).filter(function (f) { return isMemoryDailyFile(f.id); })
+          .map(function (f) {
+            return { id: f.id, label: f.id.replace(/^memory\//, ''), readOnly: false };
+          })
+          .sort(function (a, b) { return a.id < b.id ? 1 : -1; });
+        const chat = (logData.files || []).slice();
+        renderMemorySidebarList(document.getElementById('memory-notes-list'), notes.length ? notes : [{ id: 'MEMORY.md', label: 'MEMORY.md', readOnly: false }], 'No notes yet.');
+        renderMemorySidebarList(document.getElementById('memory-daily-list'), daily, 'No daily activity yet.');
+        renderMemorySidebarList(document.getElementById('memory-chat-list'), chat, 'No chat logs yet.');
       } catch (e) {
         console.error('[memory]', e);
-        document.getElementById('memory-files-list').innerHTML = '<li class="skill-meta">Error loading files.</li>';
+        ['memory-notes-list', 'memory-daily-list', 'memory-chat-list'].forEach(function (id) {
+          var ul = document.getElementById(id);
+          if (ul) ul.innerHTML = '<li class="skill-meta">Error loading files.</li>';
+        });
       }
     }
 
-    async function selectMemoryFile(id) {
+    async function selectMemoryFile(id, readOnly) {
       selectedMemoryFileId = id;
+      selectedMemoryFileReadOnly = !!readOnly || isMemoryChatLogFile(id);
       if (id && location.hash !== '#memory/' + id) location.hash = '#memory/' + id;
-      document.querySelectorAll('#memory-files-list li').forEach(function (li) {
-        var btn = li.querySelector('.memory-file-btn');
-        li.classList.toggle('selected', btn && btn.getAttribute('data-id') === id);
-      });
+      syncMemorySidebarSelection();
       var titleEl = document.getElementById('memory-editor-title');
       var metaEl = document.getElementById('memory-editor-meta');
       var areaEl = document.getElementById('memory-editor-area');
-      var label = id === 'MEMORY.md' ? 'Memory' : id;
-      titleEl.textContent = label;
-      metaEl.textContent = 'File: ' + id;
+      var actionsEl = document.getElementById('memory-editor-actions');
+      var textarea = document.getElementById('memory-editor-textarea');
+      titleEl.textContent = memoryFileLabel(id);
+      metaEl.textContent = selectedMemoryFileReadOnly
+        ? ('File: ' + id + ' · read-only conversation log')
+        : ('File: ' + id);
       areaEl.style.display = 'block';
+      if (actionsEl) actionsEl.style.display = selectedMemoryFileReadOnly ? 'none' : 'block';
+      if (textarea) {
+        textarea.readOnly = selectedMemoryFileReadOnly;
+        textarea.classList.toggle('read-only', selectedMemoryFileReadOnly);
+      }
       try {
-        var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id));
+        var url = selectedMemoryFileReadOnly
+          ? (API + '/api/workspace-logs/' + encodeURIComponent(id))
+          : (API + '/api/workspace-md/' + encodeURIComponent(id));
+        var r = await fetch(url);
         if (!r.ok) throw new Error('Failed to load');
         var d = await r.json();
-        document.getElementById('memory-editor-textarea').value = d.content || '';
+        if (textarea) textarea.value = d.content || '';
       } catch (e) {
-        document.getElementById('memory-editor-textarea').value = '';
+        if (textarea) textarea.value = '';
       }
     }
 
     document.getElementById('memory-editor-save').addEventListener('click', async function () {
       var id = selectedMemoryFileId;
-      if (!id) return;
+      if (!id || selectedMemoryFileReadOnly) return;
       var content = document.getElementById('memory-editor-textarea').value;
       var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
       if (r.ok) {
@@ -2932,6 +2999,29 @@
       identityEditorFileId = null;
       var savedEl = document.getElementById('identity-editor-modal-saved');
       if (savedEl) savedEl.style.display = 'none';
+    }
+
+    function renderHomeIdentityTiles() {
+      var grid = document.getElementById('home-identity-tiles');
+      if (!grid) return;
+      var identityHtml = IDENTITY_FILE_ORDER.map(function (fileId) {
+        var label = IDENTITY_FILE_LABELS[fileId] || fileId;
+        return '<button type="button" class="soul-tile-link identity-tile-btn" data-file-id="' + escapeHtml(fileId) + '" data-label="' + escapeHtml(label) + '">' +
+          '<span class="soul-tile-icon">◇</span>' +
+          '<span class="soul-tile-title">' + escapeHtml(label) + '</span>' +
+          '<span class="soul-tile-desc">Edit ' + escapeHtml(fileId) + '</span></button>';
+      }).join('');
+      grid.innerHTML = identityHtml +
+        '<a href="#memory" class="soul-tile-link">' +
+        '<span class="soul-tile-icon">◇</span>' +
+        '<span class="soul-tile-title">Memory</span>' +
+        '<span class="soul-tile-desc">Edit MEMORY.md</span></a>';
+      grid.querySelectorAll('.identity-tile-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var fileId = btn.getAttribute('data-file-id');
+          if (fileId) openIdentityEditor(fileId);
+        });
+      });
     }
 
     async function openIdentityEditor(fileId) {
@@ -2958,12 +3048,8 @@
       textarea.focus();
     }
 
-    document.querySelectorAll('.identity-tile-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var fileId = btn.getAttribute('data-file-id');
-        if (fileId) openIdentityEditor(fileId);
-      });
-    });
+    renderHomeIdentityTiles();
+
     document.getElementById('identity-editor-modal-cancel').addEventListener('click', closeIdentityEditor);
     document.getElementById('identity-editor-modal-save').addEventListener('click', async function () {
       var id = identityEditorFileId;
