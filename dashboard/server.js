@@ -1031,6 +1031,7 @@ app.get('/api/workspace-md', (_req, res) => {
       const names = readdirSync(memoryDir);
       for (const name of names) {
         if (!name.endsWith('.md')) continue;
+        if (/^\d{4}-\d{2}-\d{2}\.md$/.test(name)) continue;
         const key = `memory/${name}`;
         if (!/^[a-zA-Z0-9_.-]+$/.test(name.replace(/\.md$/, ''))) continue;
         const full = join(memoryDir, name);

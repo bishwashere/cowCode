@@ -114,7 +114,7 @@ async function main() {
   const planBlock = intentPlanToSystemBlock(intentPlan);
   let systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
   if (sessionRotated) {
-    systemPrompt += buildSessionBootstrapContext(workspaceDir).block;
+    systemPrompt += buildSessionBootstrapContext(workspaceDir, { logJid: dashboardJid }).block;
   }
 
   try {

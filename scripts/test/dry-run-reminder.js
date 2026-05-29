@@ -128,7 +128,6 @@ function step4Print(storePath) {
   console.log('  - Cron executor (lib/executors/cron.js) calls cron/store.js: addJob(input, storePath).');
   console.log('  - addJob writes to: ' + storePath);
   console.log('  - That file is ~/.cowcode/cron/jobs.json (or COWCODE_STATE_DIR/cron/jobs.json).');
-  console.log('  - After add, we also append one line to workspace/memory/<today>.md via memoryWrite (Added reminder: message at when).');
   if (existsSync(storePath)) {
     const raw = readFileSync(storePath, 'utf8');
     console.log('\n  Current jobs.json (first 400 chars):');

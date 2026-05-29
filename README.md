@@ -439,9 +439,10 @@ Semantic memory is stored in a SQLite database with the [`sqlite-vec`](https://g
 
 ### How memory works
 
-1. When memory is enabled, each message exchange is indexed: text is embedded via the configured LLM and stored as a float vector in SQLite.
-2. On each new message, the bot runs a similarity search against stored memories and prepends relevant past context to the system prompt.
-3. Explicit save commands (`"remember that..."`, `"save this to notes"`) create named memory entries.
+1. When memory is enabled, each message exchange is indexed into SQLite from **chat-log** (`chat-log/YYYY-MM-DD.jsonl` and `chat-log/private/*.jsonl`). Long-term notes in **MEMORY.md** (and optional custom `memory/*.md` files like `preferences.md`) are indexed too.
+2. Legacy date-stamped `memory/YYYY-MM-DD.md` files are **not** indexed — daily history lives in chat-log only.
+3. On each new message, the bot runs a similarity search against stored memories and prepends relevant past context to the system prompt.
+4. Explicit save commands (`"remember that..."`, `"save this to notes"`) append to `MEMORY.md`.
 
 ### Key files
 
@@ -462,7 +463,7 @@ LLM context is scoped to a **session** per chat (owner log, per-DM jid, or group
 - **Daily reset** — New session at **03:00** in `agents.defaults.userTimezone` (same timezone as reminders; `"auto"` uses the host TZ). Override hour with `agents.defaults.sessionResetHour` (0–23).
 - **Manual reset** — Say e.g. `start a new session`, `new session`, or `/new-session` (no special reply text; context simply clears).
 - **State file** — `~/.cowcode/chat-sessions/state.json`
-- **Bootstrap (not in session history)** — On each **new session** and every **Tide** follow-up, the model receives `MEMORY.md` plus today and yesterday’s daily markdown logs (`workspace/memory/YYYY-MM-DD.md`) read from disk. Chat session history stays scoped to the current session only.
+- **Bootstrap (not in session history)** — On each **new session**, daemon **restart**, and every **Tide** follow-up, the model receives `MEMORY.md` plus **today and yesterday’s chat logs** (`chat-log/YYYY-MM-DD.jsonl` and, for private chats, `chat-log/private/<jid>.jsonl`). Chat session history stays scoped to the current session only.
 
 ---
 
@@ -575,7 +576,7 @@ cowCode/
 │   ├── telegram.js          # Telegram bot adapter (polling)
 │   ├── whatsapp.js          # WhatsApp utility functions
 │   ├── memory-index.js      # Memory embedding + vector search
-│   ├── memory-write.js      # Memory write operations
+│   ├── session-bootstrap.js # MEMORY.md bootstrap for new sessions / Tide
 │   ├── chat-log.js          # Append/read conversation logs
 │   ├── paths.js             # Resolves all state directory paths
 │   ├── speech-client.js     # Speech-to-text / text-to-speech client

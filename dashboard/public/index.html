@@ -1245,16 +1245,11 @@
     <div class="groups-layout">
       <div class="groups-sidebar card">
         <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Memory & logs</h2>
-        <p class="skill-meta" style="margin:0 0 0.75rem 0;">Notes and daily activity are editable. Chat logs are read-only conversation history.</p>
+        <p class="skill-meta" style="margin:0 0 0.75rem 0;">Long-term notes are editable. Chat logs are read-only conversation history.</p>
         <div id="memory-sidebar-sections">
           <div class="memory-sidebar-section">
             <div class="memory-sidebar-heading">Notes</div>
             <ul id="memory-notes-list" class="groups-ul"></ul>
-          </div>
-          <div class="memory-sidebar-section">
-            <div class="memory-sidebar-heading">Daily activity</div>
-            <p class="skill-meta">Reminders and saved notes per day (<code>memory/YYYY-MM-DD.md</code>).</p>
-            <ul id="memory-daily-list" class="groups-ul"></ul>
           </div>
           <div class="memory-sidebar-section">
             <div class="memory-sidebar-heading">Chat logs</div>
@@ -1503,14 +1498,11 @@
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
     }
-    function isMemoryDailyFile(id) {
-      return id && id.indexOf('memory/') === 0 && id.endsWith('.md') && id !== 'MEMORY.md';
-    }
     function isMemoryChatLogFile(id) {
       return id && (id.indexOf('chat-log/') === 0 || id.indexOf('group-chat-log/') === 0);
     }
     function isMemoryWorkspaceFile(id) {
-      return isMemoryNotesFile(id) || isMemoryDailyFile(id) || isMemoryChatLogFile(id);
+      return isMemoryNotesFile(id) || isMemoryChatLogFile(id);
     }
     function setPage(name, memoryFileId, openIdentityFileId) {
       if (name === 'chat' || name === 'status') name = 'home';
@@ -2893,7 +2885,6 @@
 
     function memoryFileLabel(id) {
       if (id === 'MEMORY.md') return 'MEMORY.md';
-      if (isMemoryDailyFile(id)) return id.replace(/^memory\//, '');
       if (isMemoryChatLogFile(id)) return id.replace(/^chat-log\//, '').replace(/^group-chat-log\//, 'group /');
       return id;
     }
@@ -2928,18 +2919,12 @@
         const mdData = await mdRes.json();
         const logData = await logRes.json();
         const notes = (mdData.files || []).filter(function (f) { return isMemoryNotesFile(f.id); });
-        const daily = (mdData.files || []).filter(function (f) { return isMemoryDailyFile(f.id); })
-          .map(function (f) {
-            return { id: f.id, label: f.id.replace(/^memory\//, ''), readOnly: false };
-          })
-          .sort(function (a, b) { return a.id < b.id ? 1 : -1; });
         const chat = (logData.files || []).slice();
         renderMemorySidebarList(document.getElementById('memory-notes-list'), notes.length ? notes : [{ id: 'MEMORY.md', label: 'MEMORY.md', readOnly: false }], 'No notes yet.');
-        renderMemorySidebarList(document.getElementById('memory-daily-list'), daily, 'No daily activity yet.');
         renderMemorySidebarList(document.getElementById('memory-chat-list'), chat, 'No chat logs yet.');
       } catch (e) {
         console.error('[memory]', e);
-        ['memory-notes-list', 'memory-daily-list', 'memory-chat-list'].forEach(function (id) {
+        ['memory-notes-list', 'memory-chat-list'].forEach(function (id) {
           var ul = document.getElementById(id);
           if (ul) ul.innerHTML = '<li class="skill-meta">Error loading files.</li>';
         });

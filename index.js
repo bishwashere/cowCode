@@ -53,7 +53,7 @@ import { indexChatExchange } from './lib/memory-index.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
 import { ensureChatSession } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
-import { toLogJid } from './lib/owner-config.js';
+import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
 import { ensureGroupConfigFor } from './lib/group-config.js';
@@ -521,7 +521,9 @@ async function main() {
     if (tideSession.rotated) {
       console.log('[tide] New session for', tideSessionKey, '—', tideSessionId);
     }
-    const tideBootstrap = buildSessionBootstrapContext(getWorkspaceDir()).block;
+    const tideBootstrap = buildSessionBootstrapContext(getWorkspaceDir(), {
+      logJid: isTgGroup ? undefined : tideLogJid,
+    }).block;
     const historyMessages = isTgGroup
       ? readLastGroupExchanges(getWorkspaceDir(), tideJid, 5, tideSessionId)
       : readLastPrivateExchanges(getWorkspaceDir(), tideLogJid, 5, tideSessionId);
@@ -652,7 +654,7 @@ async function main() {
     console.log('[tide] Enabled. Follow-up cooldown:', cooldownMinutes, 'min. Health-check interval:', healthCheckMinutes, 'min.');
     if (tideGlobalInterval) clearInterval(tideGlobalInterval);
     maybeRunTideChecklist('onRestart');
-    buildSessionBootstrapContext(getWorkspaceDir());
+    buildSessionBootstrapContext(getWorkspaceDir(), { logJid: getOwnerLogJid() });
     tideGlobalInterval = setInterval(() => {
       maybeRunTideChecklist('onCycle');
       // 1. Always run the Telegram polling watchdog, independent of any active conversation.
@@ -840,7 +842,7 @@ async function main() {
     const workspaceDirForBootstrap = getWorkspaceDir();
     const sessionBootstrap =
       sessionRotated
-        ? buildSessionBootstrapContext(workspaceDirForBootstrap).block
+        ? buildSessionBootstrapContext(workspaceDirForBootstrap, { logJid: isGroupJid ? undefined : logJid }).block
         : '';
     const agentId = (bioOpts.agentIdOverride && String(bioOpts.agentIdOverride).trim())
       || (isGroupJid ? resolveAgentIdForGroup(jid) : DEFAULT_AGENT_ID);
