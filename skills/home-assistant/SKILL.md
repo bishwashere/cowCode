@@ -56,6 +56,17 @@ If the user mentions a room or device by name and you don't know the entity_id:
 1. Use **`search <name>`** (e.g. `search living_room`) to get matching entities and their `entity_id`.
 2. Then use **`on`**, **`off`**, **`state`**, etc. with that `entity_id`.
 
+## How to present results to the user
+
+**Always reply in natural, conversational language.** The tool result includes a **`summary`** field — use that as your source of truth.
+
+- Say: "It's 72° and sunny outside, and about 74° in the dining room."
+- Do **not** show `entity_id` values (e.g. `sensor.dining_room_temperature`, `weather.forecast_home`).
+- Do **not** repeat the same reading twice in different formats.
+- Do **not** use bullet lists or labeled sections unless the user asked for a list of devices.
+- Round temperatures to whole degrees when speaking (73.58° → "about 74°").
+- Use friendly names (Dining Room, Outside) — never raw Home Assistant identifiers.
+
 ## Notes
 
 - Entity IDs are `domain.name` (e.g. `light.living_room`, `automation.morning`). Use `list` or `search` to discover them.
@@ -65,7 +76,7 @@ If the user mentions a room or device by name and you don't know the entity_id:
 
 ```tool-schema
 home_assistant_run
-  description: Control and query home appliances and sensors inside the home (lights, switches, plugs, fans, thermostats, home sensors, automations, scenes, scripts). Use command string e.g. "list lights", "on light.xyz", "search kitchen", "state light.living_room". Do NOT use for outdoor or weather queries - use web search for those.
+  description: Control and query home appliances and sensors inside the home (lights, switches, plugs, fans, thermostats, home sensors, automations, scenes, scripts). Use command string e.g. "list lights", "on light.xyz", "search kitchen", "state light.living_room". Reply to the user in plain conversational sentences using the summary field — never entity_id. Do NOT use for outdoor or weather queries unless weather is exposed in Home Assistant.
   parameters:
     command: string
 ```

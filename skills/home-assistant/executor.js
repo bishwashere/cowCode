@@ -7,6 +7,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { getStateDir } from '../../lib/paths.js';
+import { enrichHaToolResult } from '../../lib/home-assistant-format.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -104,5 +105,5 @@ export async function executeHomeAssistant(ctx, args) {
       error: 'Provide a command (e.g. "list lights", "search kitchen", "on light.living_room") or action + domain/entity_id. Use "help" for all commands.',
     });
   }
-  return runCli(argv);
+  return enrichHaToolResult(await runCli(argv));
 }
