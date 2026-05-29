@@ -36,6 +36,7 @@
     "test:gmail-skill": "node scripts/test/test-gmail-skill.js",
     "test:calendar-skill": "node scripts/test/test-calendar-skill.js",
     "test:skill-install": "node scripts/test/test-skill-install.js",
+    "test:credential-utils": "node scripts/test/test-credential-utils.js",
     "test:all": "pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner"
   },
   "dependencies": {

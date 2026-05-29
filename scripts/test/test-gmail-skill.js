@@ -1,9 +1,12 @@
 /**
  * Unit tests for the Gmail skill executor.
  * Tests argument validation without real gog CLI calls.
- * Run with GOG_ACCOUNT set and gog authenticated for live tests.
+ * Run with gog authenticated and skills.gog.account in config for live tests.
  */
 
+import { readFileSync, existsSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 import { executeGmail } from '../../lib/executors/gmail.js';
 
 let passed = 0;
@@ -77,6 +80,32 @@ await test('unknown action returns error', async () => {
   const result = await executeGmail({}, {}, 'gmail_banana');
   assertError(result, 'unknown');
 });
+
+function getGogDefaultAccount() {
+  const configPath = join(process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode'), 'config.json');
+  try {
+    if (!existsSync(configPath)) return '';
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    return config?.skills?.gog?.account || '';
+  } catch {
+    return '';
+  }
+}
+
+const gogAccount = process.env.GOG_ACCOUNT || getGogDefaultAccount();
+if (gogAccount) {
+  console.log('\n  Running live Gmail tests\n');
+  await test('list_emails with account @me uses configured default', async () => {
+    const result = await executeGmail({}, { account: '@me', max: 1 }, 'gmail_list_emails');
+    const obj = typeof result === 'string' ? JSON.parse(result) : result;
+    if (obj.error && /no auth for gmail @me/i.test(obj.error)) {
+      throw new Error(`@me was not normalized: ${obj.error.slice(0, 120)}`);
+    }
+    if (obj.error && !/no auth|not found|exited/i.test(obj.error)) {
+      throw new Error(`Unexpected error: ${obj.error.slice(0, 120)}`);
+    }
+  });
+}
 
 console.log(`\nResults: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

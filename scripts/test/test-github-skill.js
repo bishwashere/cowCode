@@ -201,6 +201,12 @@ await test('create_pr requires confirm:true', async () => {
 
 // ── Live integration tests ────────────────────────────────────────────────────
 
+await test('read_repo rejects @me as repo', async () => {
+  if (!liveToken) return;
+  const result = await executeGithub({}, { repo: '@me' }, 'github_read_repo');
+  assertError(result, 'list_repos');
+});
+
 if (liveToken) {
   console.log('\n  Running live list_repos tests\n');
 

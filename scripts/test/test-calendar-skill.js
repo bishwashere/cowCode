@@ -1,9 +1,12 @@
 /**
  * Unit tests for the Calendar skill executor.
  * Tests argument validation, confirmation flow, and duration parsing.
- * Run with GOG_ACCOUNT set and gog authenticated for live tests.
+ * Run with gog authenticated and skills.gog.account in config for live tests.
  */
 
+import { readFileSync, existsSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 import { executeCalendar } from '../../lib/executors/calendar.js';
 
 let passed = 0;
@@ -151,6 +154,29 @@ await test('all-day event: start date-only passes our validation', async () => {
     throw new Error(`Unexpected validation error: ${obj.error}`);
   }
 });
+
+function getGogDefaultAccount() {
+  const configPath = join(process.env.COWCODE_STATE_DIR || join(homedir(), '.cowcode'), 'config.json');
+  try {
+    if (!existsSync(configPath)) return '';
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    return config?.skills?.gog?.account || '';
+  } catch {
+    return '';
+  }
+}
+
+const gogAccount = process.env.GOG_ACCOUNT || getGogDefaultAccount();
+if (gogAccount) {
+  console.log('\n  Running live Calendar tests\n');
+  await test('list_events with account @me uses configured default', async () => {
+    const result = await executeCalendar({}, { account: '@me', days: 1, max: 1 }, 'calendar_list_events');
+    const text = String(result);
+    if (/no auth for calendar @me/i.test(text)) {
+      throw new Error('@me was not normalized');
+    }
+  });
+}
 
 console.log(`\nResults: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
