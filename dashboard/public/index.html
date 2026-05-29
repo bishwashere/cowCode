@@ -127,29 +127,27 @@
     /* Agent team map (projects-style boxes) */
     .agent-map-canvas {
       position: relative;
-      min-height: 6rem;
-      padding: 0.25rem 0;
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+    .agent-map-canvas-inner {
+      position: relative;
+      min-width: 100%;
     }
     .agent-map-arrows {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
       pointer-events: none;
       z-index: 0;
       overflow: visible;
     }
     .agent-map-nodes {
-      position: relative;
+      position: absolute;
+      top: 0; left: 0;
       z-index: 1;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.85rem 1rem;
-      align-content: flex-start;
     }
     .agent-map-node {
-      position: relative;
-      flex-shrink: 0;
+      position: absolute;
       width: 132px;
       background: var(--bg);
       border: 1px solid var(--border);
@@ -209,11 +207,17 @@
       margin-top: 0.3rem;
       line-height: 1.35;
     }
+    .agent-map-tree-line {
+      stroke: var(--border);
+      stroke-width: 1.5;
+      fill: none;
+    }
     .agent-map-arrow-line {
       stroke: var(--accent);
       stroke-width: 1.5;
+      stroke-dasharray: 4 3;
       fill: none;
-      opacity: 0.5;
+      opacity: 0.65;
     }
     .card {
       background: var(--card);
@@ -1334,11 +1338,16 @@
           </div>
         </div>
         <div class="chat-upper-right card">
-          <h2 class="chat-upper-right-title">Agent team</h2>
-          <p class="skill-meta" style="margin:0 0 0.5rem 0;">Click an agent to chat. Arrows show who can message whom (<code>agent-send</code> + allow list).</p>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
+            <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
+            <button type="button" id="agent-team-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+          </div>
+          <p class="skill-meta" style="margin:0 0 0.6rem 0;">Click to chat. Tree shows hierarchy; dashed arrows show message-passing links.</p>
           <div id="agent-map-canvas" class="agent-map-canvas">
-            <svg id="agent-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
-            <div id="agent-map-nodes" class="agent-map-nodes"></div>
+            <div id="agent-map-canvas-inner" class="agent-map-canvas-inner">
+              <svg id="agent-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
+              <div id="agent-map-nodes" class="agent-map-nodes"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -2081,7 +2090,11 @@
         var r = await fetch(API + '/api/agents');
         var d = await r.json();
         var agents = Array.isArray(d.agents) ? d.agents : [{ id: 'main' }];
-        var preferred = preselectId || selectedChatAgentId || 'main';
+        var nonMain = agents.find(function(a) { return String(a.id) !== 'main'; });
+        var preferred = preselectId
+          || (selectedChatAgentId !== 'main' ? selectedChatAgentId : null)
+          || (nonMain ? nonMain.id : null)
+          || 'main';
         select.innerHTML = agents.map(function (a) {
           var id = String(a.id || 'main');
           var selected = id === preferred ? ' selected' : '';
@@ -3621,83 +3634,140 @@
       });
     }
 
-    function drawAgentMapArrows(agents) {
+    // Tree layout constants
+    var T_NODE_W = 132;   // card width
+    var T_NODE_H = 80;    // approximate card height
+    var T_H_GAP  = 20;    // horizontal gap between siblings
+    var T_V_GAP  = 52;    // vertical gap root→children
+    var T_PAD_X  = 16;    // horizontal canvas padding
+    var T_PAD_Y  = 10;    // vertical canvas padding
+
+    function agentTreeLayout(agents) {
+      var root = agents.find(function(a) { return a.id === 'main'; }) || agents[0];
+      var others = agents.filter(function(a) { return a !== root; });
+      var n = others.length;
+      var rowW = n > 0 ? n * T_NODE_W + (n - 1) * T_H_GAP : 0;
+      var canvasW = Math.max(rowW, T_NODE_W) + T_PAD_X * 2;
+      var canvasH = T_PAD_Y + T_NODE_H + (n > 0 ? T_V_GAP + T_NODE_H : 0) + T_PAD_Y;
+      var positions = {};
+      // Root centered
+      positions[root.id] = { x: (canvasW - T_NODE_W) / 2, y: T_PAD_Y };
+      // Children evenly spread
+      var startX = (canvasW - rowW) / 2;
+      others.forEach(function(a, i) {
+        positions[a.id] = { x: startX + i * (T_NODE_W + T_H_GAP), y: T_PAD_Y + T_NODE_H + T_V_GAP };
+      });
+      return { positions: positions, canvasW: canvasW, canvasH: canvasH, root: root, others: others };
+    }
+
+    function drawAgentMapArrows(agents, layout) {
       var svg = document.getElementById('agent-map-arrows');
-      var container = document.getElementById('agent-map-canvas');
-      if (!svg || !container) return;
-      var w = container.clientWidth || 1;
-      var h = container.clientHeight || 1;
+      var inner = document.getElementById('agent-map-canvas-inner');
+      if (!svg || !inner || !layout) { if (svg) svg.innerHTML = ''; return; }
+      var w = layout.canvasW;
+      var h = layout.canvasH;
       svg.setAttribute('width', String(w));
       svg.setAttribute('height', String(h));
       svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
-      var edges = [];
-      (agents || []).forEach(function (a) {
+
+      var defs = '<defs>' +
+        '<marker id="agent-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">' +
+          '<polygon points="0 0, 7 3, 0 6" fill="#a78bfa" opacity="0.8"/>' +
+        '</marker>' +
+      '</defs>';
+      var shapes = [];
+
+      // Tree connector lines: root bottom → each child top (elbow style)
+      if (layout.others.length > 0) {
+        var rp = layout.positions[layout.root.id];
+        var rootCX = rp.x + T_NODE_W / 2;
+        var rootBotY = rp.y + T_NODE_H;
+        var midY = rootBotY + T_V_GAP / 2;
+        var childCXs = layout.others.map(function(a) {
+          var p = layout.positions[a.id];
+          return p ? p.x + T_NODE_W / 2 : rootCX;
+        });
+        var leftCX = Math.min.apply(null, childCXs);
+        var rightCX = Math.max.apply(null, childCXs);
+
+        // Trunk down from root
+        shapes.push('<line x1="' + rootCX + '" y1="' + rootBotY + '" x2="' + rootCX + '" y2="' + midY + '" class="agent-map-tree-line"/>');
+        // Horizontal bar
+        if (layout.others.length > 1) {
+          shapes.push('<line x1="' + leftCX + '" y1="' + midY + '" x2="' + rightCX + '" y2="' + midY + '" class="agent-map-tree-line"/>');
+        }
+        // Drop lines to each child
+        layout.others.forEach(function(a) {
+          var p = layout.positions[a.id];
+          if (!p) return;
+          var cx = p.x + T_NODE_W / 2;
+          shapes.push('<line x1="' + cx + '" y1="' + midY + '" x2="' + cx + '" y2="' + p.y + '" class="agent-map-tree-line"/>');
+        });
+      }
+
+      // Permission arrows (dashed, curved)
+      (agents || []).forEach(function(a) {
         if (!a.canAgentSend) return;
         var allow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
-        allow.forEach(function (target) {
-          if ((agents || []).some(function (x) { return x.id === target; })) {
-            edges.push({ from: a.id, to: target });
-          }
+        allow.forEach(function(target) {
+          if (!(agents || []).some(function(x) { return x.id === target; })) return;
+          var fp = layout.positions[a.id];
+          var tp = layout.positions[target];
+          if (!fp || !tp) return;
+          var fx = fp.x + T_NODE_W / 2, fy = fp.y + T_NODE_H / 2;
+          var tx = tp.x + T_NODE_W / 2, ty = tp.y + T_NODE_H / 2;
+          var cx = (fx + tx) / 2, cy = Math.min(fy, ty) - 28;
+          shapes.push('<path d="M' + fx + ',' + fy + ' Q' + cx + ',' + cy + ' ' + tx + ',' + ty + '" class="agent-map-arrow-line" marker-end="url(#agent-arrowhead)"/>');
         });
       });
-      if (!edges.length) {
-        svg.innerHTML = '';
-        return;
-      }
-      var cr = container.getBoundingClientRect();
-      function center(id) {
-        var el = container.querySelector('.agent-map-node[data-agent-id="' + id + '"]');
-        if (!el) return null;
-        var r = el.getBoundingClientRect();
-        return { x: r.left - cr.left + r.width / 2, y: r.top - cr.top + r.height / 2 };
-      }
-      var defs = '<defs><marker id="agent-arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a78bfa" opacity="0.65"/></marker></defs>';
-      var lines = edges.map(function (e) {
-        var f = center(e.from);
-        var t = center(e.to);
-        if (!f || !t) return '';
-        return '<line x1="' + f.x + '" y1="' + f.y + '" x2="' + t.x + '" y2="' + t.y + '" class="agent-map-arrow-line" marker-end="url(#agent-arrowhead)"/>';
-      }).join('');
-      svg.innerHTML = defs + lines;
+
+      svg.innerHTML = defs + shapes.join('');
     }
 
     function renderAgentMap() {
       var nodesEl = document.getElementById('agent-map-nodes');
-      if (!nodesEl) return;
+      var inner = document.getElementById('agent-map-canvas-inner');
+      if (!nodesEl || !inner) return;
       var agents = agentMapData || [];
       if (!agents.length) {
-        nodesEl.innerHTML = '<p class="skill-meta" style="margin:0;">No agents yet. Use + Agent to create one.</p>';
-        drawAgentMapArrows([]);
+        nodesEl.innerHTML = '';
+        inner.style.height = '3rem';
+        if (document.getElementById('agent-map-arrows')) document.getElementById('agent-map-arrows').innerHTML = '';
         return;
       }
-      nodesEl.innerHTML = agents.map(function (a) {
+
+      var layout = agentTreeLayout(agents);
+      inner.style.width  = layout.canvasW + 'px';
+      inner.style.height = layout.canvasH + 'px';
+
+      nodesEl.innerHTML = agents.map(function(a) {
+        var pos = layout.positions[a.id] || { x: 0, y: 0 };
         var id = escapeHtml(a.id);
         var rawTitle = (a.title && String(a.title).trim()) ? String(a.title).trim() : '';
         var titleHtml = rawTitle
           ? '<div class="agent-map-node-title">' + escapeHtml(rawTitle) + '</div><div class="agent-map-node-id-sub">' + id + '</div>'
           : '<div class="agent-map-node-id">' + id + '</div>';
         var skillCount = Array.isArray(a.skillsEnabled) ? a.skillsEnabled.length : 0;
-        var allowCount = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow.length : 0;
-        var canSend = !!a.canAgentSend;
-        var meta;
-        if (canSend && allowCount) meta = allowCount + ' peer' + (allowCount === 1 ? '' : 's');
-        else if (a.id === 'main') meta = 'default agent';
-        else meta = 'isolated';
+        var isMain = a.id === 'main';
+        var meta = isMain ? 'root' : 'agent';
         var sel = a.id === selectedChatAgentId ? ' selected' : '';
         var chatLabel = rawTitle ? rawTitle + ' (' + a.id + ')' : a.id;
-        return '<div class="agent-map-node' + sel + '" data-agent-id="' + id + '" role="button" tabindex="0" title="Chat with ' + escapeHtml(chatLabel) + '">' +
-          '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit agent ' + id + '" title="Edit agent">✎</button>' +
+        return '<div class="agent-map-node' + sel + '" data-agent-id="' + id + '" role="button" tabindex="0"' +
+          ' title="Chat with ' + escapeHtml(chatLabel) + '"' +
+          ' style="left:' + pos.x + 'px; top:' + pos.y + 'px;">' +
+          '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Edit agent">✎</button>' +
           titleHtml +
           '<div class="agent-map-node-meta">' + skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + escapeHtml(meta) + '</div></div>';
       }).join('');
-      nodesEl.querySelectorAll('.agent-map-node-edit').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
+
+      nodesEl.querySelectorAll('.agent-map-node-edit').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
           e.stopPropagation();
           var aid = btn.getAttribute('data-agent-id');
           if (aid) openAgentEditModal(aid);
         });
       });
-      nodesEl.querySelectorAll('.agent-map-node').forEach(function (node) {
+      nodesEl.querySelectorAll('.agent-map-node').forEach(function(node) {
         function pick() {
           var id = node.getAttribute('data-agent-id');
           if (!id) return;
@@ -3707,13 +3777,12 @@
           updateAgentMapSelection();
         }
         node.addEventListener('click', pick);
-        node.addEventListener('keydown', function (e) {
+        node.addEventListener('keydown', function(e) {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
         });
       });
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () { drawAgentMapArrows(agents); });
-      });
+
+      drawAgentMapArrows(agents, layout);
     }
 
     function setChatAgent(agentId) {
@@ -3939,6 +4008,9 @@
       setChatAgent((e.target && e.target.value) || 'main');
     });
     document.getElementById('chat-agent-create-btn').addEventListener('click', function () {
+      openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+    });
+    document.getElementById('agent-team-create-btn').addEventListener('click', function () {
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
     });
     document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);
