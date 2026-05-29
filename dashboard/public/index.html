@@ -664,6 +664,10 @@
     }
     .modal-card.modal-card-wide { max-width: 34rem; }
     .modal-card.modal-card-editor { max-width: 42rem; }
+    .modal-card.modal-card-agent-edit {
+      max-width: min(92vw, 52rem);
+      max-height: min(92vh, 820px);
+    }
     .modal-card .identity-editor-textarea {
       display: block;
       width: 100%;
@@ -731,28 +735,110 @@
       color: var(--muted);
     }
     .modal-card button.secondary:hover { color: var(--text); border-color: var(--muted); filter: none; }
-    .agent-edit-skills-list,
-    .agent-edit-links {
-      max-height: 9rem;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.5rem 0.65rem;
-      background: var(--bg);
+    .agent-edit-basics {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 0.75rem 1rem;
+      margin-top: 0.85rem;
     }
-    .agent-edit-skills-list label,
-    .agent-edit-links label {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.45rem;
+    .agent-edit-basics .field { margin-top: 0; }
+    @media (max-width: 520px) {
+      .agent-edit-basics { grid-template-columns: 1fr; }
+      .agent-edit-tiles-grid { grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); }
+    }
+    .agent-edit-section { margin-top: 1.1rem; }
+    .agent-edit-section > label {
+      display: block;
       font-size: 0.82rem;
-      margin: 0.35rem 0;
-      cursor: pointer;
-    }
-    .agent-edit-skills-list .skill-desc {
-      font-size: 0.72rem;
       color: var(--muted);
-      margin-top: 0.1rem;
+      margin-bottom: 0.35rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .agent-edit-tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+      gap: 0.55rem;
+      margin-top: 0.45rem;
+    }
+    .agent-edit-peer-grid {
+      grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    }
+    .agent-edit-tile {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      min-height: 4.25rem;
+      padding: 0.55rem 0.65rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .agent-edit-tile:hover { border-color: var(--muted); }
+    .agent-edit-tile:has(input:checked) {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.35);
+      background: rgba(167, 139, 250, 0.07);
+    }
+    .agent-edit-tile-input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    .agent-edit-tile-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent);
+      word-break: break-word;
+      line-height: 1.25;
+      padding-right: 1rem;
+    }
+    .agent-edit-tile-desc {
+      font-size: 0.68rem;
+      color: var(--muted);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .agent-edit-tile-check {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.45rem;
+      width: 0.85rem;
+      height: 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      color: transparent;
+      line-height: 1;
+    }
+    .agent-edit-tile:has(input:checked) .agent-edit-tile-check {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #1a1025;
+    }
+    .agent-edit-messaging-block {
+      margin-top: 1.1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .agent-edit-messaging-block .field label {
+      text-transform: none;
+      font-weight: normal;
+      letter-spacing: 0;
     }
     .agent-edit-row-inline {
       display: flex;
@@ -1131,38 +1217,43 @@
   </div>
 
   <div id="agent-edit-modal" class="modal-overlay" aria-hidden="true">
-    <div class="modal-card modal-card-wide" role="dialog" aria-modal="true" aria-labelledby="agent-edit-modal-heading">
+    <div class="modal-card modal-card-agent-edit" role="dialog" aria-modal="true" aria-labelledby="agent-edit-modal-heading">
       <h2 id="agent-edit-modal-heading">Edit agent</h2>
       <p class="skill-meta" style="margin:0;">Update display title, skills, and which agents this one can message.</p>
-      <div class="field">
-        <label for="agent-edit-modal-id">Agent id</label>
-        <input id="agent-edit-modal-id" type="text" readonly disabled>
-      </div>
-      <div class="field">
-        <label for="agent-edit-modal-title">Title <span class="skill-meta">(optional)</span></label>
-        <input id="agent-edit-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
-      </div>
-      <div class="field">
-        <label><input type="checkbox" id="agent-edit-modal-agent-send"> Agent messaging (<code>agent-send</code> skill)</label>
-        <p class="field-hint">When enabled, this agent can send messages to other agents you select below.</p>
-      </div>
-      <div id="agent-edit-modal-links-wrap" class="field" style="display:none;">
-        <label>Can message these agents</label>
-        <div id="agent-edit-modal-links" class="agent-edit-links"></div>
-      </div>
-      <div id="agent-edit-modal-messaging-advanced" class="field agent-edit-row-inline" style="display:none;">
+      <div class="agent-edit-basics">
         <div class="field">
-          <label for="agent-edit-modal-max-depth">Max depth</label>
-          <input id="agent-edit-modal-max-depth" type="number" min="1" max="10" step="1">
+          <label for="agent-edit-modal-id">Agent id</label>
+          <input id="agent-edit-modal-id" type="text" readonly disabled>
         </div>
         <div class="field">
-          <label for="agent-edit-modal-max-calls">Max calls / turn</label>
-          <input id="agent-edit-modal-max-calls" type="number" min="1" max="50" step="1">
+          <label for="agent-edit-modal-title">Title <span class="skill-meta">(optional)</span></label>
+          <input id="agent-edit-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
         </div>
       </div>
-      <div class="field">
+      <div class="field agent-edit-section">
         <label>Skills</label>
-        <div id="agent-edit-modal-skills" class="agent-edit-skills-list"></div>
+        <p class="field-hint" style="margin:0;">Click tiles to enable or disable skills for this agent.</p>
+        <div id="agent-edit-modal-skills" class="agent-edit-tiles-grid"></div>
+      </div>
+      <div class="agent-edit-messaging-block">
+        <div class="field">
+          <label><input type="checkbox" id="agent-edit-modal-agent-send"> Agent messaging (<code>agent-send</code> skill)</label>
+          <p class="field-hint">When enabled, this agent can send messages to other agents you select below.</p>
+        </div>
+        <div id="agent-edit-modal-links-wrap" class="field agent-edit-section" style="display:none;">
+          <label>Can message these agents</label>
+          <div id="agent-edit-modal-links" class="agent-edit-tiles-grid agent-edit-peer-grid"></div>
+        </div>
+        <div id="agent-edit-modal-messaging-advanced" class="field agent-edit-row-inline" style="display:none;">
+          <div class="field">
+            <label for="agent-edit-modal-max-depth">Max depth</label>
+            <input id="agent-edit-modal-max-depth" type="number" min="1" max="10" step="1">
+          </div>
+          <div class="field">
+            <label for="agent-edit-modal-max-calls">Max calls / turn</label>
+            <input id="agent-edit-modal-max-calls" type="number" min="1" max="50" step="1">
+          </div>
+        </div>
       </div>
       <p id="agent-edit-modal-error" class="modal-error" role="alert"></p>
       <div class="modal-actions">
@@ -1999,6 +2090,31 @@
       syncAgentEditMessagingSections();
     }
 
+    function renderAgentEditSkillTile(skill, enabled) {
+      var sid = escapeHtml(skill.id);
+      var desc = escapeHtml((skill.description || '').trim());
+      var checked = enabled.includes(skill.id) ? ' checked' : '';
+      return '<label class="agent-edit-tile agent-edit-skill-tile">' +
+        '<input type="checkbox" class="agent-edit-tile-input" data-edit-skill="' + sid + '"' + checked + '>' +
+        '<span class="agent-edit-tile-check" aria-hidden="true">✓</span>' +
+        '<span class="agent-edit-tile-title">' + sid + '</span>' +
+        (desc ? '<span class="agent-edit-tile-desc">' + desc + '</span>' : '') +
+        '</label>';
+    }
+
+    function renderAgentEditPeerTile(agent, allow) {
+      var tid = escapeHtml(agent.id);
+      var title = (agent.title && String(agent.title).trim()) ? escapeHtml(String(agent.title).trim()) : tid;
+      var checked = allow.includes(agent.id) ? ' checked' : '';
+      var sub = title !== tid ? '<span class="agent-edit-tile-desc">' + tid + '</span>' : '';
+      return '<label class="agent-edit-tile agent-edit-peer-tile">' +
+        '<input type="checkbox" class="agent-edit-tile-input" data-edit-link="' + tid + '"' + checked + '>' +
+        '<span class="agent-edit-tile-check" aria-hidden="true">✓</span>' +
+        '<span class="agent-edit-tile-title">' + title + '</span>' +
+        sub +
+        '</label>';
+    }
+
     async function openAgentEditModal(agentId) {
       agentEditModalAgentId = agentId || 'main';
       showAgentEditModalError('');
@@ -2019,11 +2135,7 @@
         var skillsEl = document.getElementById('agent-edit-modal-skills');
         if (skillsEl) {
           skillsEl.innerHTML = list.map(function (s) {
-            var sid = escapeHtml(s.id);
-            var checked = enabled.includes(s.id) ? ' checked' : '';
-            var desc = escapeHtml((s.description || '').trim());
-            return '<label><input type="checkbox" data-edit-skill="' + sid + '"' + checked + '><span><span class="skill-id">' + sid + '</span>' +
-              (desc ? '<div class="skill-desc">' + desc + '</div>' : '') + '</span></label>';
+            return renderAgentEditSkillTile(s, enabled);
           }).join('');
           skillsEl.querySelectorAll('input[data-edit-skill]').forEach(function (cb) {
             cb.addEventListener('change', syncAgentSendFromSkillsList);
@@ -2050,11 +2162,7 @@
             linksEl.innerHTML = '<p class="skill-meta" style="margin:0;">No other agents yet.</p>';
           } else {
             linksEl.innerHTML = others.map(function (a) {
-              var tid = escapeHtml(a.id);
-              var ttitle = (a.title && String(a.title).trim()) ? escapeHtml(String(a.title).trim()) : tid;
-              var checked = allow.includes(a.id) ? ' checked' : '';
-              var sub = ttitle !== tid ? ' <span class="skill-meta">(' + tid + ')</span>' : '';
-              return '<label><input type="checkbox" data-edit-link="' + tid + '"' + checked + '><span>' + ttitle + sub + '</span></label>';
+              return renderAgentEditPeerTile(a, allow);
             }).join('');
           }
         }
