@@ -26,6 +26,9 @@ const {
   normalizeAgentTitle,
   normalizeAgentMessagingPolicy,
   getAgentMessagingPolicy,
+  syncAgentSendSkillInConfig,
+  resolveEnabledSkillsForAgent,
+  agentSendEnabledForAgent,
 } = await import('../../lib/agent-config.js');
 
 let passed = 0;
@@ -70,6 +73,20 @@ async function main() {
   const normalized = normalizeAgentMessagingPolicy({ allow: [' Backend ', ''], maxDepth: 0, maxCallsPerTurn: -1 });
   check('normalize allow ids', normalized.allow.includes('backend') && normalized.allow.length === 1);
   check('normalize defaults for invalid nums', normalized.maxDepth === 2 && normalized.maxCallsPerTurn === 5);
+
+  const withLinks = syncAgentSendSkillInConfig({
+    skills: { enabled: ['search'] },
+    agentMessaging: { allow: ['backend'] },
+  });
+  check('sync adds agent-send when links exist', withLinks.skills.enabled.includes('agent-send'));
+  check('agentSendEnabledForAgent with links', agentSendEnabledForAgent('pm'));
+  check('resolveEnabledSkillsForAgent injects agent-send', resolveEnabledSkillsForAgent('pm', ['search']).includes('agent-send'));
+
+  const withoutLinks = syncAgentSendSkillInConfig({
+    skills: { enabled: ['search', 'agent-send'] },
+    agentMessaging: { allow: [] },
+  });
+  check('sync removes agent-send when no links', !withoutLinks.skills.enabled.includes('agent-send'));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

@@ -96,7 +96,8 @@ async function main() {
   check('reject: unknown agent', isError(await executeAgentSend(baseCtx(), { agent: 'ghost', message: 'hi' })));
 
   // Not in allow list (reviewer exists but not allowed)
-  check('reject: not in allow list', isError(await executeAgentSend(baseCtx(), { agent: 'reviewer', message: 'hi' })));
+  const notAllowed = await executeAgentSend(baseCtx(), { agent: 'reviewer', message: 'hi' });
+  check('reject: not linked', isError(notAllowed) && /not linked/i.test(notAllowed));
 
   // Loop guard (target already in chain)
   check(

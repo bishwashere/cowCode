@@ -10,6 +10,8 @@ Offload **long or heavy work** to a background agent turn. The user gets an imme
 
 This is the cowCode equivalent of OpenClaw sub-agents (`sessions_spawn`).
 
+**Always available in chat** — no skill toggle or setup. Use `/tasks` to check status.
+
 ## When to use
 
 - Research, multi-step browsing, large file analysis, or anything that may take minutes.

@@ -27,6 +27,7 @@ const {
   _setBackgroundRunTurnForTests,
 } = await import('../../lib/background-tasks.js');
 const { executeBackgroundTasks } = await import('../../lib/executors/background-tasks.js');
+const { getEnabledSkillIds } = await import('../../skills/loader.js');
 
 let passed = 0;
 let failed = 0;
@@ -107,6 +108,8 @@ async function main() {
   recoverStaleBackgroundTasks(storePath);
   const stale = listTasksForJid('999', storePath)[0];
   check('recover: running -> failed on restart', stale?.status === 'failed' && /restart/.test(stale?.error || ''));
+
+  check('implicit: always in enabled skill ids', getEnabledSkillIds({ agentId: 'main' }).includes('background-tasks'));
 
   // Mock fast background turn
   _setBackgroundRunTurnForTests(async () => ({

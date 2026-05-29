@@ -1292,23 +1292,10 @@
         <div id="agent-edit-modal-skills" class="agent-edit-tiles-grid"></div>
       </div>
       <div class="agent-edit-messaging-block">
-        <div class="field">
-          <label><input type="checkbox" id="agent-edit-modal-agent-send"> Agent messaging (<code>agent-send</code> skill)</label>
-          <p class="field-hint">When enabled, this agent can send messages to other agents you select below.</p>
-        </div>
-        <div id="agent-edit-modal-links-wrap" class="field agent-edit-section" style="display:none;">
-          <label>Can message these agents</label>
+        <div id="agent-edit-modal-links-wrap" class="field agent-edit-section">
+          <label>Team links</label>
+          <p class="field-hint" style="margin:0;">Agents this one can delegate to. Links appear as paths on the team map.</p>
           <div id="agent-edit-modal-links" class="agent-edit-tiles-grid agent-edit-peer-grid"></div>
-        </div>
-        <div id="agent-edit-modal-messaging-advanced" class="field agent-edit-row-inline" style="display:none;">
-          <div class="field">
-            <label for="agent-edit-modal-max-depth">Max depth</label>
-            <input id="agent-edit-modal-max-depth" type="number" min="1" max="10" step="1">
-          </div>
-          <div class="field">
-            <label for="agent-edit-modal-max-calls">Max calls / turn</label>
-            <input id="agent-edit-modal-max-calls" type="number" min="1" max="50" step="1">
-          </div>
         </div>
       </div>
       <p id="agent-edit-modal-error" class="modal-error" role="alert"></p>
@@ -2219,32 +2206,6 @@
       }
     }
 
-    function syncAgentEditMessagingSections() {
-      var sendCb = document.getElementById('agent-edit-modal-agent-send');
-      var linksWrap = document.getElementById('agent-edit-modal-links-wrap');
-      var adv = document.getElementById('agent-edit-modal-messaging-advanced');
-      var on = sendCb && sendCb.checked;
-      if (linksWrap) linksWrap.style.display = on ? '' : 'none';
-      if (adv) adv.style.display = on ? '' : 'none';
-    }
-
-    function syncAgentSendFromSkillsCheckbox() {
-      var sendCb = document.getElementById('agent-edit-modal-agent-send');
-      var skillsEl = document.getElementById('agent-edit-modal-skills');
-      if (!sendCb || !skillsEl) return;
-      var agentSendSkill = skillsEl.querySelector('input[data-edit-skill="agent-send"]');
-      if (agentSendSkill) agentSendSkill.checked = sendCb.checked;
-    }
-
-    function syncAgentSendFromSkillsList() {
-      var sendCb = document.getElementById('agent-edit-modal-agent-send');
-      var skillsEl = document.getElementById('agent-edit-modal-skills');
-      if (!sendCb || !skillsEl) return;
-      var agentSendSkill = skillsEl.querySelector('input[data-edit-skill="agent-send"]');
-      if (agentSendSkill) sendCb.checked = agentSendSkill.checked;
-      syncAgentEditMessagingSections();
-    }
-
     function renderAgentEditSkillTile(skill, enabled) {
       var sid = escapeHtml(skill.id);
       var desc = escapeHtml((skill.description || '').trim());
@@ -2286,30 +2247,15 @@
         if (titleInput) titleInput.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
         if (heading) heading.textContent = 'Edit agent: ' + agentId;
         var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled.slice() : (skillsResp.enabled || []).slice();
-        var list = skillsResp.skills || [];
+        var list = (skillsResp.skills || []).filter(function (s) { return s.id !== 'agent-send' && s.id !== 'background-tasks'; });
         var skillsEl = document.getElementById('agent-edit-modal-skills');
         if (skillsEl) {
           skillsEl.innerHTML = list.map(function (s) {
             return renderAgentEditSkillTile(s, enabled);
           }).join('');
-          skillsEl.querySelectorAll('input[data-edit-skill]').forEach(function (cb) {
-            cb.addEventListener('change', syncAgentSendFromSkillsList);
-          });
         }
         var messaging = cfg.agentMessaging || {};
         var allow = Array.isArray(messaging.allow) ? messaging.allow : [];
-        var sendCb = document.getElementById('agent-edit-modal-agent-send');
-        if (sendCb) {
-          sendCb.checked = enabled.includes('agent-send');
-          sendCb.onchange = function () {
-            syncAgentSendFromSkillsCheckbox();
-            syncAgentEditMessagingSections();
-          };
-        }
-        var maxDepthEl = document.getElementById('agent-edit-modal-max-depth');
-        var maxCallsEl = document.getElementById('agent-edit-modal-max-calls');
-        if (maxDepthEl) maxDepthEl.value = messaging.maxDepth != null ? messaging.maxDepth : 2;
-        if (maxCallsEl) maxCallsEl.value = messaging.maxCallsPerTurn != null ? messaging.maxCallsPerTurn : 5;
         var others = (agentsResp.agents || []).filter(function (a) { return a.id !== agentId; });
         var linksEl = document.getElementById('agent-edit-modal-links');
         if (linksEl) {
@@ -2321,7 +2267,6 @@
             }).join('');
           }
         }
-        syncAgentEditMessagingSections();
         modal.classList.add('open');
         modal.setAttribute('aria-hidden', 'false');
         agentEditModalOpen = true;
@@ -2348,33 +2293,22 @@
       var titleInput = document.getElementById('agent-edit-modal-title');
       var skillsEl = document.getElementById('agent-edit-modal-skills');
       var linksEl = document.getElementById('agent-edit-modal-links');
-      var sendCb = document.getElementById('agent-edit-modal-agent-send');
       var enabled = [];
       if (skillsEl) {
         skillsEl.querySelectorAll('input[data-edit-skill]:checked').forEach(function (cb) {
           enabled.push(cb.getAttribute('data-edit-skill'));
         });
       }
-      if (sendCb && sendCb.checked && enabled.indexOf('agent-send') === -1) enabled.push('agent-send');
-      if (sendCb && !sendCb.checked) enabled = enabled.filter(function (s) { return s !== 'agent-send'; });
       var allow = [];
       if (linksEl) {
         linksEl.querySelectorAll('input[data-edit-link]:checked').forEach(function (cb) {
           allow.push(cb.getAttribute('data-edit-link'));
         });
       }
-      var maxDepthEl = document.getElementById('agent-edit-modal-max-depth');
-      var maxCallsEl = document.getElementById('agent-edit-modal-max-calls');
-      var maxDepth = maxDepthEl ? parseInt(maxDepthEl.value, 10) : 2;
-      var maxCalls = maxCallsEl ? parseInt(maxCallsEl.value, 10) : 5;
       var patch = {
         title: titleInput ? titleInput.value : '',
         skills: { enabled: enabled },
-        agentMessaging: {
-          allow: allow,
-          maxDepth: Number.isFinite(maxDepth) && maxDepth > 0 ? maxDepth : 2,
-          maxCallsPerTurn: Number.isFinite(maxCalls) && maxCalls > 0 ? maxCalls : 5,
-        },
+        agentMessaging: { allow: allow },
       };
       if (submitBtn) submitBtn.disabled = true;
       showAgentEditModalError('');
@@ -3788,8 +3722,8 @@
 
       // Permission arrows (dashed, curved)
       (agents || []).forEach(function(a) {
-        if (!a.canAgentSend) return;
         var allow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
+        if (!allow.length) return;
         allow.forEach(function(target) {
           if (!(agents || []).some(function(x) { return x.id === target; })) return;
           var fp = layout.positions[a.id];

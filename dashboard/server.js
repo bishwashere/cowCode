@@ -18,9 +18,9 @@ import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsTe
 dotenv.config({ path: getEnvPath() });
 import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
-import { DEFAULT_ENABLED } from '../skills/loader.js';
+import { DEFAULT_ENABLED, UI_HIDDEN_SKILL_IDS, stripImplicitSkillsFromConfig } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
-import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy } from '../lib/agent-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy, getAgentTitle, normalizeAgentTitle, normalizeAgentMessagingPolicy, syncAgentSendSkillInConfig } from '../lib/agent-config.js';
 import {
   getTideChecklistFromConfig,
   normalizeChecklistConfig,
@@ -104,6 +104,10 @@ function getAllSkillIds() {
     .filter((d) => d.isDirectory())
     .filter((d) => SKILL_MD_NAMES.some((name) => existsSync(join(SKILLS_DIR, d.name, name))))
     .map((d) => d.name);
+}
+
+function getUiSkillIds() {
+  return getAllSkillIds().filter((id) => !UI_HIDDEN_SKILL_IDS.has(id));
 }
 
 /** Parse YAML-like front matter (--- ... ---) and return { description } (and id/name if present). */
@@ -287,7 +291,7 @@ app.get('/api/skills', (_req, res) => {
   try {
     const config = loadConfig();
     const enabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
-    const allIds = getAllSkillIds();
+    const allIds = getUiSkillIds();
     const list = allIds.map((id) => ({
       id,
       enabled: enabled.includes(id),
@@ -341,7 +345,7 @@ app.patch('/api/skills', (req, res) => {
     }
     const config = loadConfig();
     if (!config.skills) config.skills = {};
-    config.skills.enabled = enabled;
+    config.skills.enabled = stripImplicitSkillsFromConfig(enabled).filter((id) => id !== 'agent-send');
     saveConfig(config);
     res.json({ enabled });
   } catch (err) {
@@ -361,7 +365,7 @@ app.get('/api/agents', (_req, res) => {
         skillsEnabled,
         hasLlm: !!config.llm,
         agentMessaging: getAgentMessagingPolicy(id),
-        canAgentSend: skillsEnabled.includes('agent-send'),
+        hasAgentLinks: getAgentMessagingPolicy(id).allow.length > 0,
       };
     });
     res.json({ agents });
@@ -393,8 +397,12 @@ app.patch('/api/agents/:id/config', (req, res) => {
       else delete config.title;
     }
     if (patch.agentMessaging !== undefined) {
-      config.agentMessaging = normalizeAgentMessagingPolicy(patch.agentMessaging);
+      config.agentMessaging = normalizeAgentMessagingPolicy({
+        ...(config.agentMessaging || {}),
+        ...patch.agentMessaging,
+      });
     }
+    syncAgentSendSkillInConfig(config);
     saveAgentConfig(id, config);
     if (id === DEFAULT_AGENT_ID) saveConfig(config);
     res.json(config);
@@ -454,7 +462,7 @@ app.get('/api/group/skills', (_req, res) => {
     const agentConfig = loadAgentConfig(agentId);
     const baseEnabled = Array.isArray(agentConfig.skills?.enabled) ? agentConfig.skills.enabled : DEFAULT_ENABLED;
     const enabled = baseEnabled.filter((id) => !deny.includes(id));
-    const allIds = getAllSkillIds();
+    const allIds = getUiSkillIds();
     const list = allIds.map((id) => ({
       id,
       enabled: enabled.includes(id),
@@ -520,7 +528,7 @@ app.get('/api/groups/:id/skills', (req, res) => {
     const agentConfig = loadAgentConfig(agentId);
     const baseEnabled = Array.isArray(agentConfig.skills?.enabled) ? agentConfig.skills.enabled : DEFAULT_ENABLED;
     const enabled = baseEnabled.filter((sid) => !deny.includes(sid));
-    const allIds = getAllSkillIds();
+    const allIds = getUiSkillIds();
     const list = allIds.map((sid) => ({
       id: sid,
       enabled: enabled.includes(sid),

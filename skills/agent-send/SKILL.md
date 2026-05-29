@@ -29,7 +29,7 @@ After you get the reply, synthesize a single answer for the user. You may messag
 
 ## Limits and safety
 
-- **Allow list** - you can only message agents listed in your `agentMessaging.allow`.
+- **Allow list** - you can only message agents linked on the team map (`agentMessaging.allow`).
 - **No self / no loops** - you cannot message yourself or any agent already in the current delegation chain.
 - **Depth** - delegations can nest only up to `agentMessaging.maxDepth` (default 2).
 - **Per-turn cap** - at most `agentMessaging.maxCallsPerTurn` delegations per turn (default 5).
@@ -38,11 +38,12 @@ If a call is rejected, the tool result explains why. Do not retry the same block
 
 ## Configuration
 
-This skill is **off by default** and is never available in group chats. To enable it for an agent, add `agent-send` to that agent's `skills.enabled` and configure its policy in the agent's `config.json`:
+Team links on the **agent map** (or `agentMessaging.allow` in the agent config) define who this agent can delegate to. When links exist, `agent-send` is enabled automatically — no separate skill toggle.
+
+Optional limits in the agent config (defaults shown):
 
 ```jsonc
 {
-  "skills": { "enabled": ["search", "memory", "agent-send"] },
   "agentMessaging": {
     "allow": ["backend", "reviewer"],
     "maxDepth": 2,
