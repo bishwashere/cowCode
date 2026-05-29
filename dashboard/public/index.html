@@ -566,19 +566,50 @@
     .soul-tile-icon { font-size: 1.1rem; color: var(--accent); }
     .soul-tile-title { font-weight: 600; font-size: 1rem; }
     .soul-tile-desc { font-size: 0.8rem; color: var(--muted); }
-    #memory-editor-textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: inherit; font-size: 0.9rem; resize: vertical; }
-    #memory-editor-textarea.read-only { color: var(--muted); }
-    .memory-sidebar-section { margin-bottom: 1rem; }
-    .memory-sidebar-section:last-child { margin-bottom: 0; }
-    .memory-sidebar-heading {
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--muted);
-      margin-bottom: 0.35rem;
+    /* Memory page — tiles */
+    .memory-tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+      gap: 0.75rem;
     }
-    .memory-sidebar-section .skill-meta { margin: 0 0 0.4rem 0; font-size: 0.75rem; line-height: 1.35; }
+    .memory-tile {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.9rem 1rem 0.75rem;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: var(--bg);
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+      transition: border-color 0.13s, background 0.13s;
+      font: inherit;
+    }
+    .memory-tile:hover { border-color: var(--accent); }
+    .memory-tile.active { border-color: var(--accent); background: rgba(99,102,241,0.07); }
+    .memory-tile-icon { font-size: 1.3rem; line-height: 1; margin-bottom: 0.2rem; }
+    .memory-tile-title { font-weight: 600; font-size: 0.92rem; }
+    .memory-tile-stat { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; min-height: 0.9rem; }
+    /* Memory page — content panels */
+    .mem-panel { display: none; }
+    .mem-panel.active { display: block; }
+    .mem-panel-split { display: none; }
+    .mem-panel-split.active { display: flex; gap: 0; }
+    .mem-log-textarea {
+      display: block; width: 100%; height: 62vh; min-height: 18rem;
+      font-family: inherit; font-size: 0.83rem; line-height: 1.55;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--muted); padding: 0.75rem; border-radius: 6px;
+      resize: vertical; white-space: pre; overflow-wrap: normal;
+    }
+    .mem-edit-textarea {
+      display: block; width: 100%; min-height: 20rem; height: 62vh;
+      font-family: inherit; font-size: 0.9rem; line-height: 1.6;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); padding: 0.75rem; border-radius: 6px;
+      resize: vertical;
+    }
     .chat-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #page-home .chat-layout.card { margin-bottom: 0; }
     .chat-toolbar {
@@ -1200,13 +1231,9 @@
       <h2 id="agent-create-modal-title">Create agent</h2>
       <p class="skill-meta" style="margin:0;">Add a new agent persona with its own skills and identity files. Memory starts empty.</p>
       <div class="field">
-        <label for="agent-create-modal-name">Agent id</label>
-        <input id="agent-create-modal-name" type="text" placeholder="e.g. backend, pm, alex" autocomplete="off">
-        <p class="field-hint">Lowercase letters, numbers, hyphens, and underscores. Cannot be <code>main</code>.</p>
-      </div>
-      <div class="field">
-        <label for="agent-create-modal-title">Title <span class="skill-meta">(optional)</span></label>
-        <input id="agent-create-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+        <label for="agent-create-modal-title-input">Name</label>
+        <input id="agent-create-modal-title-input" type="text" placeholder="e.g. Project Manager, Backend Bot, Alex" autocomplete="off">
+        <p class="field-hint">A display name for this agent. The internal id is generated automatically.</p>
       </div>
       <div class="field">
         <label for="agent-create-modal-from">Copy settings from</label>
@@ -1338,33 +1365,111 @@
   </div>
 
   <div id="page-memory" class="page">
-    <div class="groups-layout">
-      <div class="groups-sidebar card">
-        <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Memory & logs</h2>
-        <p class="skill-meta" style="margin:0 0 0.75rem 0;">Long-term notes are editable. Chat logs are read-only conversation history.</p>
-        <div id="memory-sidebar-sections">
-          <div class="memory-sidebar-section">
-            <div class="memory-sidebar-heading">Notes</div>
-            <ul id="memory-notes-list" class="groups-ul"></ul>
-          </div>
-          <div class="memory-sidebar-section">
-            <div class="memory-sidebar-heading">Chat history</div>
-            <p class="skill-meta">All conversations by day (from <code>chat-log/</code>, including private DMs).</p>
-            <ul id="memory-chat-list" class="groups-ul"></ul>
-          </div>
-        </div>
+
+    <!-- Tile row -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="memory-tiles" id="memory-tiles">
+        <button type="button" class="memory-tile active" data-tile="today">
+          <span class="memory-tile-icon">📅</span>
+          <div class="memory-tile-title">Today</div>
+          <div class="memory-tile-stat" id="mtile-today-stat">Loading…</div>
+        </button>
+        <button type="button" class="memory-tile" data-tile="yesterday">
+          <span class="memory-tile-icon">🗓</span>
+          <div class="memory-tile-title">Yesterday</div>
+          <div class="memory-tile-stat" id="mtile-yesterday-stat">—</div>
+        </button>
+        <button type="button" class="memory-tile" data-tile="longterm">
+          <span class="memory-tile-icon">🧠</span>
+          <div class="memory-tile-title">Long-term</div>
+          <div class="memory-tile-stat">MEMORY.md</div>
+        </button>
+        <button type="button" class="memory-tile" data-tile="history">
+          <span class="memory-tile-icon">💬</span>
+          <div class="memory-tile-title">History</div>
+          <div class="memory-tile-stat" id="mtile-history-stat">—</div>
+        </button>
+        <button type="button" class="memory-tile" data-tile="notes">
+          <span class="memory-tile-icon">📝</span>
+          <div class="memory-tile-title">Notes</div>
+          <div class="memory-tile-stat" id="mtile-notes-stat">—</div>
+        </button>
       </div>
-      <div class="groups-main">
-        <div id="memory-editor-card" class="groups-detail card">
-          <h2 style="margin:0 0 0.75rem 0; font-size:1rem;" id="memory-editor-title">Select a file</h2>
-          <p class="skill-meta" id="memory-editor-meta" style="margin:0 0 0.75rem 0;"></p>
-          <div id="memory-editor-area" style="display:none;">
-            <textarea id="memory-editor-textarea" class="skill-doc-inline skill-doc-textarea" spellcheck="false" style="display:block; width:100%; min-height:20rem; margin-bottom:0.75rem;"></textarea>
-            <div id="memory-editor-actions"><button id="memory-editor-save">Save</button><span id="memory-editor-saved" style="margin-left:0.75rem; color: var(--green); font-size:0.85rem; display:none;">Saved.</span></div>
+    </div>
+
+    <!-- Today panel -->
+    <div id="mem-panel-today" class="mem-panel card active">
+      <div style="display:flex; align-items:baseline; gap:0.75rem; margin-bottom:0.5rem;">
+        <h2 style="margin:0; font-size:1rem;">Today</h2>
+        <span class="skill-meta" id="mem-today-date-label"></span>
+      </div>
+      <p class="skill-meta" style="margin:0 0 0.65rem 0;">Read-only conversation log for today.</p>
+      <textarea id="mem-today-textarea" class="mem-log-textarea" readonly placeholder="No conversations today yet."></textarea>
+    </div>
+
+    <!-- Yesterday panel -->
+    <div id="mem-panel-yesterday" class="mem-panel card">
+      <div style="display:flex; align-items:baseline; gap:0.75rem; margin-bottom:0.5rem;">
+        <h2 style="margin:0; font-size:1rem;">Yesterday</h2>
+        <span class="skill-meta" id="mem-yesterday-date-label"></span>
+      </div>
+      <p class="skill-meta" style="margin:0 0 0.65rem 0;">Read-only conversation log for yesterday.</p>
+      <textarea id="mem-yesterday-textarea" class="mem-log-textarea" readonly placeholder="No conversations yesterday."></textarea>
+    </div>
+
+    <!-- Long-term panel -->
+    <div id="mem-panel-longterm" class="mem-panel card">
+      <div style="display:flex; align-items:baseline; gap:0.75rem; margin-bottom:0.4rem;">
+        <h2 style="margin:0; font-size:1rem;">Long-term memory</h2>
+        <span class="skill-meta">MEMORY.md</span>
+      </div>
+      <p class="skill-meta" style="margin:0 0 0.75rem 0;">Persistent notes the agent keeps about you — preferences, facts, important decisions. Fully editable.</p>
+      <textarea id="mem-longterm-textarea" class="mem-edit-textarea" spellcheck="false" placeholder="Nothing saved yet. Ask the agent to remember something."></textarea>
+      <div style="margin-top:0.6rem; display:flex; align-items:center; gap:0.75rem;">
+        <button id="mem-longterm-save" type="button">Save</button>
+        <span id="mem-longterm-saved" style="color:var(--green); font-size:0.85rem; display:none;">Saved.</span>
+      </div>
+    </div>
+
+    <!-- History panel (split layout) -->
+    <div id="mem-panel-history" class="mem-panel">
+      <div class="groups-layout">
+        <div class="groups-sidebar card">
+          <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">Chat history</h2>
+          <p class="skill-meta" style="margin:0 0 0.6rem 0;">All conversation days, newest first.</p>
+          <ul id="mem-history-list" class="groups-ul"></ul>
+        </div>
+        <div class="groups-main">
+          <div class="groups-detail card">
+            <h2 style="margin:0 0 0.4rem 0; font-size:1rem;" id="mem-history-detail-title">Select a day</h2>
+            <p class="skill-meta" id="mem-history-detail-meta" style="margin:0 0 0.5rem 0;"></p>
+            <textarea id="mem-history-textarea" class="mem-log-textarea" readonly placeholder="Select a day from the list to view the conversation."></textarea>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Notes panel (split layout) -->
+    <div id="mem-panel-notes" class="mem-panel">
+      <div class="groups-layout">
+        <div class="groups-sidebar card">
+          <h2 style="margin:0 0 0.5rem 0; font-size:1rem;">Notes</h2>
+          <p class="skill-meta" style="margin:0 0 0.6rem 0;">Custom memory files like preferences.md.</p>
+          <ul id="mem-notes-list" class="groups-ul"></ul>
+        </div>
+        <div class="groups-main">
+          <div class="groups-detail card">
+            <h2 style="margin:0 0 0.4rem 0; font-size:1rem;" id="mem-notes-detail-title">Select a file</h2>
+            <textarea id="mem-notes-textarea" class="mem-edit-textarea" spellcheck="false" placeholder="Select a file from the list."></textarea>
+            <div id="mem-notes-actions" style="margin-top:0.6rem; display:none; align-items:center; gap:0.75rem;">
+              <button id="mem-notes-save" type="button">Save</button>
+              <span id="mem-notes-saved" style="color:var(--green); font-size:0.85rem; display:none;">Saved.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <div id="page-crons" class="page">
@@ -1389,7 +1494,7 @@
         <h2 style="margin:0 0 0.75rem 0; font-size:1rem;">Agents</h2>
         <p class="skill-meta" style="margin:0 0 0.5rem 0;">Default <code>main</code> exists automatically. Create additional agents here.</p>
         <div style="display:flex; gap:0.4rem; margin-bottom:0.75rem;">
-          <input id="agent-create-name" type="text" placeholder="agent name (e.g. alex)" style="flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.85rem;">
+          <input id="agent-create-name" type="text" placeholder="Agent name (e.g. Alex, Backend Bot)" style="flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.85rem;">
           <button id="agent-create-btn" type="button" style="margin-top:0;">Create</button>
         </div>
         <div style="display:flex; gap:0.4rem; margin-bottom:0.75rem;">
@@ -2002,17 +2107,15 @@
     async function openAgentCreateModal(opts) {
       opts = opts || {};
       var modal = document.getElementById('agent-create-modal');
-      var nameInput = document.getElementById('agent-create-modal-name');
-      if (!modal || !nameInput) return;
+      var titleInput = document.getElementById('agent-create-modal-title-input');
+      if (!modal || !titleInput) return;
       showAgentCreateModalError('');
-      nameInput.value = '';
-      var titleInput = document.getElementById('agent-create-modal-title');
-      if (titleInput) titleInput.value = '';
+      titleInput.value = '';
       await populateAgentCreateFromSelect(opts.fromAgentId);
       modal.classList.add('open');
       modal.setAttribute('aria-hidden', 'false');
       agentCreateModalOpen = true;
-      setTimeout(function () { nameInput.focus(); }, 0);
+      setTimeout(function () { titleInput.focus(); }, 0);
     }
 
     function closeAgentCreateModal() {
@@ -2025,24 +2128,28 @@
     }
 
     async function submitAgentCreateModal(switchChatToNew) {
-      var nameInput = document.getElementById('agent-create-modal-name');
+      var titleInput = document.getElementById('agent-create-modal-title-input');
       var fromSelect = document.getElementById('agent-create-modal-from');
       var submitBtn = document.getElementById('agent-create-modal-submit');
-      if (!nameInput || !fromSelect) return;
-      var normalized = normalizeAgentIdInput(nameInput.value);
+      if (!titleInput || !fromSelect) return;
+      var title = titleInput.value.trim();
+      if (!title) {
+        showAgentCreateModalError('Enter a name for the agent.');
+        titleInput.focus();
+        return;
+      }
+      var normalized = normalizeAgentIdInput(title);
       if (!normalized) {
-        showAgentCreateModalError('Enter an agent id (letters, numbers, hyphens, underscores).');
-        nameInput.focus();
+        showAgentCreateModalError('Name must contain at least one letter or number.');
+        titleInput.focus();
         return;
       }
       if (normalized === 'main') {
-        showAgentCreateModalError('Cannot create another "main" agent — that id is reserved.');
-        nameInput.focus();
+        showAgentCreateModalError('"main" is reserved. Choose a different name.');
+        titleInput.focus();
         return;
       }
       var fromAgentId = (fromSelect.value || 'main').trim() || 'main';
-      var titleInput = document.getElementById('agent-create-modal-title');
-      var title = titleInput ? titleInput.value : '';
       if (submitBtn) submitBtn.disabled = true;
       showAgentCreateModalError('');
       try {
@@ -2254,11 +2361,13 @@
 
     document.getElementById('agent-create-btn').addEventListener('click', async function () {
       var input = document.getElementById('agent-create-name');
-      var name = normalizeAgentIdInput(input && input.value);
-      if (!name) return;
+      var rawName = (input && input.value) ? input.value.trim() : '';
+      if (!rawName) return;
+      var id = normalizeAgentIdInput(rawName);
+      if (!id) return;
       try {
-        var d = await createAgentViaApi(name, 'main');
-        selectedAgentId = d.id || name;
+        var d = await createAgentViaApi(id, 'main', rawName);
+        selectedAgentId = d.id || id;
         if (input) input.value = '';
         await fetchAgentsPage();
         await fetchChatAgents();
@@ -3004,33 +3113,25 @@
     var selectedMemoryFileId = null;
     var selectedMemoryFileReadOnly = false;
     var identityEditorFileId = null;
+    var activeTile = 'today';
+    var memoryAllLogs = [];
+    var memoryAllNotes = [];
+    var selectedHistoryId = null;
+    var selectedNotesId = null;
+
+    function localDateStr(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    var MEM_TODAY = localDateStr(new Date());
+    var MEM_YESTERDAY = localDateStr(new Date(Date.now() - 86400000));
+    var MEM_TODAY_ID = 'chat-log/day/' + MEM_TODAY;
+    var MEM_YESTERDAY_ID = 'chat-log/day/' + MEM_YESTERDAY;
 
     function memoryFileLabel(id) {
       if (id === 'MEMORY.md') return 'MEMORY.md';
       if (isMemoryChatDayFile(id)) return id.replace(/^chat-log\/day\//, '');
       if (isMemoryChatLogFile(id)) return id.replace(/^chat-log\//, '').replace(/^group-chat-log\//, 'group /');
       return id;
-    }
-    function renderMemorySidebarList(ul, files, emptyText) {
-      if (!ul) return;
-      if (!files.length) {
-        ul.innerHTML = '<li class="skill-meta">' + escapeHtml(emptyText) + '</li>';
-        return;
-      }
-      ul.innerHTML = files.map(function (f) {
-        return '<li class="' + (selectedMemoryFileId === f.id ? 'selected' : '') + '"><button type="button" class="link memory-file-btn" data-id="' + escapeHtml(f.id) + '" data-readonly="' + (f.readOnly ? '1' : '0') + '">' + escapeHtml(f.label) + '</button></li>';
-      }).join('');
-      ul.querySelectorAll('.memory-file-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          selectMemoryFile(btn.getAttribute('data-id'), btn.getAttribute('data-readonly') === '1');
-        });
-      });
-    }
-    function syncMemorySidebarSelection() {
-      document.querySelectorAll('.memory-file-btn').forEach(function (btn) {
-        var li = btn.closest('li');
-        if (li) li.classList.toggle('selected', btn.getAttribute('data-id') === selectedMemoryFileId);
-      });
     }
 
     function sortMemoryFilesNewestFirst(files) {
@@ -3042,69 +3143,209 @@
       });
     }
 
+    function setMemoryTile(tile) {
+      activeTile = tile;
+      document.querySelectorAll('.memory-tile').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-tile') === tile);
+      });
+      var panels = ['today','yesterday','longterm','history','notes'];
+      panels.forEach(function (t) {
+        var el = document.getElementById('mem-panel-' + t);
+        if (el) el.classList.toggle('active', t === tile);
+      });
+      if (tile === 'today') loadMemoryLog(MEM_TODAY_ID, 'mem-today-textarea', function(content) {
+        var stat = document.getElementById('mtile-today-stat');
+        var lines = content ? content.split('\n').filter(function(l){return l.trim();}).length : 0;
+        if (stat) stat.textContent = lines ? lines + ' lines' : 'No chats yet';
+      });
+      if (tile === 'yesterday') loadMemoryLog(MEM_YESTERDAY_ID, 'mem-yesterday-textarea', null);
+      if (tile === 'longterm') loadMemoryMd('MEMORY.md', 'mem-longterm-textarea');
+      if (tile === 'history') renderMemoryHistoryList();
+      if (tile === 'notes') renderMemoryNotesList();
+      location.hash = '#memory';
+    }
+
+    async function loadMemoryLog(id, textareaId, onLoad) {
+      var ta = document.getElementById(textareaId);
+      if (!ta) return;
+      ta.value = 'Loading…';
+      try {
+        var r = await fetch(API + '/api/workspace-logs/' + encodeURIComponent(id));
+        if (!r.ok) { ta.value = ''; if (onLoad) onLoad(''); return; }
+        var d = await r.json();
+        ta.value = d.content || '';
+        if (onLoad) onLoad(d.content || '');
+      } catch(e) { ta.value = ''; if (onLoad) onLoad(''); }
+    }
+
+    async function loadMemoryMd(id, textareaId) {
+      var ta = document.getElementById(textareaId);
+      if (!ta) return;
+      ta.value = 'Loading…';
+      try {
+        var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id));
+        if (!r.ok) { ta.value = ''; return; }
+        var d = await r.json();
+        ta.value = d.content || '';
+      } catch(e) { ta.value = ''; }
+    }
+
+    function renderMemoryHistoryList() {
+      var ul = document.getElementById('mem-history-list');
+      if (!ul) return;
+      var list = memoryAllLogs.filter(function(f) {
+        return f.id !== MEM_TODAY_ID && f.id !== MEM_YESTERDAY_ID;
+      });
+      if (!list.length) {
+        ul.innerHTML = '<li class="skill-meta" style="padding:0.25rem 0;">No older history.</li>';
+        return;
+      }
+      ul.innerHTML = list.map(function(f) {
+        var label = isMemoryChatDayFile(f.id) ? f.id.replace(/^chat-log\/day\//, '') : memoryFileLabel(f.id);
+        return '<li class="' + (selectedHistoryId === f.id ? 'selected' : '') + '"><button type="button" class="link mem-history-btn" data-id="' + escapeHtml(f.id) + '">' + escapeHtml(label) + '</button></li>';
+      }).join('');
+      ul.querySelectorAll('.mem-history-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { selectHistoryDay(btn.getAttribute('data-id')); });
+      });
+    }
+
+    async function selectHistoryDay(id) {
+      selectedHistoryId = id;
+      var titleEl = document.getElementById('mem-history-detail-title');
+      var metaEl = document.getElementById('mem-history-detail-meta');
+      var ta = document.getElementById('mem-history-textarea');
+      if (titleEl) titleEl.textContent = isMemoryChatDayFile(id) ? id.replace(/^chat-log\/day\//, '') : memoryFileLabel(id);
+      if (metaEl) metaEl.textContent = id;
+      if (ta) ta.value = 'Loading…';
+      document.querySelectorAll('.mem-history-btn').forEach(function(btn) {
+        var li = btn.closest('li');
+        if (li) li.classList.toggle('selected', btn.getAttribute('data-id') === id);
+      });
+      try {
+        var r = await fetch(API + '/api/workspace-logs/' + encodeURIComponent(id));
+        if (!r.ok) throw new Error('not found');
+        var d = await r.json();
+        if (ta) ta.value = d.content || '(empty)';
+      } catch(e) { if (ta) ta.value = ''; }
+    }
+
+    function renderMemoryNotesList() {
+      var ul = document.getElementById('mem-notes-list');
+      if (!ul) return;
+      var list = memoryAllNotes;
+      if (!list.length) {
+        ul.innerHTML = '<li class="skill-meta" style="padding:0.25rem 0;">No custom note files.</li>';
+        return;
+      }
+      ul.innerHTML = list.map(function(f) {
+        return '<li class="' + (selectedNotesId === f.id ? 'selected' : '') + '"><button type="button" class="link mem-notes-btn" data-id="' + escapeHtml(f.id) + '">' + escapeHtml(f.label || f.id) + '</button></li>';
+      }).join('');
+      ul.querySelectorAll('.mem-notes-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { selectNotesFile(btn.getAttribute('data-id')); });
+      });
+    }
+
+    async function selectNotesFile(id) {
+      selectedNotesId = id;
+      selectedMemoryFileId = id;
+      selectedMemoryFileReadOnly = false;
+      var titleEl = document.getElementById('mem-notes-detail-title');
+      var ta = document.getElementById('mem-notes-textarea');
+      var actionsEl = document.getElementById('mem-notes-actions');
+      if (titleEl) titleEl.textContent = id;
+      if (ta) ta.value = 'Loading…';
+      if (actionsEl) actionsEl.style.display = 'flex';
+      document.querySelectorAll('.mem-notes-btn').forEach(function(btn) {
+        var li = btn.closest('li');
+        if (li) li.classList.toggle('selected', btn.getAttribute('data-id') === id);
+      });
+      try {
+        var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id));
+        if (!r.ok) throw new Error('not found');
+        var d = await r.json();
+        if (ta) ta.value = d.content || '';
+      } catch(e) { if (ta) ta.value = ''; }
+    }
+
     async function fetchMemoryFiles() {
       try {
-        const [mdRes, logRes] = await Promise.all([
+        var [mdRes, logRes] = await Promise.all([
           fetch(API + '/api/workspace-md'),
           fetch(API + '/api/workspace-logs'),
         ]);
-        const mdData = await mdRes.json();
-        const logData = await logRes.json();
-        const notes = (mdData.files || []).filter(function (f) { return isMemoryNotesFile(f.id); });
-        const chat = sortMemoryFilesNewestFirst(logData.files || []);
-        renderMemorySidebarList(document.getElementById('memory-notes-list'), notes.length ? notes : [{ id: 'MEMORY.md', label: 'MEMORY.md', readOnly: false }], 'No notes yet.');
-        renderMemorySidebarList(document.getElementById('memory-chat-list'), chat, 'No chat history yet.');
-      } catch (e) {
+        var mdData = await mdRes.json();
+        var logData = await logRes.json();
+
+        memoryAllLogs = sortMemoryFilesNewestFirst(logData.files || []);
+        // Notes = everything except MEMORY.md (which is long-term)
+        memoryAllNotes = (mdData.files || []).filter(function(f) { return f.id !== 'MEMORY.md'; });
+
+        // Tile stats
+        var todayLog = memoryAllLogs.find(function(f) { return f.id === MEM_TODAY_ID; });
+        var yestLog = memoryAllLogs.find(function(f) { return f.id === MEM_YESTERDAY_ID; });
+        var histCount = memoryAllLogs.filter(function(f) { return f.id !== MEM_TODAY_ID && f.id !== MEM_YESTERDAY_ID; }).length;
+
+        var todayStat = document.getElementById('mtile-today-stat');
+        var yestStat = document.getElementById('mtile-yesterday-stat');
+        var histStat = document.getElementById('mtile-history-stat');
+        var notesStat = document.getElementById('mtile-notes-stat');
+
+        if (todayStat) todayStat.textContent = todayLog ? MEM_TODAY : 'No chats yet';
+        if (yestStat) yestStat.textContent = yestLog ? MEM_YESTERDAY : 'No chats';
+        if (histStat) histStat.textContent = histCount ? histCount + ' days' : 'No older history';
+        if (notesStat) notesStat.textContent = memoryAllNotes.length ? memoryAllNotes.length + ' file' + (memoryAllNotes.length === 1 ? '' : 's') : 'No files';
+
+        // Date labels
+        var todayLabel = document.getElementById('mem-today-date-label');
+        var yestLabel = document.getElementById('mem-yesterday-date-label');
+        if (todayLabel) todayLabel.textContent = MEM_TODAY;
+        if (yestLabel) yestLabel.textContent = MEM_YESTERDAY;
+
+        // Re-render active tile if it's one of the list-based ones
+        if (activeTile === 'history') renderMemoryHistoryList();
+        if (activeTile === 'notes') renderMemoryNotesList();
+        // Auto-load today content
+        if (activeTile === 'today') setMemoryTile('today');
+      } catch(e) {
         console.error('[memory]', e);
-        ['memory-notes-list', 'memory-chat-list'].forEach(function (id) {
-          var ul = document.getElementById(id);
-          if (ul) ul.innerHTML = '<li class="skill-meta">Error loading files.</li>';
-        });
       }
     }
 
+    // Legacy compat: selectMemoryFile is still called from hash navigation
     async function selectMemoryFile(id, readOnly) {
       selectedMemoryFileId = id;
       selectedMemoryFileReadOnly = !!readOnly || isMemoryChatLogFile(id);
-      if (id && location.hash !== '#memory/' + id) location.hash = '#memory/' + id;
-      syncMemorySidebarSelection();
-      var titleEl = document.getElementById('memory-editor-title');
-      var metaEl = document.getElementById('memory-editor-meta');
-      var areaEl = document.getElementById('memory-editor-area');
-      var actionsEl = document.getElementById('memory-editor-actions');
-      var textarea = document.getElementById('memory-editor-textarea');
-      titleEl.textContent = memoryFileLabel(id);
-      metaEl.textContent = selectedMemoryFileReadOnly
-        ? ('File: ' + id + ' · read-only conversation log')
-        : ('File: ' + id);
-      areaEl.style.display = 'block';
-      if (actionsEl) actionsEl.style.display = selectedMemoryFileReadOnly ? 'none' : 'block';
-      if (textarea) {
-        textarea.readOnly = selectedMemoryFileReadOnly;
-        textarea.classList.toggle('read-only', selectedMemoryFileReadOnly);
-      }
-      try {
-        var url = selectedMemoryFileReadOnly
-          ? (API + '/api/workspace-logs/' + encodeURIComponent(id))
-          : (API + '/api/workspace-md/' + encodeURIComponent(id));
-        var r = await fetch(url);
-        if (!r.ok) throw new Error('Failed to load');
-        var d = await r.json();
-        if (textarea) textarea.value = d.content || '';
-      } catch (e) {
-        if (textarea) textarea.value = '';
-      }
+      if (!id) return;
+      if (id === MEM_TODAY_ID) { setMemoryTile('today'); return; }
+      if (id === MEM_YESTERDAY_ID) { setMemoryTile('yesterday'); return; }
+      if (id === 'MEMORY.md') { setMemoryTile('longterm'); return; }
+      if (isMemoryChatLogFile(id)) { setMemoryTile('history'); await selectHistoryDay(id); return; }
+      setMemoryTile('notes'); await selectNotesFile(id);
     }
 
-    document.getElementById('memory-editor-save').addEventListener('click', async function () {
-      var id = selectedMemoryFileId;
-      if (!id || selectedMemoryFileReadOnly) return;
-      var content = document.getElementById('memory-editor-textarea').value;
-      var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
+    // Tile click handlers
+    document.querySelectorAll('.memory-tile').forEach(function(btn) {
+      btn.addEventListener('click', function() { setMemoryTile(btn.getAttribute('data-tile')); });
+    });
+
+    // Long-term save
+    document.getElementById('mem-longterm-save').addEventListener('click', async function() {
+      var content = document.getElementById('mem-longterm-textarea').value;
+      var r = await fetch(API + '/api/workspace-md/MEMORY.md', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
       if (r.ok) {
-        var savedEl = document.getElementById('memory-editor-saved');
-        savedEl.style.display = 'inline';
-        setTimeout(function () { savedEl.style.display = 'none'; }, 2000);
+        var savedEl = document.getElementById('mem-longterm-saved');
+        if (savedEl) { savedEl.style.display = 'inline'; setTimeout(function(){ savedEl.style.display = 'none'; }, 2000); }
+      }
+    });
+
+    // Notes save
+    document.getElementById('mem-notes-save').addEventListener('click', async function() {
+      if (!selectedNotesId) return;
+      var content = document.getElementById('mem-notes-textarea').value;
+      var r = await fetch(API + '/api/workspace-md/' + encodeURIComponent(selectedNotesId), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content }) });
+      if (r.ok) {
+        var savedEl = document.getElementById('mem-notes-saved');
+        if (savedEl) { savedEl.style.display = 'inline'; setTimeout(function(){ savedEl.style.display = 'none'; }, 2000); }
       }
     });
 
@@ -3710,7 +3951,7 @@
     document.querySelector('#agent-create-modal .modal-card').addEventListener('click', function (e) {
       e.stopPropagation();
     });
-    document.getElementById('agent-create-modal-name').addEventListener('keydown', function (e) {
+    document.getElementById('agent-create-modal-title-input').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
         submitAgentCreateModal(true);
