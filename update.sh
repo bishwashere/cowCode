@@ -34,15 +34,19 @@ read_build() {
 }
 
 fetch_remote_build() {
-  node --input-type=module -e "
+  local sha
+  sha=$(node --input-type=module -e "
     import { fetchRemoteBuild } from 'file://$ROOT/lib/build-info.js';
     const b = await fetchRemoteBuild('$BRANCH');
     if (b) console.log(b);
-  " 2>/dev/null || {
-    curl -fsSL -H "Accept: application/vnd.github+json" -H "User-Agent: cowcode-update" \
-      "https://api.github.com/repos/bishwashere/cowCode/commits/${BRANCH}" 2>/dev/null \
-      | node -pe "((d=JSON.parse(require('fs').readFileSync(0,'utf8'))).sha||'').slice(0,7)" 2>/dev/null || true
-  }
+  " 2>/dev/null) || true
+  if [ -n "$sha" ]; then
+    echo "$sha"
+    return
+  fi
+  sha=$(git ls-remote https://github.com/bishwashere/cowCode.git "refs/heads/${BRANCH}" 2>/dev/null \
+    | awk 'NR==1 { print substr($1, 1, 7) }') || true
+  [ -n "$sha" ] && echo "$sha"
 }
 
 format_version_label() {
@@ -96,6 +100,13 @@ REMOTE_JSON="${REMOTE_JSON:-$WORK/remote_package.json}"
 AFTER_VER=$(node -p "require('$REMOTE_JSON').version" 2>/dev/null || true)
 BEFORE_BUILD=$(read_build)
 AFTER_BUILD=$(fetch_remote_build)
+# Ensure both sides have a commit id for the update banner (API can fail; ls-remote fallback above).
+if [ -z "$AFTER_BUILD" ]; then
+  AFTER_BUILD=$(fetch_remote_build)
+fi
+if [ -z "$BEFORE_BUILD" ] && [ -d "$ROOT/.git" ]; then
+  BEFORE_BUILD=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)
+fi
 
 echo ""
 echo "  cowCode — Updating..."
@@ -142,6 +153,9 @@ rm -rf "$ROOT/node_modules"
 (cd "$ROOT" && (pnpm install --silent 2>/dev/null || npm install --silent 2>/dev/null || true))
 
 # Record build id and show final version
+if [ -z "$AFTER_BUILD" ]; then
+  AFTER_BUILD=$(fetch_remote_build)
+fi
 [ -n "$AFTER_BUILD" ] && write_build "$AFTER_BUILD"
 NOW_VER=$(node -p "require('$ROOT/package.json').version" 2>/dev/null || true)
 NOW_BUILD=$(read_build)

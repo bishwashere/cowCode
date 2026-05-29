@@ -4,7 +4,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { formatVersionLabel, readBuild, BUILD_FILE } from '../../lib/build-info.js';
+import { formatVersionLabel, readBuild, fetchRemoteBuildSync, BUILD_FILE } from '../../lib/build-info.js';
 
 let failed = 0;
 
@@ -26,6 +26,13 @@ assert(readBuild(root) === 'abc1234', 'readBuild from BUILD file');
 assert(formatVersionLabel('2.0.0', 'abc1234') === 'v2.0.0 (abc1234)', 'format with version and build');
 assert(formatVersionLabel('2.0.0', null) === 'v2.0.0', 'format version only');
 assert(formatVersionLabel(null, 'deadbeef') === '(deadbeef)', 'format build only');
+
+const remote = fetchRemoteBuildSync('master');
+if (remote) {
+  assert(/^[0-9a-f]{7}$/i.test(remote), 'fetchRemoteBuildSync returns 7-char sha');
+} else {
+  console.log('SKIP: fetchRemoteBuildSync (no network or git)');
+}
 
 if (failed > 0) {
   console.error(`\n${failed} assertion(s) failed`);
