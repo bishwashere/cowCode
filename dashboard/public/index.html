@@ -1252,8 +1252,8 @@
             <ul id="memory-notes-list" class="groups-ul"></ul>
           </div>
           <div class="memory-sidebar-section">
-            <div class="memory-sidebar-heading">Chat logs</div>
-            <p class="skill-meta">Everyday conversations (<code>chat-log/*.jsonl</code>).</p>
+            <div class="memory-sidebar-heading">Chat history</div>
+            <p class="skill-meta">All conversations by day (from <code>chat-log/</code>, including private DMs).</p>
             <ul id="memory-chat-list" class="groups-ul"></ul>
           </div>
         </div>
@@ -1500,6 +1500,9 @@
     }
     function isMemoryChatLogFile(id) {
       return id && (id.indexOf('chat-log/') === 0 || id.indexOf('group-chat-log/') === 0);
+    }
+    function isMemoryChatDayFile(id) {
+      return id && id.indexOf('chat-log/day/') === 0;
     }
     function isMemoryWorkspaceFile(id) {
       return isMemoryNotesFile(id) || isMemoryChatLogFile(id);
@@ -2885,6 +2888,7 @@
 
     function memoryFileLabel(id) {
       if (id === 'MEMORY.md') return 'MEMORY.md';
+      if (isMemoryChatDayFile(id)) return id.replace(/^chat-log\/day\//, '');
       if (isMemoryChatLogFile(id)) return id.replace(/^chat-log\//, '').replace(/^group-chat-log\//, 'group /');
       return id;
     }
@@ -2910,6 +2914,15 @@
       });
     }
 
+    function sortMemoryFilesNewestFirst(files) {
+      return files.slice().sort(function (a, b) {
+        var ta = typeof a.lastActivityMs === 'number' ? a.lastActivityMs : 0;
+        var tb = typeof b.lastActivityMs === 'number' ? b.lastActivityMs : 0;
+        if (tb !== ta) return tb - ta;
+        return String(b.label || b.id || '').localeCompare(String(a.label || a.id || ''));
+      });
+    }
+
     async function fetchMemoryFiles() {
       try {
         const [mdRes, logRes] = await Promise.all([
@@ -2919,9 +2932,9 @@
         const mdData = await mdRes.json();
         const logData = await logRes.json();
         const notes = (mdData.files || []).filter(function (f) { return isMemoryNotesFile(f.id); });
-        const chat = (logData.files || []).slice();
+        const chat = sortMemoryFilesNewestFirst(logData.files || []);
         renderMemorySidebarList(document.getElementById('memory-notes-list'), notes.length ? notes : [{ id: 'MEMORY.md', label: 'MEMORY.md', readOnly: false }], 'No notes yet.');
-        renderMemorySidebarList(document.getElementById('memory-chat-list'), chat, 'No chat logs yet.');
+        renderMemorySidebarList(document.getElementById('memory-chat-list'), chat, 'No chat history yet.');
       } catch (e) {
         console.error('[memory]', e);
         ['memory-notes-list', 'memory-chat-list'].forEach(function (id) {

@@ -28,6 +28,7 @@
     "test:chat-session": "node scripts/test/test-chat-session.js",
     "test:session-bootstrap": "node scripts/test/test-session-bootstrap.js",
     "test:memory-index-files": "node scripts/test/test-memory-index-files.js",
+    "test:workspace-chat-days": "node scripts/test/test-workspace-chat-days.js",
     "test:update-build": "node scripts/test/test-update-build.js",
     "test:dry-run": "node scripts/test/dry-run-reminder.js",
     "test:intent-planner": "node scripts/test/test-intent-planner.js",

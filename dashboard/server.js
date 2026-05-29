@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir } from '../lib/paths.js';
+import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/chat-log.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
 dotenv.config({ path: getEnvPath() });
@@ -1007,6 +1008,7 @@ function isAllowedWorkspaceMdKey(key) {
   if (SOUL_FILE_IDS.includes(key)) return true;
   if (key.startsWith('memory/') && key.endsWith('.md')) {
     const name = key.slice(7, -3);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(name)) return false;
     return /^[a-zA-Z0-9_.-]+$/.test(name);
   }
   return false;
@@ -1085,6 +1087,8 @@ app.patch('/api/workspace-md/:key', (req, res) => {
 
 const CHAT_LOG_DIR_NAME = 'chat-log';
 const GROUP_CHAT_LOG_DIR_NAME = 'group-chat-log';
+const CHAT_LOG_DAY_PREFIX = `${CHAT_LOG_DIR_NAME}/day/`;
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function normalizeWorkspaceLogKey(key) {
   return String(key || '').replace(/\\/g, '/').replace(/^\/+/, '');
@@ -1092,6 +1096,9 @@ function normalizeWorkspaceLogKey(key) {
 
 function isAllowedWorkspaceLogKey(key) {
   const k = normalizeWorkspaceLogKey(key);
+  if (k.startsWith(CHAT_LOG_DAY_PREFIX)) {
+    return DATE_ONLY_RE.test(k.slice(CHAT_LOG_DAY_PREFIX.length));
+  }
   if (!k.endsWith('.jsonl')) return false;
   if (k.startsWith(`${CHAT_LOG_DIR_NAME}/`)) {
     const rest = k.slice(CHAT_LOG_DIR_NAME.length + 1);
@@ -1112,81 +1119,33 @@ function getWorkspaceLogPath(key) {
 
 function formatChatLogForDisplay(raw) {
   const lines = String(raw || '').split('\n').filter((l) => l.trim());
-  const blocks = [];
+  const rows = [];
   for (const line of lines) {
     try {
       const row = JSON.parse(line);
-      const ts = row.ts ? new Date(row.ts).toISOString().replace('T', ' ').slice(0, 19) : '';
-      let block = ts ? `[${ts}]\n` : '';
-      if (row.jid) block += `Chat: ${row.jid}\n`;
-      if (row.sessionId) block += `Session: ${row.sessionId}\n`;
-      if (row.user) block += `User: ${row.user}\n`;
-      if (row.assistant) block += `Assistant: ${row.assistant}\n`;
-      blocks.push(block.trim());
+      rows.push({
+        ts: row.ts,
+        jid: row.jid,
+        sessionId: row.sessionId,
+        user: row.user != null ? String(row.user) : '',
+        assistant: row.assistant != null ? String(row.assistant) : '',
+      });
     } catch (_) {
-      blocks.push(line);
+      rows.push({ user: line, assistant: '' });
     }
   }
-  return blocks.join('\n\n');
+  return formatExchangesAsText(rows);
 }
 
 function listWorkspaceLogFiles(workspaceDir) {
-  const list = [];
-  const chatLogDir = join(workspaceDir, CHAT_LOG_DIR_NAME);
-  if (existsSync(chatLogDir) && statSync(chatLogDir).isDirectory()) {
-    for (const name of readdirSync(chatLogDir)) {
-      if (/^\d{4}-\d{2}-\d{2}\.jsonl$/.test(name)) {
-        const full = join(chatLogDir, name);
-        if (existsSync(full) && statSync(full).isFile()) {
-          list.push({
-            id: `${CHAT_LOG_DIR_NAME}/${name}`,
-            label: name.replace(/\.jsonl$/, ''),
-            category: 'chat',
-            readOnly: true,
-            exists: true,
-          });
-        }
-      }
-    }
-    const privateDir = join(chatLogDir, 'private');
-    if (existsSync(privateDir) && statSync(privateDir).isDirectory()) {
-      for (const name of readdirSync(privateDir)) {
-        if (!name.endsWith('.jsonl')) continue;
-        const full = join(privateDir, name);
-        if (existsSync(full) && statSync(full).isFile()) {
-          list.push({
-            id: `${CHAT_LOG_DIR_NAME}/private/${name}`,
-            label: `private/${name.replace(/\.jsonl$/, '')}`,
-            category: 'chat',
-            readOnly: true,
-            exists: true,
-          });
-        }
-      }
-    }
-  }
-  const groupDir = join(workspaceDir, GROUP_CHAT_LOG_DIR_NAME);
-  if (existsSync(groupDir) && statSync(groupDir).isDirectory()) {
-    for (const groupId of readdirSync(groupDir)) {
-      const groupPath = join(groupDir, groupId);
-      if (!existsSync(groupPath) || !statSync(groupPath).isDirectory()) continue;
-      for (const name of readdirSync(groupPath)) {
-        if (!/^\d{4}-\d{2}-\d{2}\.jsonl$/.test(name)) continue;
-        const full = join(groupPath, name);
-        if (existsSync(full) && statSync(full).isFile()) {
-          list.push({
-            id: `${GROUP_CHAT_LOG_DIR_NAME}/${groupId}/${name}`,
-            label: `group ${groupId}/${name.replace(/\.jsonl$/, '')}`,
-            category: 'chat',
-            readOnly: true,
-            exists: true,
-          });
-        }
-      }
-    }
-  }
-  list.sort((a, b) => (a.id === b.id ? 0 : a.id < b.id ? 1 : -1));
-  return list;
+  return collectChatLogDateEntries(workspaceDir).map(({ date, lastActivityMs }) => ({
+    id: `${CHAT_LOG_DAY_PREFIX}${date}`,
+    label: date,
+    category: 'chat-day',
+    readOnly: true,
+    exists: true,
+    lastActivityMs,
+  }));
 }
 
 app.get('/api/workspace-logs', (_req, res) => {
@@ -1203,6 +1162,13 @@ app.get('/api/workspace-logs/:key', (req, res) => {
     const key = decodeURIComponent(req.params.key || '');
     if (!isAllowedWorkspaceLogKey(key)) {
       res.status(400).json({ error: 'Invalid log file key' });
+      return;
+    }
+    const workspaceDir = getWorkspaceDir();
+    if (key.startsWith(CHAT_LOG_DAY_PREFIX)) {
+      const dateStr = key.slice(CHAT_LOG_DAY_PREFIX.length);
+      const content = formatExchangesAsText(readChatLogDayExchanges(workspaceDir, dateStr));
+      res.json({ id: key, label: dateStr, content, readOnly: true });
       return;
     }
     const path = getWorkspaceLogPath(key);
@@ -1405,6 +1371,7 @@ app.delete('/api/projects/branches/:id', requireProjectsAuth, (req, res) => {
 app.use(express.static(join(__dirname, 'public')));
 
 app.get('/', (_req, res) => {
+  res.set('Cache-Control', 'no-cache');
   res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
