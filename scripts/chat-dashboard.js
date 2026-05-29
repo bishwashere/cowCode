@@ -14,6 +14,7 @@ import { getEnvPath, getCronStorePath, getWorkspaceDir, getAgentWorkspaceDir } f
 import dotenv from 'dotenv';
 import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent.js';
+import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock } from '../lib/intent-planner.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
 import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig } from '../lib/agent-config.js';
@@ -85,6 +86,9 @@ async function main() {
     agentId,
     scheduleOneShot: noop,
     startCron: noop,
+    runInternalAgent: runInternalAgentTurn,
+    agentDepth: 0,
+    agentCallChain: [agentId],
   };
   // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
   const enabledSkillIds = getEnabledSkillIds({ agentId });

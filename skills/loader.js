@@ -256,7 +256,7 @@ export function getEnabledSkillSummaries(options = {}) {
  * @returns {{ compactList: string, runSkillTool: Array, getFullSkillDoc: (skillId: string) => string, toolNameToSkill: (name: string) => { skillId: string, action: string } | null }}
  */
 /** Skills never exposed to the LLM in group chats (mirrors executor.js BLOCKED_IN_GROUP). */
-const ALWAYS_HIDDEN_IN_GROUP = new Set(['go-read', 'go-write', 'ssh-inspect']);
+const ALWAYS_HIDDEN_IN_GROUP = new Set(['go-read', 'go-write', 'ssh-inspect', 'agent-send']);
 
 export function getSkillContext(options = {}) {
   const { groupJid, agentId = DEFAULT_AGENT_ID, hintSkills } = options;

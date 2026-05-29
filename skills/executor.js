@@ -21,6 +21,7 @@ import { executeHomeAssistant } from '../lib/executors/home-assistant.js';
 import { executeMe } from '../lib/executors/me.js';
 import { executeCore } from '../lib/executors/core.js';
 import { executeSshInspect } from '../lib/executors/ssh-inspect.js';
+import { executeAgentSend } from '../lib/executors/agent-send.js';
 
 const EXECUTORS = {
   cron: executeCron,
@@ -40,10 +41,11 @@ const EXECUTORS = {
   'home-assistant': executeHomeAssistant,
   me: executeMe,
   'ssh-inspect': executeSshInspect,
+  'agent-send': executeAgentSend,
 };
 
 /** go-read and go-write are disabled in group chats; allowed in DMs and dashboard. */
-const BLOCKED_IN_GROUP = new Set(['go-read', 'go-write', 'ssh-inspect']);
+const BLOCKED_IN_GROUP = new Set(['go-read', 'go-write', 'ssh-inspect', 'agent-send']);
 
 /**
  * @param {string} skillId - cron | search | memory | go-read | go-write

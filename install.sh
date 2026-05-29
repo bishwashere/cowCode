@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install flow: download → launcher + PATH → setup (deps, config, WhatsApp link, bot runs).
 # New shell is created only after setup.js exits (user presses Ctrl+C to stop the bot).
-# Code lives in ~/.local/share/cowcode (fixed path); state in ~/.cowcode. Same idea as OpenClaw.
+# Code lives in ~/.local/share/cowcode (fixed path); state in ~/.cowcode.
 set -e
 POST_INSTALL_CMD=
 [ "$1" = "-c" ] && [ -n "${2:-}" ] && POST_INSTALL_CMD="$2"
@@ -9,7 +9,7 @@ POST_INSTALL_CMD=
 BRANCH="${COWCODE_BRANCH:-master}"
 TARBALL="https://github.com/bishwashere/cowCode/archive/refs/heads/${BRANCH}.tar.gz"
 EXTRACTED="cowCode-${BRANCH}"
-# Fixed install path — no path dependency (like OpenClaw global install)
+# Fixed install path — no path dependency (global install)
 INSTALL_DIR="${COWCODE_INSTALL_DIR:-$HOME/.local/share/cowcode}"
 BIN_DIR="$HOME/.local/bin"
 
@@ -40,7 +40,7 @@ INSTALL_BUILD=$(node --input-type=module -e "
 echo "  ✓ Code installed.${INSTALL_BUILD:+ (build $INSTALL_BUILD)}"
 echo ""
 
-# Launcher: fixed path only (like OpenClaw — run cowcode from anywhere)
+# Launcher: fixed path only — run cowcode from anywhere
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/cowcode" << LAUNCHER
 #!/usr/bin/env bash

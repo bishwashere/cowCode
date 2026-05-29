@@ -2,7 +2,7 @@
 
 One central agent handles everything: it picks the right skill from the list, runs it in the shared executor, and keeps things smooth. Skills add smarts like shortcuts or recipes; the heavy lifting stays shared. No babysitters, no extras.
 
-Every skill is **one file**: `SKILL.md`. There is no `skill.json` — all metadata lives in the markdown frontmatter and body. No separate JS or config file for actions; everything is defined in the same SKILL.md (OpenClaw-style).
+Every skill is **one file**: `SKILL.md`. There is no `skill.json` — all metadata lives in the markdown frontmatter and body. No separate JS or config file for actions; everything is defined in the same SKILL.md.
 
 Every skill must be **compact-compatible** so the loader can inject a short list (id + description) on each run and full doc when the skill is called.
 

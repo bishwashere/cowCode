@@ -26,6 +26,7 @@ const {
 } = Baileys;
 import { loadConfig, chat as llmChat } from './llm.js';
 import { runAgentTurn, stripThinking } from './lib/agent.js';
+import { runInternalAgentTurn } from './lib/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock } from './lib/intent-planner.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -853,6 +854,10 @@ async function main() {
       startCron: () => startCron({ sock, selfJid: selfJidForCron, storePath: getCronStorePath(), telegramBot: telegramBot || undefined }),
       groupNonOwner: !!bioOpts.groupNonOwner,
       isGroup: isGroupJid,
+      // Agent-to-agent (agent-send): group runs never get it (blocked in executor/loader).
+      runInternalAgent: isGroupJid ? undefined : runInternalAgentTurn,
+      agentDepth: 0,
+      agentCallChain: [agentId],
     };
     const isGroupNonOwner = !!bioOpts.groupNonOwner;
     // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
