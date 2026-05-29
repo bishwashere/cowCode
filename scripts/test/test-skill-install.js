@@ -9,7 +9,9 @@ import { fileURLToPath } from 'url';
 import {
   normalizeSkillId,
   getSkillsToEnable,
+  getSkillsToRemove,
   runSkillInstall,
+  runSkillRemove,
 } from '../../lib/skill-install.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -103,6 +105,59 @@ await testAsync('runSkillInstall saves Brave key to .env for search', async () =
     const config = JSON.parse(readFileSync(join(stateDir, 'config.json'), 'utf8'));
     if (!config.skills.enabled.includes('search')) throw new Error('search not enabled');
     if (config.skills.search.apiKey !== 'BRAVE_API_KEY') throw new Error('search apiKey ref missing');
+  } finally {
+    process.env.COWCODE_STATE_DIR = prev || '';
+  }
+});
+
+test('getSkillsToRemove keeps gmail-only when removing gmail', () => {
+  const list = getSkillsToRemove('gmail', 'gog');
+  if (list.length !== 1 || list[0] !== 'gmail') throw new Error('expected gmail only');
+});
+
+await testAsync('runSkillRemove disables github and clears credentials', async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-skill-remove-'));
+  const prev = process.env.COWCODE_STATE_DIR;
+  process.env.COWCODE_STATE_DIR = stateDir;
+  try {
+    await runSkillInstall('github', ROOT, {
+      ask: async () => '',
+      promptSecret: async () => 'ghp_test_token_for_install',
+    });
+    const result = await runSkillRemove('github', ROOT, {
+      ask: async () => '',
+      clearCredentials: true,
+    });
+    if (!result.ok) throw new Error(result.message);
+    const config = JSON.parse(readFileSync(join(stateDir, 'config.json'), 'utf8'));
+    if (config.skills.enabled.includes('github')) throw new Error('github still enabled');
+    const secrets = JSON.parse(readFileSync(join(stateDir, 'secrets.json'), 'utf8'));
+    if (secrets.github) throw new Error('github token should be removed');
+  } finally {
+    process.env.COWCODE_STATE_DIR = prev || '';
+  }
+});
+
+await testAsync('runSkillRemove disables skill but keeps credentials by default', async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), 'cowcode-skill-remove-'));
+  const prev = process.env.COWCODE_STATE_DIR;
+  process.env.COWCODE_STATE_DIR = stateDir;
+  try {
+    await runSkillInstall('search', ROOT, {
+      ask: async () => '',
+      promptSecret: async (_p, existing) => existing || 'BSA_test_brave_key',
+    });
+    const result = await runSkillRemove('search', ROOT, {
+      ask: async () => 'n',
+      clearCredentials: false,
+    });
+    if (!result.ok) throw new Error(result.message);
+    const config = JSON.parse(readFileSync(join(stateDir, 'config.json'), 'utf8'));
+    if (config.skills.enabled.includes('search')) throw new Error('search still enabled');
+    const envText = readFileSync(join(stateDir, '.env'), 'utf8');
+    if (!envText.includes('BRAVE_API_KEY=BSA_test_brave_key')) {
+      throw new Error('credentials should remain when not clearing');
+    }
   } finally {
     process.env.COWCODE_STATE_DIR = prev || '';
   }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * CLI entry: auth, start/stop/status/restart, update, and skill add/install.
- * Usage: cowcode auth | cowcode start|stop|status|restart | cowcode logs | cowcode add <skill-id> | cowcode update [--force]
+ * CLI entry: auth, start/stop/status/restart, update, and skill add/remove.
+ * Usage: cowcode auth | cowcode start|stop|status|restart | cowcode logs | cowcode add <skill-id> | cowcode remove <skill-id> | cowcode update [--force]
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
@@ -19,6 +19,44 @@ const INSTALL_DIR = process.env.COWCODE_INSTALL_DIR
 const args = process.argv.slice(2);
 const sub = args[0];
 const isForceUpdate = args.slice(1).some((a) => a === '--force' || a === '-f');
+
+function restartBotAfterSkillChange() {
+  const daemonScript = join(INSTALL_DIR, 'scripts', 'daemon.sh');
+  if (existsSync(daemonScript)) {
+    console.log('');
+    console.log('Restarting bot to apply skill changes...');
+    const restartResult = spawnSync('bash', [daemonScript, 'restart'], {
+      stdio: 'inherit',
+      env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
+      cwd: INSTALL_DIR,
+    });
+    if (restartResult.status === 0) {
+      console.log('  ✓ Bot restarted.');
+    } else {
+      console.error('  ✗ Auto-restart failed. Run: cowcode restart');
+    }
+  } else {
+    console.log('Restart skipped (daemon script not found). Run: cowcode restart');
+  }
+}
+
+async function runSkillCommand(action, skillArg) {
+  try {
+    const skillInstallPath = join(INSTALL_DIR, 'lib', 'skill-install.js');
+    const mod = await import(pathToFileURL(skillInstallPath).href);
+    const result = action === 'remove'
+      ? await mod.runSkillRemove(skillArg, INSTALL_DIR)
+      : await mod.runSkillInstall(skillArg, INSTALL_DIR);
+    if (!result.ok) {
+      console.error('cowCode:', result.message);
+      process.exit(1);
+    }
+    restartBotAfterSkillChange();
+  } catch (err) {
+    console.error(`cowCode: skills ${action} failed.`, err?.message || err);
+    process.exit(1);
+  }
+}
 
 /** After a successful update: restart the daemon and run dashboard, with clear logging. */
 function runPostUpdateRestartAndDashboard() {
@@ -379,50 +417,25 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
       process.exit(1);
     }
   })();
-} else if (sub === 'skills' || sub === 'add') {
+} else if (sub === 'skills' || sub === 'add' || sub === 'remove') {
   const skillSub = args[1];
-  const skillArg = sub === 'add' ? args[1] : args[2];
+  const skillArg = (sub === 'add' || sub === 'remove') ? args[1] : args[2];
   const wantsInstall = sub === 'add' ? !!skillArg : (skillSub === 'install' && !!skillArg);
+  const wantsRemove = sub === 'remove' ? !!skillArg : (skillSub === 'remove' && !!skillArg);
   if (wantsInstall) {
-    (async () => {
-      try {
-        const skillInstallPath = join(INSTALL_DIR, 'lib', 'skill-install.js');
-        const mod = await import(pathToFileURL(skillInstallPath).href);
-        const result = await mod.runSkillInstall(skillArg, INSTALL_DIR);
-        if (!result.ok) {
-          console.error('cowCode:', result.message);
-          process.exit(1);
-        }
-        const daemonScript = join(INSTALL_DIR, 'scripts', 'daemon.sh');
-        if (existsSync(daemonScript)) {
-          console.log('');
-          console.log('Restarting bot to apply skill changes...');
-          const restartResult = spawnSync('bash', [daemonScript, 'restart'], {
-            stdio: 'inherit',
-            env: { ...process.env, COWCODE_INSTALL_DIR: INSTALL_DIR },
-            cwd: INSTALL_DIR,
-          });
-          if (restartResult.status === 0) {
-            console.log('  ✓ Bot restarted.');
-          } else {
-            console.error('  ✗ Auto-restart failed. Run: cowcode restart');
-          }
-        } else {
-          console.log('Restart skipped (daemon script not found). Run: cowcode restart');
-        }
-      } catch (err) {
-        console.error('cowCode: skills install failed.', err?.message || err);
-        process.exit(1);
-      }
-    })();
+    runSkillCommand('install', skillArg);
+  } else if (wantsRemove) {
+    runSkillCommand('remove', skillArg);
   } else {
     console.log('Usage: cowcode add <skill-id>');
+    console.log('       cowcode remove <skill-id>');
     console.log('   or: cowcode skills install <skill-id>');
+    console.log('   or: cowcode skills remove <skill-id>');
     console.log('  Example: cowcode add speech');
-    console.log('  Example: cowcode add github');
-    console.log('  Example: cowcode add google');
-    console.log('  Enables a skill and prompts for whatever credentials it needs.');
-    process.exit((sub === 'add' || skillSub === 'install') ? 1 : 0);
+    console.log('  Example: cowcode remove github');
+    console.log('  add: enables a skill and prompts for credentials.');
+    console.log('  remove: disables a skill; optionally clears saved credentials.');
+    process.exit((sub === 'add' || sub === 'remove' || skillSub === 'install' || skillSub === 'remove') ? 1 : 0);
   }
 } else {
   console.log('Usage: cowcode start | stop | status | restart');
@@ -434,7 +447,9 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   console.log('       cowcode create agent <name>');
   console.log('       cowcode delete agent <name> [--yes]');
   console.log('       cowcode add <skill-id>');
+  console.log('       cowcode remove <skill-id>');
   console.log('       cowcode skills install <skill-id>');
+  console.log('       cowcode skills remove <skill-id>');
   console.log('       cowcode server add <host> <name> [--user <user>] [--alias <alias>]');
   console.log('       cowcode server use <name>');
   console.log('       cowcode server list');
