@@ -28,6 +28,7 @@ import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
+import { skipSuiteIf } from './e2e-skip.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -259,7 +260,13 @@ function makeTests(servers, stateDir) {
 async function main() {
   console.log('Server Inspection Test — ssh-inspect E2E\n');
 
-  const servers = ensureSshInspectEnabled();
+  let servers;
+  try {
+    servers = ensureSshInspectEnabled();
+  } catch (err) {
+    skipSuiteIf('server-inspect-e2e', () => err?.message || 'ssh-inspect not configured');
+    return;
+  }
   console.log(
     'Registered servers:',
     servers.map((s) => s.alias ? `${s.name} (${s.alias})` : s.name).join(', '),

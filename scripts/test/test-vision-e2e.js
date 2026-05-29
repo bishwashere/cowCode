@@ -11,6 +11,9 @@ import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
+import { skipSuiteIf } from './e2e-skip.js';
+import dotenv from 'dotenv';
+import { getEnvPath } from '../../lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -84,6 +87,14 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
+  skipSuiteIf('vision-e2e', () => {
+    dotenv.config({ path: getEnvPath() });
+    if (!process.env.OPENAI_API_KEY?.trim()) {
+      return 'OPENAI_API_KEY not set (needed for image generation)';
+    }
+    return null;
+  });
+
   console.log('E2E tests: vision skill (user message → LLM → vision → reply → judge).');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 

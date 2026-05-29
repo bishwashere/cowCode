@@ -18,6 +18,7 @@ Set **`arguments.command`** to one of the commands below. The user can speak nat
 
 | Command | When to use | Example |
 |---------|-------------|---------|
+| `list sensor` | List temperature/humidity and other sensors | "Check all temp sensors" → `list sensor` |
 | `list lights` | List all lights | "What lights do I have?", "Show my lights" |
 | `list automation` | List all automations | "List my automations", "Show thermostat automations" |
 | `list switch` | List switches | "What switches are there?" |
@@ -44,7 +45,7 @@ Set **`arguments.command`** to one of the commands below. The user can speak nat
 | Turn on the living room light | `on light.living_room` |
 | Turn off the bedroom light | `off light.bedroom` |
 | Is the garage door open? | `state cover.garage_door` |
-| What are my home sensors reading? | `search <sensor name>` then `state <entity_id>` |
+| What are my home sensors reading? | `list sensor` or `search <sensor name>` then `state <entity_id>` |
 | Run my "good night" script | `script script.good_night` |
 | Trigger morning automation | `automation automation.morning` |
 | Set thermostat to 21 | `climate climate.thermostat 21` |

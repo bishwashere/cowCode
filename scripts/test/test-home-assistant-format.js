@@ -3,6 +3,7 @@
  */
 
 import { describeEntityState, enrichHaToolResult, friendlyLabel } from '../../lib/home-assistant-format.js';
+import { normalizeHaDomain } from '../../lib/home-assistant-client.js';
 
 let passed = 0;
 let failed = 0;
@@ -19,6 +20,12 @@ function test(name, fn) {
 }
 
 console.log('\nHome Assistant format tests\n');
+
+test('normalizeHaDomain maps lights → light', () => {
+  if (normalizeHaDomain('lights') !== 'light') throw new Error('lights alias failed');
+  if (normalizeHaDomain('sensor') !== 'sensor') throw new Error('sensor unchanged');
+  if (normalizeHaDomain('sensors') !== 'sensor') throw new Error('sensors alias failed');
+});
 
 test('friendlyLabel prefers friendly_name over entity_id', () => {
   const label = friendlyLabel({

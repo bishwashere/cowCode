@@ -5,12 +5,15 @@
  */
 
 import { spawn } from 'child_process';
-import { mkdirSync, existsSync, copyFileSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir, tmpdir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
+import { skipSuiteIf } from './e2e-skip.js';
+import dotenv from 'dotenv';
+import { getEnvPath } from '../../lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -84,6 +87,19 @@ function runE2E(userMessage, opts = {}) {
 }
 
 async function main() {
+  skipSuiteIf('gog-e2e', () => {
+    dotenv.config({ path: getEnvPath() });
+    const configPath = join(DEFAULT_STATE_DIR, 'config.json');
+    let account = process.env.GOG_ACCOUNT || '';
+    if (!account && existsSync(configPath)) {
+      try {
+        account = JSON.parse(readFileSync(configPath, 'utf8'))?.skills?.gog?.account || '';
+      } catch (_) {}
+    }
+    if (!account?.trim()) return 'gog not configured (set skills.gog.account or GOG_ACCOUNT)';
+    return null;
+  });
+
   console.log('E2E tests: gog skill (user message → LLM → gog → reply → judge).');
   console.log('Timeout per test:', PER_TEST_TIMEOUT_MS / 1000, 's.\n');
 

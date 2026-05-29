@@ -24,9 +24,9 @@ import { assertActualResult, ExpectMode, formatExpectModeLabel } from './e2e-exp
  */
 export async function runSkillTests(skillName, tests, opts = {}) {
   const total = tests.length;
-  console.log(`Skill: ${skillName}. Initial state: ${total} tests — all FAILED.\n`);
+  console.log(`Skill: ${skillName}. Initial state: ${total} tests — all PENDING.\n`);
   for (const t of tests) {
-    console.log(`  [FAILED] ${t.name}${formatExpectModeLabel(t.expectMode)}`);
+    console.log(`  [PENDING] ${t.name}${formatExpectModeLabel(t.expectMode)}`);
   }
   console.log('\nRunning tests (passing ones will be marked SUCCESS)...\n');
 

@@ -22,6 +22,9 @@ import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
+import { skipSuiteIf } from './e2e-skip.js';
+import dotenv from 'dotenv';
+import { getEnvPath } from '../../lib/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -93,7 +96,16 @@ function runE2E(userMessage) {
 }
 
 async function main() {
-  ensureHomeAssistantEnabled();
+  skipSuiteIf('home-assistant-e2e', () => {
+    dotenv.config({ path: getEnvPath() });
+    if (!process.env.HA_TOKEN?.trim()) return 'HA_TOKEN not set in ~/.cowcode/.env';
+    try {
+      ensureHomeAssistantEnabled();
+    } catch (e) {
+      return e?.message || 'home-assistant not configured';
+    }
+    return null;
+  });
 
   const tests = [
     {

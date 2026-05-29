@@ -22,8 +22,8 @@ if (!token || !String(token).trim()) {
   process.exit(1);
 }
 if (!chatId || !String(chatId).trim()) {
-  console.error('TEST_CHAT_ID is required. Set it in env or ~/.cowcode/.env.');
-  process.exit(1);
+  console.log('SKIP telegram-send: TEST_CHAT_ID not set (optional live test).');
+  process.exit(0);
 }
 
 const bot = new TelegramBot(token.trim(), { polling: false });
