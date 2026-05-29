@@ -68,6 +68,12 @@ import { loadGroupMd, buildGroupPromptBlock } from './lib/group-prompt.js';
 import { buildOneOnOneSystemPrompt } from './lib/system-prompt.js';
 import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAULT_AGENT_ID } from './lib/agent-config.js';
 import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/background-tasks.js';
+import {
+  buildAnswerCompletenessProbePrompt,
+  buildContinuationContextBlock,
+  getImplicitContinuationHint,
+  shouldSkipToolRetryProbe,
+} from './lib/conversation-context.js';
 import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/group-display-names.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
 import { toUserMessage, getErrorMessageForLog } from './lib/user-error.js';
