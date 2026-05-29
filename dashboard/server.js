@@ -19,7 +19,7 @@ import { getResolvedTimezone, getResolvedTimeFormat } from '../lib/timezone.js';
 import { loadStore } from '../cron/store.js';
 import { DEFAULT_ENABLED } from '../skills/loader.js';
 import { getGroupRestrictions, saveGroupRestrictions } from '../lib/group-config.js';
-import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent } from '../lib/agent-config.js';
+import { ensureMainAgentInitialized, loadAgentConfig, saveAgentConfig, listAgentIds, DEFAULT_AGENT_ID, resolveAgentIdForGroup, createAgent, deleteAgent, getAgentMessagingPolicy } from '../lib/agent-config.js';
 import {
   getTideChecklistFromConfig,
   normalizeChecklistConfig,
@@ -305,10 +305,13 @@ app.get('/api/agents', (_req, res) => {
     const ids = listAgentIds();
     const agents = ids.map((id) => {
       const config = loadAgentConfig(id);
+      const skillsEnabled = Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED;
       return {
         id,
-        skillsEnabled: Array.isArray(config.skills?.enabled) ? config.skills.enabled : DEFAULT_ENABLED,
+        skillsEnabled,
         hasLlm: !!config.llm,
+        agentMessaging: getAgentMessagingPolicy(id),
+        canAgentSend: skillsEnabled.includes('agent-send'),
       };
     });
     res.json({ agents });

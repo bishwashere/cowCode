@@ -50,6 +50,7 @@
       height: 100dvh;
       max-height: 100dvh;
       overflow: hidden;
+      padding: 0.65rem 1rem 0.5rem;
     }
     #page-chat.active {
       flex: 1 1 0;
@@ -57,6 +58,108 @@
       flex-direction: column;
       min-height: 0;
       overflow: hidden;
+    }
+    .chat-page-split {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .chat-upper {
+      flex: 0 0 50%;
+      max-height: 50%;
+      min-height: 0;
+      display: flex;
+      gap: 0.65rem;
+    }
+    .chat-upper-left,
+    .chat-upper-right {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      margin-bottom: 0;
+      padding: 0.85rem 1rem;
+    }
+    .chat-upper-left .overview-grid {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem 0.75rem;
+    }
+    .chat-upper-left .url-box { font-size: 0.78rem; margin-top: 0.5rem; }
+    .chat-upper-right-title {
+      margin: 0 0 0.5rem 0;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .chat-lower {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-lower .chat-layout {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+    /* Agent team map (projects-style boxes) */
+    .agent-map-canvas {
+      position: relative;
+      min-height: 6rem;
+      padding: 0.25rem 0;
+    }
+    .agent-map-arrows {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      overflow: visible;
+    }
+    .agent-map-nodes {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem 1rem;
+      align-content: flex-start;
+    }
+    .agent-map-node {
+      flex-shrink: 0;
+      width: 132px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.7rem;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .agent-map-node:hover { border-color: var(--muted); }
+    .agent-map-node.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.35);
+    }
+    .agent-map-node-id {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      word-break: break-word;
+    }
+    .agent-map-node-meta {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+      line-height: 1.35;
+    }
+    .agent-map-arrow-line {
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      fill: none;
+      opacity: 0.5;
     }
     .card {
       background: var(--card);
@@ -898,21 +1001,53 @@
   </div>
 
   <div id="page-chat" class="page active">
-    <div class="chat-layout card" style="padding:0;">
-      <div class="chat-toolbar" style="position:relative;">
-        <span class="skill-meta" style="margin:0;">Agent</span>
-        <select id="chat-agent-select" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.35rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.82rem; min-width:8rem;"></select>
-        <button type="button" id="chat-agent-create-btn" class="chat-toolbar-btn" title="Create a new agent">+ Agent</button>
-        <button type="button" id="chat-new-btn" class="chat-toolbar-btn" title="Start a new conversation">New</button>
-        <button type="button" id="chat-history-btn" class="chat-toolbar-btn" title="Browse past conversations">History</button>
-        <div id="chat-history-panel" class="chat-history-panel"></div>
+    <div class="chat-page-split">
+      <div class="chat-upper">
+        <div class="chat-upper-left card">
+          <div>
+            <span id="chat-status-dot" class="status-dot stopped"></span>
+            <span id="chat-status-text">Checking…</span>
+          </div>
+          <div class="url-box">
+            Dashboard: <strong id="chat-dashboard-url">—</strong>
+          </div>
+          <div class="overview-grid">
+            <div class="overview-item"><span class="overview-label">Daemon uptime</span><span id="chat-overview-uptime">—</span></div>
+            <div class="overview-item"><span class="overview-label">Crons activated</span><span id="chat-overview-crons">—</span></div>
+            <div class="overview-item"><span class="overview-label">Skills activated</span><span id="chat-overview-skills">—</span></div>
+            <div class="overview-item"><span class="overview-label">Group restrictions</span><span id="chat-overview-group-skills">—</span></div>
+            <div class="overview-item"><span class="overview-label">Priority model</span><span id="chat-overview-model">—</span></div>
+            <div class="overview-item"><span class="overview-label">Time zone</span><span id="chat-overview-timezone">—</span></div>
+            <div class="overview-item"><span class="overview-label">Time format</span><span id="chat-overview-time-format">—</span></div>
+          </div>
+        </div>
+        <div class="chat-upper-right card">
+          <h2 class="chat-upper-right-title">Agent team</h2>
+          <p class="skill-meta" style="margin:0 0 0.5rem 0;">Click an agent to chat. Arrows show who can message whom (<code>agent-send</code> + allow list).</p>
+          <div id="agent-map-canvas" class="agent-map-canvas">
+            <svg id="agent-map-arrows" class="agent-map-arrows" aria-hidden="true"></svg>
+            <div id="agent-map-nodes" class="agent-map-nodes"></div>
+          </div>
+        </div>
       </div>
-      <div id="chat-messages" class="chat-messages">
-        <div id="chat-messages-inner" class="chat-messages-inner"></div>
-      </div>
-      <div class="chat-input-area">
-        <textarea id="chat-input" placeholder="Message the LLM…" rows="1"></textarea>
-        <button type="button" id="chat-send">Send</button>
+      <div class="chat-lower">
+        <div class="chat-layout card" style="padding:0;">
+          <div class="chat-toolbar" style="position:relative;">
+            <span class="skill-meta" style="margin:0;">Agent</span>
+            <select id="chat-agent-select" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.35rem 0.5rem; border-radius:4px; font-family:inherit; font-size:0.82rem; min-width:8rem;"></select>
+            <button type="button" id="chat-agent-create-btn" class="chat-toolbar-btn" title="Create a new agent">+ Agent</button>
+            <button type="button" id="chat-new-btn" class="chat-toolbar-btn" title="Start a new conversation">New</button>
+            <button type="button" id="chat-history-btn" class="chat-toolbar-btn" title="Browse past conversations">History</button>
+            <div id="chat-history-panel" class="chat-history-panel"></div>
+          </div>
+          <div id="chat-messages" class="chat-messages">
+            <div id="chat-messages-inner" class="chat-messages-inner"></div>
+          </div>
+          <div class="chat-input-area">
+            <textarea id="chat-input" placeholder="Message the LLM…" rows="1"></textarea>
+            <button type="button" id="chat-send">Send</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1252,21 +1387,30 @@
       const dot = document.getElementById('status-dot');
       const text = document.getElementById('status-text');
       const urlEl = document.getElementById('dashboard-url');
+      const chatDot = document.getElementById('chat-status-dot');
+      const chatText = document.getElementById('chat-status-text');
+      const chatUrlEl = document.getElementById('chat-dashboard-url');
+      function setDaemonStatus(running, label) {
+        var cls = running ? 'status-dot running' : 'status-dot stopped';
+        if (dot) { dot.className = cls; text.textContent = label; }
+        if (chatDot) { chatDot.className = cls; if (chatText) chatText.textContent = label; }
+      }
       try {
         const statusRes = await fetch(API + '/api/status');
         const statusData = await statusRes.json();
-        if (statusData.dashboardUrl) urlEl.textContent = statusData.dashboardUrl;
+        if (statusData.dashboardUrl) {
+          if (urlEl) urlEl.textContent = statusData.dashboardUrl;
+          if (chatUrlEl) chatUrlEl.textContent = statusData.dashboardUrl;
+        }
         if (statusData.daemonRunning) {
-          dot.className = 'status-dot running';
-          text.textContent = 'Daemon is running';
+          setDaemonStatus(true, 'Daemon is running');
         } else {
-          dot.className = 'status-dot stopped';
-          text.textContent = 'Daemon is not running';
+          setDaemonStatus(false, 'Daemon is not running');
         }
       } catch (e) {
-        dot.className = 'status-dot stopped';
-        text.textContent = 'Daemon is not running';
-        urlEl.textContent = '—';
+        setDaemonStatus(false, 'Daemon is not running');
+        if (urlEl) urlEl.textContent = '—';
+        if (chatUrlEl) chatUrlEl.textContent = '—';
       }
       function formatUptime(sec) {
         if (sec == null || typeof sec !== 'number' || sec < 0) return '—';
@@ -1282,19 +1426,25 @@
         return parts.join(' ');
       }
       function setOverview(d) {
-        document.getElementById('overview-uptime').textContent = d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—';
-        document.getElementById('overview-crons').textContent = typeof d.cronCount === 'number' ? d.cronCount : '—';
-        document.getElementById('overview-skills').textContent = typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—';
-        if (typeof d.groupSkillsDeniedCount === 'number') {
-          document.getElementById('overview-group-skills').textContent = d.groupSkillsDeniedCount + ' denied';
-        } else if (typeof d.groupSkillsEnabledCount === 'number') {
-          document.getElementById('overview-group-skills').textContent = d.groupSkillsEnabledCount;
-        } else {
-          document.getElementById('overview-group-skills').textContent = '—';
-        }
-        document.getElementById('overview-model').textContent = d.priorityModelLabel || '—';
-        document.getElementById('overview-timezone').textContent = d.timezone || '—';
-        document.getElementById('overview-time-format').textContent = d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—');
+        var fields = [
+          ['overview-uptime', 'chat-overview-uptime', d.daemonRunning && d.daemonUptimeSeconds != null ? formatUptime(d.daemonUptimeSeconds) : '—'],
+          ['overview-crons', 'chat-overview-crons', typeof d.cronCount === 'number' ? d.cronCount : '—'],
+          ['overview-skills', 'chat-overview-skills', typeof d.skillsEnabledCount === 'number' ? d.skillsEnabledCount : '—'],
+          ['overview-model', 'chat-overview-model', d.priorityModelLabel || '—'],
+          ['overview-timezone', 'chat-overview-timezone', d.timezone || '—'],
+          ['overview-time-format', 'chat-overview-time-format', d.timeFormat === '12' ? '12-hour' : d.timeFormat === '24' ? '24-hour' : (d.timeFormat || '—')],
+        ];
+        var groupVal;
+        if (typeof d.groupSkillsDeniedCount === 'number') groupVal = d.groupSkillsDeniedCount + ' denied';
+        else if (typeof d.groupSkillsEnabledCount === 'number') groupVal = d.groupSkillsEnabledCount;
+        else groupVal = '—';
+        fields.push(['overview-group-skills', 'chat-overview-group-skills', groupVal]);
+        fields.forEach(function (pair) {
+          var el = document.getElementById(pair[0]);
+          var chatEl = document.getElementById(pair[1]);
+          if (el) el.textContent = pair[2];
+          if (chatEl) chatEl.textContent = pair[2];
+        });
       }
       try {
         const overviewRes = await fetch(API + '/api/overview');
@@ -1437,6 +1587,7 @@
       var list = d.agents || [];
       if (!list.some(function (a) { return a.id === selectedAgentId; })) selectedAgentId = list.length ? list[0].id : 'main';
       var ul = document.getElementById('agents-list');
+      if (!ul) return;
       ul.innerHTML = list.map(function (a) {
         var selected = a.id === selectedAgentId ? 'selected' : '';
         return '<li class="' + selected + '"><button type="button" class="link" data-agent-id="' + escapeHtml(a.id) + '">' + escapeHtml(a.id) + '</button></li>';
@@ -2619,6 +2770,96 @@
       }
     }
 
+    var agentMapData = [];
+
+    function updateAgentMapSelection() {
+      document.querySelectorAll('.agent-map-node').forEach(function (n) {
+        n.classList.toggle('selected', n.getAttribute('data-agent-id') === selectedChatAgentId);
+      });
+    }
+
+    function drawAgentMapArrows(agents) {
+      var svg = document.getElementById('agent-map-arrows');
+      var container = document.getElementById('agent-map-canvas');
+      if (!svg || !container) return;
+      var w = container.clientWidth || 1;
+      var h = container.clientHeight || 1;
+      svg.setAttribute('width', String(w));
+      svg.setAttribute('height', String(h));
+      svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+      var edges = [];
+      (agents || []).forEach(function (a) {
+        if (!a.canAgentSend) return;
+        var allow = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow : [];
+        allow.forEach(function (target) {
+          if ((agents || []).some(function (x) { return x.id === target; })) {
+            edges.push({ from: a.id, to: target });
+          }
+        });
+      });
+      if (!edges.length) {
+        svg.innerHTML = '';
+        return;
+      }
+      var cr = container.getBoundingClientRect();
+      function center(id) {
+        var el = container.querySelector('.agent-map-node[data-agent-id="' + id + '"]');
+        if (!el) return null;
+        var r = el.getBoundingClientRect();
+        return { x: r.left - cr.left + r.width / 2, y: r.top - cr.top + r.height / 2 };
+      }
+      var defs = '<defs><marker id="agent-arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a78bfa" opacity="0.65"/></marker></defs>';
+      var lines = edges.map(function (e) {
+        var f = center(e.from);
+        var t = center(e.to);
+        if (!f || !t) return '';
+        return '<line x1="' + f.x + '" y1="' + f.y + '" x2="' + t.x + '" y2="' + t.y + '" class="agent-map-arrow-line" marker-end="url(#agent-arrowhead)"/>';
+      }).join('');
+      svg.innerHTML = defs + lines;
+    }
+
+    function renderAgentMap() {
+      var nodesEl = document.getElementById('agent-map-nodes');
+      if (!nodesEl) return;
+      var agents = agentMapData || [];
+      if (!agents.length) {
+        nodesEl.innerHTML = '<p class="skill-meta" style="margin:0;">No agents yet. Use + Agent to create one.</p>';
+        drawAgentMapArrows([]);
+        return;
+      }
+      nodesEl.innerHTML = agents.map(function (a) {
+        var id = escapeHtml(a.id);
+        var skillCount = Array.isArray(a.skillsEnabled) ? a.skillsEnabled.length : 0;
+        var allowCount = Array.isArray(a.agentMessaging && a.agentMessaging.allow) ? a.agentMessaging.allow.length : 0;
+        var canSend = !!a.canAgentSend;
+        var meta;
+        if (canSend && allowCount) meta = allowCount + ' peer' + (allowCount === 1 ? '' : 's');
+        else if (a.id === 'main') meta = 'default agent';
+        else meta = 'isolated';
+        var sel = a.id === selectedChatAgentId ? ' selected' : '';
+        return '<div class="agent-map-node' + sel + '" data-agent-id="' + id + '" role="button" tabindex="0" title="Chat with ' + id + '">' +
+          '<div class="agent-map-node-id">' + id + '</div>' +
+          '<div class="agent-map-node-meta">' + skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + escapeHtml(meta) + '</div></div>';
+      }).join('');
+      nodesEl.querySelectorAll('.agent-map-node').forEach(function (node) {
+        function pick() {
+          var id = node.getAttribute('data-agent-id');
+          if (!id) return;
+          var sel = document.getElementById('chat-agent-select');
+          if (sel) sel.value = id;
+          setChatAgent(id);
+          updateAgentMapSelection();
+        }
+        node.addEventListener('click', pick);
+        node.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+        });
+      });
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { drawAgentMapArrows(agents); });
+      });
+    }
+
     function setChatAgent(agentId) {
       saveCurrentSession();
       selectedChatAgentId = agentId || 'main';
@@ -2638,6 +2879,7 @@
         chatMessagesByAgent[selectedChatAgentId] = chatMessages;
       }
       renderChatMessages();
+      updateAgentMapSelection();
     }
 
     async function fetchChatAgents() {
@@ -2647,6 +2889,7 @@
         var r = await fetch(API + '/api/agents');
         var d = await r.json();
         var agents = Array.isArray(d.agents) ? d.agents : [];
+        agentMapData = agents;
         if (!agents.length) agents = [{ id: 'main' }];
         if (!agents.some(function (a) { return a.id === selectedChatAgentId; })) {
           selectedChatAgentId = agents[0].id;
@@ -2656,9 +2899,12 @@
           var selected = id === selectedChatAgentId ? ' selected' : '';
           return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(id) + '</option>';
         }).join('');
+        renderAgentMap();
         setChatAgent(selectedChatAgentId);
       } catch (_) {
+        agentMapData = [{ id: 'main' }];
         select.innerHTML = '<option value="main" selected>main</option>';
+        renderAgentMap();
         setChatAgent('main');
       }
     }
@@ -2882,6 +3128,15 @@
     fetchStatus();
     fetchChatAgents();
     setInterval(fetchStatus, 8000);
+    (function () {
+      var canvas = document.getElementById('agent-map-canvas');
+      if (!canvas || typeof ResizeObserver === 'undefined') return;
+      var redrawTimer;
+      new ResizeObserver(function () {
+        clearTimeout(redrawTimer);
+        redrawTimer = setTimeout(function () { drawAgentMapArrows(agentMapData); }, 80);
+      }).observe(canvas);
+    })();
     (function () {
       var p = parseHash();
       setPage(p.name, p.soulFile);
