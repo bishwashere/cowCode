@@ -411,6 +411,342 @@ Skill files live in `skills/<id>/SKILL.md` and define the prompts and executor l
 
 ---
 
+## GitHub Integration
+
+Connect cowCode to GitHub so the agent can read repositories, manage issues and PRs, create branches, post comments, and more — all through natural conversation.
+
+### 1. Create a token
+
+Go to **GitHub → Settings → Developer settings → Personal access tokens**.
+
+| Use case | Recommended scopes |
+|---|---|
+| Read-only (public repos) | `public_repo` |
+| Read/write (private repos + PRs) | `repo` |
+| Issues and PR comments | `repo` → Issues + Pull requests |
+| Fine-grained token (recommended) | Select the specific repository, grant Issues (R/W) + Pull requests (R/W) + Contents (R) |
+
+**Never grant** `admin:org`, `delete_repo`, or `workflow` unless you specifically need them.
+
+### 2. Store the token
+
+**Option A — `secrets.json`** (recommended, gitignored):
+
+```json
+// ~/.cowcode/secrets.json
+{ "github": { "token": "ghp_your_token_here" } }
+```
+
+**Option B — `.env`** file:
+
+```env
+# ~/.cowcode/.env
+GITHUB_TOKEN=ghp_your_token_here
+```
+
+### 3. Optional: set a default repo
+
+```json
+// ~/.cowcode/config.json  →  skills section
+"github": {
+  "token": "GITHUB_TOKEN",
+  "defaultRepo": "owner/repo"
+}
+```
+
+When `defaultRepo` is set, you can say "list issues" without repeating the repo name every time.
+
+### 4. Enable the skill
+
+```json
+"skills": {
+  "enabled": ["github", "...other skills"]
+}
+```
+
+Or toggle it on the **Skills** page in the dashboard. The badge next to the skill shows **configured** (green), **needs setup** (red), or **token in config** (yellow — move it to `secrets.json`).
+
+### What you can say
+
+| Message | What happens |
+|---|---|
+| `list open issues in myorg/myrepo` | Lists open issues |
+| `show me PR #42` | Reads the PR with full comment thread |
+| `what PRs are open?` | Lists open pull requests (uses defaultRepo) |
+| `read the README` | Reads `README.md` from the default branch |
+| `create branch feat/webhooks from main` | Creates a branch (asks to confirm) |
+| `open a PR from feat/webhooks titled "Add webhooks"` | Opens a PR (asks to confirm) |
+| `post a comment on issue #5 saying "Fixed in #8"` | Posts a comment (asks to confirm) |
+| `merge PR #10 with squash` | Merges the PR (shows details, asks to confirm) |
+| `search for "executeGithub" in my repo` | Searches code on GitHub |
+
+All write operations (**create branch**, **post comment**, **create PR**, **merge PR**) show you exactly what will happen and ask for confirmation before proceeding.
+
+---
+
+## Google Integration (Gmail & Calendar)
+
+Gmail and Calendar use the [`gog` CLI](https://gogcli.sh) — a Google Workspace command-line tool that handles OAuth. cowCode calls `gog` behind the scenes, so you only need to authenticate once.
+
+### 1. Install gog
+
+```bash
+brew install gog        # macOS
+# or: pip install gog   # Python-based install
+```
+
+### 2. Authenticate
+
+```bash
+gog auth
+# Follow the browser OAuth flow. Grants Gmail + Calendar scopes.
+```
+
+### 3. Set your account (optional)
+
+```json
+// ~/.cowcode/config.json  →  skills section
+"gog": {
+  "account": "you@gmail.com"
+}
+```
+
+Omit this if you only have one Google account. When set, all `gmail` and `calendar` tool calls use that account automatically.
+
+### 4. Enable the skills
+
+```json
+"skills": {
+  "enabled": ["gmail", "calendar", "..."]
+}
+```
+
+---
+
+### Gmail — what you can say
+
+| Message | What happens |
+|---|---|
+| `what's in my inbox?` | Lists recent inbox messages |
+| `show me unread emails` | Filters to unread |
+| `search for emails from boss@company.com` | Searches inbox |
+| `summarize my inbox` | Returns sender/subject breakdown for recent messages |
+| `read that email` | Reads the full body of a selected message |
+| `send an email to alice@co.com about the report` | Composes + asks to confirm before sending |
+| `reply to that thread saying "Done, see PR #8"` | Replies to the thread (confirms first) |
+| `archive all emails older than 30 days` | Bulk archive (confirms first) |
+| `mark all unread as read` | Marks all unread messages as read |
+| `clear my inbox` | Archives everything in inbox (confirms first) |
+
+Send and reply actions **always** require explicit confirmation before executing.
+
+---
+
+### Calendar — what you can say
+
+| Message | What happens |
+|---|---|
+| `what's on my calendar this week?` | Lists events for the next 7 days |
+| `do I have anything tomorrow?` | Lists tomorrow's events |
+| `book a 30-minute meeting with john@co.com next Tuesday at 2pm` | Creates event (shows details, confirms) |
+| `schedule a 1-hour team sync every Monday at 10am` | Creates recurring event (confirms) |
+| `am I free Friday at 3pm?` | Checks free/busy for that slot |
+| `find a free 1-hour slot this week` | Finds the next available block |
+| `move the 3pm standup to 4pm` | Updates the event time (confirms) |
+| `delete the standup tomorrow` | Deletes the event (confirms) |
+| `create an all-day event "Offsite" on June 15` | Creates an all-day event |
+
+Create, update, and delete actions **always** require explicit confirmation. For natural-language times ("next Tuesday 2pm"), the agent converts to the correct ISO timestamp using your local timezone before calling the API.
+
+---
+
+## Multi-Agent (Agent Team)
+
+cowCode supports multiple **agent personas**. Each agent has its own identity files, skill set, and optionally its own LLM config. You can route different conversations to different specialists — a coding agent, a writing agent, a personal assistant, etc.
+
+### Concepts
+
+| Term | Meaning |
+|---|---|
+| **Agent** | A named persona with its own skills, identity (WhoAmI, MyHuman), and optional LLM. |
+| **`main`** | The default agent. Always exists, cannot be deleted. |
+| **Agent team** | All configured agents. Visualized as a tree on the dashboard home. |
+| **Agent messaging** | One agent can invoke another via the `agent-send` skill. Controlled by an allow-list. |
+| **Groups** | WhatsApp/Telegram groups are assigned to a specific agent. Group members chat with that agent only. |
+
+### Creating agents
+
+**From the dashboard** (easiest):
+
+1. Open the dashboard home page.
+2. Click **+ Agent** (top-right of the Agent team card, or in the chat toolbar).
+3. Type a **name** (e.g. "Backend Bot", "Writer"). The internal id is auto-generated (`backend-bot`, `writer`).
+4. Choose **Copy settings from** — defaults to the most recently used non-main agent. This copies the LLM config, skills (minus sensitive defaults), and identity files.
+5. Click **Create**. The new agent appears in the tree immediately.
+
+**From the CLI:**
+
+```bash
+cowcode create agent backend-bot
+```
+
+### Configuring an agent
+
+Click the **✎** button on any agent card to edit:
+
+- **Title** — display name shown in the UI and chat toolbar
+- **Skills** — toggle which skills this agent has access to (independent of the main agent)
+- **Agent messaging** — enable the `agent-send` skill and add which other agents this one can invoke
+
+### The Agent team tree
+
+The dashboard home page shows all agents as a **tree**:
+
+```
+              [main]
+             /       \
+     [writer]     [backend-bot]
+```
+
+- **`main` is always the root** — it sits at the top.
+- Other agents branch below it.
+- **Solid lines** = tree structure (hierarchy).
+- **Dashed arrows** = message-passing permission (agent A can invoke agent B).
+- Click any node to switch the chat to that agent.
+
+### Routing messages to agents
+
+**Private chats (WhatsApp/Telegram DMs):** You select which agent handles the conversation from the chat toolbar dropdown on the dashboard, or by changing `selectedChatAgentId` in the chat UI.
+
+**Group chats:** Assign a group to a specific agent on the **Groups** page. Every message in that group is handled by the assigned agent with its specific skills.
+
+**Agent-to-agent messaging:** If `agent-send` is enabled and an agent has an allow-list configured, one agent can delegate tasks to another mid-conversation:
+
+```
+User: "Write a PR description and then ask the backend agent to open it"
+main agent → invokes writer agent to draft → invokes backend-bot to create_pr
+```
+
+### Per-agent config files
+
+Each agent's identity lives in `~/.cowcode/agents/<id>/workspace/`:
+
+| File | Purpose |
+|---|---|
+| `SOUL.md` | Core personality — tone, style, rules |
+| `WhoAmI.md` | Agent's self-description |
+| `MyHuman.md` | What this agent knows about the user |
+
+Edit these from the **Agents** page in the dashboard (select an agent → Identity files).
+
+### Groups — assigning agents
+
+On the **Groups** page, select a group and assign it to an agent. You can also add a **skills deny list** for that group (e.g., disable `go-write` in a shared group).
+
+---
+
+## Dashboard Guide
+
+Open the dashboard with:
+
+```bash
+cowcode dashboard
+# Opens http://127.0.0.1:3847
+```
+
+### Pages
+
+| Page | What it's for |
+|---|---|
+| **Home** | Chat with any agent. Status overview. Agent team tree. |
+| **Memory** | Browse and edit all memory: Today, Yesterday, Long-term (MEMORY.md), History, Notes. |
+| **Crons** | View, add, and delete scheduled reminders. |
+| **Skills** | Enable/disable skills. View credential status badges. Edit SKILL.md files inline. |
+| **Agents** | Create and configure agent personas. Edit identity files. |
+| **Groups** | Assign WhatsApp/Telegram groups to agents. Set per-group skill restrictions. |
+| **LLM** | Configure language models, providers, API keys, and fallback priority. |
+| **Tide** | Enable/disable Tide follow-ups. Manage the maintenance checklist. |
+| **Config** | Full raw JSON config editor with live preview. |
+| **Test** | Run built-in skill tests (search, browser, memory, etc.) directly from the UI. |
+| **Projects** | Visual project tracker with branched updates. |
+
+---
+
+### Home page
+
+The home page has two panels:
+
+**Left — Overview & Identity:**
+- Live status (daemon up/down, active model, skill count, timezone)
+- Identity tiles: click **Who am I**, **My human**, or **Group rules** to open an inline editor for that file
+
+**Right — Agent team:**
+- Tree visualization of all agents
+- Click any node to select that agent for chat
+- **✎** button on each node opens the edit modal
+- **+ Agent** button (top-right) opens the create-agent dialog
+
+**Below — Chat:**
+- Full in-browser chat with the selected agent
+- Agent selector dropdown + **+ Agent** button in the toolbar
+- **New** starts a fresh session; **History** browses past conversations
+
+---
+
+### Memory page
+
+The Memory page has **5 tiles** across the top. Click any tile to switch the view:
+
+| Tile | Contents |
+|---|---|
+| **Today** 📅 | Today's conversation log (read-only). Auto-loads on open. |
+| **Yesterday** 🗓 | Yesterday's conversation log (read-only). |
+| **Long-term** 🧠 | `MEMORY.md` — the agent's persistent notes about you. Editable with a Save button. |
+| **History** 💬 | All past chat days, newest first. Click a day to read the full log. |
+| **Notes** 📝 | Custom memory files (e.g. `preferences.md`). Editable. |
+
+---
+
+### Skills page
+
+Each skill shows:
+- **Name + description**
+- **Credential badge**: green `configured` / red `needs setup` / yellow `token in config` (move to `secrets.json`) / grey `gog auth`
+- **Enable/disable toggle**
+- Click a skill to expand its `SKILL.md` inline and edit the agent instructions
+
+---
+
+### Creating an agent (step by step)
+
+1. Go to **Home** or **Agents**.
+2. Click **+ Agent**.
+3. Enter a **name** — e.g. "Research Bot". The id `research-bot` is auto-generated.
+4. **Copy settings from**: defaults to the most recently used non-main agent. Copies skills and identity files.
+5. Click **Create**. The agent appears in the tree on the home page.
+6. Click **✎** on the new agent node to:
+   - Change the title
+   - Adjust which skills it has
+   - Enable agent messaging and set who it can invoke
+7. Go to **Agents → Identity files** to customize `WhoAmI.md` and `MyHuman.md` for this persona.
+
+---
+
+### GitHub skill in the dashboard
+
+On the **Skills** page, `github` shows a credential badge:
+- **configured** — token found in `secrets.json` or `GITHUB_TOKEN` env var. Ready to use.
+- **needs setup** — no token found. Click the skill to expand and read the setup instructions.
+- **token in config** — token found in `config.json`. Works, but move it to `secrets.json` for better security.
+
+---
+
+### Gmail & Calendar skills in the dashboard
+
+`gmail` and `calendar` show a **gog auth** badge — they rely on the `gog` CLI's OAuth session. If you see errors, run `gog auth` in a terminal to re-authenticate.
+
+---
+
 ## Cron / Reminder Store
 
 Reminders are stored in plain JSON at `~/.cowcode/cron/jobs.json` (no SQLite dependency for the scheduler). The store is human-readable and can be edited manually.
@@ -622,21 +958,6 @@ cowCode/
 
 ---
 
-## Dashboard
-
-Local Express web UI for chat, config, and ops.
-
-```bash
-cowcode dashboard
-# or:
-node dashboard/server.js
-```
-
-Open `http://localhost:3100` (default port). Nav pages: **Chat**, **Status**, **Soul**, **Crons**, **Skills**, **Agents**, **Groups**, **LLM**, **Tide** (checklist), **Config**, **Test**, **Projects**.
-
-**Projects** — visual project tracker with branched update chains. See [docs/projects.md](docs/projects.md) for auth and API.
-
----
 
 ## Running as a Daemon
 
