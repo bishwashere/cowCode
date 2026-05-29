@@ -35,9 +35,14 @@ Interact with GitHub via the REST API. Read repositories, issues, PRs, and files
 
 ### `list_repos`
 List repositories for the authenticated user or a specified org/user.
-- **owner** (optional) - GitHub username or org. Omit for the authenticated user. Do **not** use `@me` — leave owner empty instead.
-- **type** (optional) - `all`, `owner`, `member` (default: `owner`)
-- **per_page** (optional) - max results, 1–100 (default: 30)
+- **owner** (optional) - GitHub username or org. **Omit for the authenticated token account** — this is the default for "my repos", "how many repos do I have", etc. Do **not** use `@me` and do **not** guess owner from the user's real name (e.g. do not pass `bishwasmishra` unless that is their GitHub login).
+- **type** (optional) - `all`, `owner`, `member` (default: `all` for full repo counts)
+- **per_page** (optional) - page size, 1–100 (default: 100)
+- **paginate** (optional) - when true (default), fetches all pages so `count` is the total
+
+Returns `{ authenticated_as, owner, count, repos }`. Use `count` directly when the user asks how many repos they have.
+
+**Single-account setup:** if only one GitHub token is configured, that account IS the answer — never ask the user for their GitHub username.
 
 ### `read_repo`
 Get details about a repository (description, stars, default branch, topics, open issue count).
@@ -111,6 +116,8 @@ Search code across GitHub.
 
 | User says | Action |
 |---|---|
+| "How many repos do I have?" / "total repos" | `list_repos` — **omit owner**, type `all` — reply with `count` |
+| "List my GitHub repos" | `list_repos` — omit owner |
 | "List open issues in myorg/myrepo" | `list_issues` |
 | "Show me PR #42" | `read_issue` number: 42 |
 | "What PRs are open?" | `list_prs` |
@@ -136,11 +143,12 @@ Search code across GitHub.
 
 ```tool-schema
 github_list_repos
-  description: List repositories for the authenticated user or a GitHub user/org.
+  description: List repositories for the authenticated GitHub token account (omit owner) or for a specific user/org. Returns count and repos. For "my repos" or repo totals, omit owner — do not ask for username.
   parameters:
     owner: string (optional)
     type: string (optional)
     per_page: number (optional)
+    paginate: boolean (optional)
 
 github_read_repo
   description: Get details about a GitHub repository.

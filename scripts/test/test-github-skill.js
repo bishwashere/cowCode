@@ -211,17 +211,23 @@ if (liveToken) {
   console.log('\n  Running live list_repos tests\n');
 
   await test('list_repos accepts owner @me (authenticated user)', async () => {
-    const result = await executeGithub({}, { owner: '@me', per_page: 5 }, 'github_list_repos');
-    const arr = parse(result);
-    if (!Array.isArray(arr)) throw new Error(`Expected array, got: ${JSON.stringify(arr).slice(0, 200)}`);
-    if (arr.length === 0) throw new Error('Expected at least one repo for authenticated user');
+    const result = await executeGithub({}, { owner: '@me', per_page: 5, paginate: false }, 'github_list_repos');
+    const obj = parse(result);
+    const repos = Array.isArray(obj) ? obj : obj.repos;
+    if (!Array.isArray(repos)) throw new Error(`Expected repos array, got: ${JSON.stringify(obj).slice(0, 200)}`);
+    if (repos.length === 0) throw new Error('Expected at least one repo for authenticated user');
+    if (!Array.isArray(obj) && obj.authenticated_as && obj.count !== repos.length) {
+      throw new Error(`count ${obj.count} should match repos.length ${repos.length}`);
+    }
   });
 
   await test('list_repos returns repos for authenticated user', async () => {
-    const result = await executeGithub({}, { per_page: 5 }, 'github_list_repos');
-    const arr = parse(result);
-    if (!Array.isArray(arr)) throw new Error('Expected array');
-    if (arr.length === 0) throw new Error('Expected at least one repo');
+    const result = await executeGithub({}, { per_page: 5, paginate: false }, 'github_list_repos');
+    const obj = parse(result);
+    const repos = Array.isArray(obj) ? obj : obj.repos;
+    if (!Array.isArray(repos)) throw new Error('Expected repos array');
+    if (repos.length === 0) throw new Error('Expected at least one repo');
+    if (!Array.isArray(obj) && typeof obj.count !== 'number') throw new Error('Expected count field');
   });
 }
 
