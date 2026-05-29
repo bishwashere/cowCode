@@ -51,8 +51,8 @@ const checks = [
     ok: html.includes('agent-edit-modal-md-files') && html.includes('agent-edit-modal-md-textarea'),
   },
   {
-    name: 'Agent map node has team page extension button',
-    ok: html.includes('agent-map-node-ext') && html.includes('openTeamAgentPage'),
+    name: 'Agent team block has extension button',
+    ok: html.includes('id="agent-team-ext-btn"') && html.includes('openTeamAgentPage'),
   },
   {
     name: 'Dedicated team agent page exists',

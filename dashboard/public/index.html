@@ -204,8 +204,7 @@
     .agent-map-node-edit {
       position: absolute;
       top: 0.3rem;
-      left: 0.3rem;
-      right: auto;
+      right: 0.3rem;
       background: none;
       border: none;
       color: var(--muted);
@@ -222,27 +221,24 @@
       color: var(--accent);
       background: rgba(167, 139, 250, 0.12);
     }
-    .agent-map-node-ext {
-      position: absolute;
-      top: 0.3rem;
-      right: 0.3rem;
+    .agent-team-ext-btn {
       background: none;
-      border: none;
+      border: 1px solid var(--border);
       color: var(--muted);
       cursor: pointer;
-      padding: 0.28rem 0.42rem;
-      font-size: 1.05rem;
-      line-height: 1;
+      padding: 0.28rem 0.45rem;
       border-radius: 4px;
-      opacity: 0.55;
-      transition: opacity 0.15s, color 0.15s, background 0.15s;
+      line-height: 1;
+      opacity: 0.85;
+      transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
     }
-    .agent-map-node:hover .agent-map-node-ext { opacity: 1; }
-    .agent-map-node-ext:hover {
+    .agent-team-ext-btn:hover {
       color: var(--accent);
-      background: rgba(167, 139, 250, 0.12);
+      border-color: var(--accent);
+      background: rgba(167, 139, 250, 0.08);
+      opacity: 1;
     }
-    .agent-map-node-ext svg {
+    .agent-team-ext-btn svg {
       display: block;
       width: 1rem;
       height: 1rem;
@@ -1481,7 +1477,12 @@
           <div class="chat-upper-right-head">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
               <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
-              <button type="button" id="agent-team-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+              <div style="display:flex; align-items:center; gap:0.35rem;">
+                <button type="button" id="agent-team-ext-btn" class="agent-team-ext-btn" title="Open team agent page for selected agent" aria-label="Open team agent page">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h8a2 2 0 0 1 2 2v1h1.5a.5.5 0 0 1 .4.8l-2.2 2.93a.5.5 0 0 1-.4.2H12v4.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 13.5V2zm1 0v11.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5V7a.5.5 0 0 1 .5-.5h1.29L13.6 5H12a1 1 0 0 1-1-1V3H5zm2.75 3a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5z"/></svg>
+                </button>
+                <button type="button" id="agent-team-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+              </div>
             </div>
             <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click to chat. Tree shows hierarchy; dashed arrows show message-passing links.</p>
           </div>
@@ -4118,10 +4119,7 @@
         return '<div class="agent-map-node' + sel + inboundClass + '" data-agent-id="' + id + '" role="button" tabindex="0"' +
           ' title="Chat with ' + escapeHtml(chatLabel) + '"' +
           ' style="left:' + pos.x + 'px; top:' + pos.y + 'px;">' +
-          '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Quick edit">✎</button>' +
-          '<button type="button" class="agent-map-node-ext" data-agent-id="' + id + '" aria-label="Open team page for ' + id + '" title="Open team agent page">' +
-          '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h8a2 2 0 0 1 2 2v1h1.5a.5.5 0 0 1 .4.8l-2.2 2.93a.5.5 0 0 1-.4.2H12v4.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 13.5V2zm1 0v11.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5V7a.5.5 0 0 1 .5-.5h1.29L13.6 5H12a1 1 0 0 1-1-1V3H5zm2.75 3a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5z"/></svg>' +
-          '</button>' +
+          '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Edit agent">✎</button>' +
           titleHtml +
           inboundHtml +
           '<div class="agent-map-node-meta">' + skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + escapeHtml(meta) + '</div></div>';
@@ -4132,13 +4130,6 @@
           e.stopPropagation();
           var aid = btn.getAttribute('data-agent-id');
           if (aid) openAgentEditModal(aid);
-        });
-      });
-      nodesEl.querySelectorAll('.agent-map-node-ext').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          var aid = btn.getAttribute('data-agent-id');
-          if (aid) openTeamAgentPage(aid);
         });
       });
       nodesEl.querySelectorAll('.agent-map-node').forEach(function(node) {
@@ -4394,6 +4385,9 @@
     });
     document.getElementById('chat-agent-create-btn').addEventListener('click', function () {
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+    });
+    document.getElementById('agent-team-ext-btn').addEventListener('click', function () {
+      openTeamAgentPage(selectedChatAgentId || 'main');
     });
     document.getElementById('agent-team-create-btn').addEventListener('click', function () {
       openAgentCreateModal({ fromAgentId: selectedChatAgentId });
