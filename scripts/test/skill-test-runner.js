@@ -15,7 +15,49 @@
  */
 
 import { assertActualResult, ExpectMode, formatExpectModeLabel } from './e2e-expect.js';
-import { startReport, endReport, recordCase } from './e2e-report.js';
+
+let _reportRows = [];
+let _reportSuite = '';
+
+function fallbackStartReport(suiteName) {
+  _reportSuite = suiteName;
+  _reportRows = [];
+}
+
+function fallbackRecordCase(row) {
+  _reportRows.push({
+    name: row.name,
+    input: row.input || '',
+    output: row.output || '',
+    status: row.status,
+    detail: row.detail || '',
+  });
+  const icon = row.status === 'pass' ? '✅' : row.status === 'skip' ? '⏭️' : '❌';
+  console.log(`\n${icon} ${row.name}`);
+  if (row.input) console.log('  INPUT:', row.input);
+  if (row.output) console.log('  OUTPUT:', clipReply(row.output));
+  if (row.detail && row.status === 'fail') console.log('  DETAIL:', row.detail);
+}
+
+function fallbackEndReport() {
+  console.log(`\n## E2E report: ${_reportSuite}\n`);
+  console.log('| Test | Input | Output | Status |');
+  console.log('| --- | --- | --- | --- |');
+  for (const r of _reportRows) {
+    const status = r.status === 'pass' ? '✅ Pass' : r.status === 'skip' ? '⏭️ Skip' : '❌ Fail';
+    const detail = r.detail ? ` — ${String(r.detail).slice(0, 120)}` : '';
+    console.log(`| ${r.name} | ${r.input} | ${clipReply(r.output)} | ${status}${detail} |`);
+  }
+  const passed = _reportRows.filter((r) => r.status === 'pass').length;
+  const failed = _reportRows.filter((r) => r.status === 'fail').length;
+  const skipped = _reportRows.filter((r) => r.status === 'skip').length;
+  console.log(`\n**${_reportSuite}:** ${passed} passed, ${failed} failed, ${skipped} skipped\n`);
+}
+
+const reportApi = await import('./e2e-report.js').catch(() => null);
+const startReport = reportApi?.startReport || fallbackStartReport;
+const endReport = reportApi?.endReport || fallbackEndReport;
+const recordCase = reportApi?.recordCase || fallbackRecordCase;
 
 /**
  * @param {string} skillName - e.g. 'cron', 'browser', 'memory'
