@@ -70,9 +70,6 @@ import { ensureMainAgentInitialized, resolveAgentIdForGroup, readAgentMd, DEFAUL
 import { recoverStaleBackgroundTasks, formatTasksList, spawnBackgroundTask } from './lib/background-tasks.js';
 import {
   buildAnswerCompletenessProbePrompt,
-  buildContinuationContextBlock,
-  getImplicitContinuationHint,
-  shouldSkipToolRetryProbe,
 } from './lib/conversation-context.js';
 import { getGroupDisplayName, setGroupDisplayName, parseSetDisplayNameMessage } from './lib/group-display-names.js';
 import { resetBrowseSession } from './lib/executors/browse.js';
@@ -894,15 +891,11 @@ async function main() {
       : (inMemoryHistory.length > 0
           ? inMemoryHistory
           : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
-    const continuationHint = !isGroupJid
-      ? getImplicitContinuationHint(getWorkspaceDir(), logJid, sessionId, text)
-      : '';
     // Step 2: intent planner — one small LLM call before loading any tool schemas.
     const intentPlan = enabledSkillIds.length > 0
       ? await planIntent({
           userText: text,
           historyMessages,
-          continuationHint,
           availableSkillIds: enabledSkillIds,
           availableSkillSummaries: enabledSkillSummaries,
           agentId,
@@ -940,8 +933,6 @@ async function main() {
     const systemPrompt = buildSystemPrompt(systemPromptOpts);
     const planBlock = intentPlanToSystemBlock(intentPlan);
     let systemPromptWithPlan = planBlock ? systemPrompt + '\n\n' + planBlock : systemPrompt;
-    const continuationBlock = buildContinuationContextBlock(text, historyMessages, continuationHint);
-    if (continuationBlock) systemPromptWithPlan += continuationBlock;
     if (sessionBootstrap) systemPromptWithPlan += sessionBootstrap;
     if (!isGroupJid) {
       const memoryConfig = getMemoryConfig();
@@ -971,8 +962,7 @@ async function main() {
       (hasSearchOrBrowseTool || plannerSaysNoTools) &&
       !hasSearchOrBrowse(skillsCalledFromTurn) &&
       skillsCalledFromTurn.length === 0 &&
-      firstTextForSend &&
-      !shouldSkipToolRetryProbe({ userText: text, historyMessages, intentPlan, implicitFeedback: continuationHint })
+      firstTextForSend
     ) {
       // Ask the LLM whether the answer is actually complete before deciding to retry.
       // This replaces the old structural check (no tools called = uncertain) which fired

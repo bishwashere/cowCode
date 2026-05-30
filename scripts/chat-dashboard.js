@@ -29,10 +29,6 @@ import {
   beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from '../lib/retrospective.js';
-import {
-  buildContinuationContextBlock,
-  getImplicitContinuationHint,
-} from '../lib/conversation-context.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = Math.max(
@@ -87,7 +83,6 @@ async function main() {
   // Server-managed history, same pattern as Telegram private chats. Any `payload.history`
   // sent by the client is intentionally ignored — context lives on disk on the server.
   const historyMessages = readLastPrivateExchanges(workspaceDir, dashboardJid, DASHBOARD_HISTORY_EXCHANGES, sessionId);
-  const continuationHint = getImplicitContinuationHint(workspaceDir, dashboardJid, sessionId, message);
 
   const noop = () => {};
   const ctx = {
@@ -109,7 +104,6 @@ async function main() {
     ? await planIntent({
         userText: message,
         historyMessages,
-        continuationHint,
         availableSkillIds: enabledSkillIds,
         availableSkillSummaries: enabledSkillSummaries,
         agentId,
@@ -131,8 +125,6 @@ async function main() {
   const baseSystemPrompt = buildOneOnOneSystemPrompt(workspaceDir) + buildAgentTeamPromptBlock(agentId);
   const planBlock = intentPlanToSystemBlock(intentPlan);
   let systemPrompt = planBlock ? baseSystemPrompt + '\n\n' + planBlock : baseSystemPrompt;
-  const continuationBlock = buildContinuationContextBlock(message, historyMessages, continuationHint);
-  if (continuationBlock) systemPrompt += continuationBlock;
   if (sessionRotated) {
     systemPrompt += buildSessionBootstrapContext(workspaceDir, { logJid: dashboardJid }).block;
   }
