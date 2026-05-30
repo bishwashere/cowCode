@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Run each test suite once, sequentially. Prints structured blocks for reporting.
+set -uo pipefail
+cd "$(dirname "$0")/../.."
+
+run_suite() {
+  local name="$1"
+  shift
+  echo "@@@@@@ SUITE_START $name @@@@@@"
+  echo "@@@@@@ CMD $* @@@@@@"
+  local out
+  local code=0
+  out=$("$@" 2>&1) || code=$?
+  echo "$out"
+  echo "@@@@@@ EXIT $code @@@@@@"
+  echo "@@@@@@ SUITE_END $name @@@@@@"
+  return $code
+}
+
+# package.json scripts (dedupe agent-send/agent-title → agent-team-e2e only once)
+for script in \
+  workspace-path e2e-expect conversation-context chat-session \
+  home-assistant-format retrospective memory-index-files session-bootstrap \
+  workspace-chat-days background-tasks tide-checklist tide update-build \
+  skill-install github-skill gmail-skill calendar-skill home-assistant-format \
+  browser dry-run telegram-send intent-planner agent-team-e2e \
+  browser-e2e write-e2e edit-e2e me-e2e \
+  cron-e2e memory-e2e home-assistant-e2e; do
+  run_suite "pnpm test:$script" pnpm run "test:$script" || true
+done
+
+# not in package.json
+for pair in \
+  "agent-map-ui|node scripts/test/test-agent-map-ui.js" \
+  "apply-patch|node scripts/test/test-apply-patch.js" \
+  "credential-utils|node scripts/test/test-credential-utils.js" \
+  "fixture-state|node scripts/test/test-fixture-state.js" \
+  "read-e2e|node scripts/test/test-read-e2e.js" \
+  "search-e2e|node scripts/test/test-search-e2e.js" \
+  "core-e2e|node scripts/test/test-core-e2e.js" \
+  "go-read-e2e|node scripts/test/test-go-read-e2e.js" \
+  "go-write-e2e|node scripts/test/test-go-write-e2e.js" \
+  "apply-patch-e2e|node scripts/test/test-apply-patch-e2e.js" \
+  "speech-e2e|node scripts/test/test-speech-e2e.js" \
+  "vision-e2e|node scripts/test/test-vision-e2e.js" \
+  "gog-e2e|node scripts/test/test-gog-e2e.js" \
+  "basic-e2e|node scripts/test/test-basic-e2e.js" \
+  "agent|node scripts/test/test-agent.js" \
+  "server-inspect-e2e|node scripts/test/test-server-inspect-e2e.js"; do
+  name="${pair%%|*}"
+  cmd="${pair#*|}"
+  run_suite "$name" $cmd || true
+done

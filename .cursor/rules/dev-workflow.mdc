@@ -26,11 +26,10 @@ Whenever a feature is added or an existing one is modified:
    ```
    Full suite fallback: `pnpm run test:all`
 3. **If no test exists**, create one under `scripts/test/test-<feature-name>.js` before finishing the change.
-4. **Always present a results table** to the user after running:
+4. **Always present a results table** to the user after running (auto-printed by `e2e-report.js` for `runSkillTests`; must include **Input**, **Output**, **Status** columns):
 
-| Test | Question / Scenario | Result |
-|------|---------------------|--------|
-| `test-agent.js` | Does the agent respond correctly? | ✅ Pass |
-| `test-browser.js` | Can the browser executor open a page? | ❌ Fail — `Error: ...` |
+| Test | Input | Output | Status |
+|------|-------|--------|--------|
+| `test-agent-team-e2e` | `new session` | `New session started.` | ✅ Pass |
 
 Never mark a feature done without showing this table.

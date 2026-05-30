@@ -15,6 +15,7 @@
  */
 
 import { assertActualResult, ExpectMode, formatExpectModeLabel } from './e2e-expect.js';
+import { startReport, endReport, recordCase } from './e2e-report.js';
 
 /**
  * @param {string} skillName - e.g. 'cron', 'browser', 'memory'
@@ -24,6 +25,7 @@ import { assertActualResult, ExpectMode, formatExpectModeLabel } from './e2e-exp
  */
 export async function runSkillTests(skillName, tests, opts = {}) {
   const total = tests.length;
+  startReport(skillName);
   console.log(`Skill: ${skillName}. Initial state: ${total} tests — all PENDING.\n`);
   for (const t of tests) {
     console.log(`  [PENDING] ${t.name}${formatExpectModeLabel(t.expectMode)}`);
@@ -33,6 +35,7 @@ export async function runSkillTests(skillName, tests, opts = {}) {
   let passed = 0;
   let failed = 0;
   for (const t of tests) {
+    const inputText = t.input ?? t.name;
     try {
       const result = await t.run();
       if (t.expectMode === ExpectMode.ACTUAL) {
@@ -41,21 +44,44 @@ export async function runSkillTests(skillName, tests, opts = {}) {
       passed++;
       const reply = result && (typeof result === 'string' ? result : result.reply);
       const skillsCalled = result && typeof result === 'object' && Array.isArray(result.skillsCalled) ? result.skillsCalled : [];
-      if (skillsCalled.length) console.log(`  Skills called: ${skillsCalled.join(', ')}`);
-      if (reply) console.log(`  Reply: ${reply.slice(0, 500)}`);
+      const outputText = [
+        reply ? clipReply(reply) : '',
+        skillsCalled.length ? `(skills: ${skillsCalled.join(', ')})` : '',
+      ].filter(Boolean).join(' ');
+      recordCase({
+        name: t.name,
+        input: inputText,
+        output: outputText,
+        status: 'pass',
+      });
       console.log(`  [SUCCESS] ${t.name}${formatExpectModeLabel(t.expectMode)}`);
     } catch (err) {
       failed++;
       const reply = err && err.reply;
       const skillsCalled = err && Array.isArray(err.skillsCalled) ? err.skillsCalled : [];
-      if (skillsCalled.length) console.log(`  Skills called: ${skillsCalled.join(', ')}`);
-      if (reply) console.log(`  Reply: ${reply.slice(0, 500)}`);
+      const outputText = [
+        reply ? clipReply(reply) : '',
+        skillsCalled.length ? `(skills: ${skillsCalled.join(', ')})` : '',
+      ].filter(Boolean).join(' ');
       const msg = (err && err.message) || String(err);
+      recordCase({
+        name: t.name,
+        input: inputText,
+        output: outputText || msg,
+        status: 'fail',
+        detail: msg,
+      });
       console.log(`  [FAILED] ${t.name} — ${msg.slice(0, 200)}${msg.length > 200 ? '…' : ''}`);
     }
   }
 
   console.log('\n--- Result ---');
   console.log(`Passed: ${passed}, Failed: ${failed}`);
+  endReport();
   return { passed, failed };
+}
+
+function clipReply(reply) {
+  const s = String(reply ?? '').trim();
+  return s.length > 500 ? s.slice(0, 500) + '…' : s;
 }

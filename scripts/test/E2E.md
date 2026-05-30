@@ -33,7 +33,7 @@ User message  →  index.js --test  OR  chat-dashboard.js  →  Reply
               Pass / Fail
 ```
 
-Shared runner: `e2e-run.js` (`runE2E`, `runDashboardE2E`).
+Shared runner: `skill-test-runner.js` (`runSkillTests`). Report table: `e2e-report.js` (`recordCase`, `startReport` / `endReport` — prints **Input | Output | Status** per case). Helpers: `e2e-run.js` (`runE2E`, `runDashboardE2E`).
 
 ## Internal contract tests
 
@@ -49,8 +49,8 @@ See **[E2E_EXPECT.md](E2E_EXPECT.md)** and `e2e-expect.js`.
 |--------|-----------|--------|
 | [cron/](cron/inputs.md) | `test-cron-e2e.js` | `--test` |
 | [agent/](agent/inputs.md) | `test-agent.js` | `--test` |
-| - | `test-agent-team-e2e.js` | `--test` + dashboard |
-| - | `test-basic-e2e.js` | `--test` |
+| [agent-team/](agent-team/inputs.md) | `test-agent-team-e2e.js` | `--test` + dashboard |
+| [basic/](basic/inputs.md) | `test-basic-e2e.js` | `--test` |
 | - | `test-chat-session.js` | direct (session logic only) |
 | [edit/](edit/inputs.md) | `test-edit-e2e.js` | `--test` |
 | [write/](write/inputs.md) | `test-write-e2e.js` | `--test` |
@@ -65,6 +65,7 @@ See **[E2E_EXPECT.md](E2E_EXPECT.md)** and `e2e-expect.js`.
 | [core/](core/inputs.md) | `test-core-e2e.js` | `--test` |
 | [go-write/](go-write/inputs.md) | `test-go-write-e2e.js` | `--test` |
 | [search/](search/inputs.md) | `test-search-e2e.js` | `--test` |
+| [server-inspect/](server-inspect/inputs.md) | `test-server-inspect-e2e.js` | `--test` |
 | [speech/](speech/inputs.md) | `test-speech-e2e.js` | `--test` |
 | [gog/](gog/inputs.md) | `test-gog-e2e.js` | `--test` |
 | [tide/](tide/inputs.md) | `test-tide.js` | direct (payload) |
