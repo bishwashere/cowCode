@@ -29,6 +29,7 @@ import { runAgentTurn, stripThinking } from './lib/agent.js';
 import { runInternalAgentTurn } from './lib/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock } from './lib/intent-planner.js';
 import { buildDelegationContext } from './lib/agent-delegation-router.js';
+import { executeSkill } from './skills/executor.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
@@ -951,6 +952,7 @@ async function main() {
         target: delegatedTarget,
         score: delegationContext?.recommendation?.score ?? 0,
         matchedSkills: delegationContext?.recommendation?.matchedSkills || [],
+        blocked: delegationContext?.recommendation?.blocked === true,
       }));
     }
     // Step 3: intent planner — one small LLM call before loading any tool schemas.
@@ -1004,15 +1006,43 @@ async function main() {
     }
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
-    const turnResult = await runAgentTurn({
-      userText: text,
-      ctx,
-      systemPrompt: systemPromptWithPlan,
-      tools: toolsForRequest,
-      historyMessages,
-      getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
-      resolveToolName: skillContext?.resolveToolName ?? (() => null),
-    });
+    let turnResult = null;
+    if (presetDelegationPlan && delegatedTarget) {
+      try {
+        console.log('[agent-router] forcing agent-send to', delegatedTarget);
+        const forcedRaw = await executeSkill('agent-send', ctx, {
+          agent: delegatedTarget,
+          message: text,
+        });
+        const forced = JSON.parse(forcedRaw || '{}');
+        if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {
+          const label = forced.agentTitle || forced.agent || delegatedTarget;
+          turnResult = {
+            textToSend: `[CowCode] ${label} replied: ${forced.reply.trim()}`,
+            skillsCalled: ['agent-send'],
+          };
+        } else if (forced && typeof forced.error === 'string') {
+          console.log('[agent-router] forced agent-send failed:', forced.error);
+          turnResult = {
+            textToSend: `[CowCode] ${forced.error.trim()}`,
+            skillsCalled: ['agent-send'],
+          };
+        }
+      } catch (err) {
+        console.log('[agent-router] forced agent-send exception:', getErrorMessageForLog(err));
+      }
+    }
+    if (!turnResult) {
+      turnResult = await runAgentTurn({
+        userText: text,
+        ctx,
+        systemPrompt: systemPromptWithPlan,
+        tools: toolsForRequest,
+        historyMessages,
+        getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
+        resolveToolName: skillContext?.resolveToolName ?? (() => null),
+      });
+    }
     let resultToUse = turnResult;
     let skillsCalledFromTurn = Array.isArray(turnResult?.skillsCalled) && turnResult.skillsCalled.length ? turnResult.skillsCalled : [];
     const hasSearchOrBrowse = (arr) => Array.isArray(arr) && (arr.includes('search') || arr.includes('browse'));

@@ -4,7 +4,7 @@
  */
 
 import { createTempStateDir } from './e2e-run.js';
-import { setupAgentTeamFixture } from './agent-team-fixture.js';
+import { setupAgentTeamFixture, patchAgentConfig } from './agent-team-fixture.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -58,6 +58,27 @@ async function run() {
     availableSkillIds,
   });
   assert(greeting === null, 'Expected no delegation recommendation for greeting');
+
+  const marketingTypo = buildDelegationContext({
+    agentId: 'main',
+    userText: 'what can be 3 blog ideas for marketting nextpostai.com',
+    availableSkillIds,
+  });
+  assert(
+    marketingTypo?.recommendation?.targetAgentId === 'marketer',
+    `Expected marketer recommendation for marketing typo, got ${marketingTypo?.recommendation?.targetAgentId || 'none'}`,
+  );
+
+  await patchAgentConfig('main', { agentMessaging: { allow: ['marketer'] } });
+  const alexNotLinked = buildDelegationContext({
+    agentId: 'main',
+    userText: "Can you check with Alex if he's around?",
+    availableSkillIds,
+  });
+  assert(
+    alexNotLinked?.recommendation?.targetAgentId === 'alex' && alexNotLinked?.recommendation?.blocked === true,
+    `Expected blocked explicit alex recommendation, got ${JSON.stringify(alexNotLinked?.recommendation || null)}`,
+  );
 
   console.log('agent-delegation-router tests passed');
 }
