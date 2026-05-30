@@ -28,6 +28,7 @@ import { loadConfig, chat as llmChat } from './llm.js';
 import { runAgentTurn, stripThinking } from './lib/agent.js';
 import { runInternalAgentTurn } from './lib/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock } from './lib/intent-planner.js';
+import { buildDelegationContext } from './lib/agent-delegation-router.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
@@ -927,18 +928,44 @@ async function main() {
       : (inMemoryHistory.length > 0
           ? inMemoryHistory
           : readLastPrivateExchanges(getWorkspaceDir(), logJid, MAX_CHAT_HISTORY_EXCHANGES, sessionId));
-    // Step 2: intent planner — one small LLM call before loading any tool schemas.
-    const intentPlan = enabledSkillIds.length > 0
+    // Step 2: specialization-aware delegation check before planner.
+    // This runs before tool schema loading and can pre-select agent-send.
+    const delegationContext = !isGroupJid
+      ? buildDelegationContext({
+          agentId,
+          userText: text,
+          availableSkillIds: enabledSkillIds,
+        })
+      : null;
+    const delegatedTarget = delegationContext?.recommendation?.targetAgentId || '';
+    const presetDelegationPlan = delegatedTarget
+      ? {
+          mode: 'tool',
+          skills: ['agent-send'],
+          plan: `Delegate to ${delegatedTarget} via agent-send first; that agent is the best specialization match for this request.`,
+          answer_style: 'short',
+        }
+      : null;
+    if (presetDelegationPlan) {
+      console.log('[agent-router]', JSON.stringify({
+        target: delegatedTarget,
+        score: delegationContext?.recommendation?.score ?? 0,
+        matchedSkills: delegationContext?.recommendation?.matchedSkills || [],
+      }));
+    }
+    // Step 3: intent planner — one small LLM call before loading any tool schemas.
+    const intentPlan = presetDelegationPlan || (enabledSkillIds.length > 0
       ? await planIntent({
           userText: text,
           historyMessages,
           availableSkillIds: enabledSkillIds,
           availableSkillSummaries: enabledSkillSummaries,
           agentId,
+          delegationContext,
         })
-      : null;
+      : null);
     if (intentPlan) console.log('[intent-planner]', JSON.stringify(intentPlan));
-    // Step 3: load tool schemas based on what the planner returned.
+    // Step 4: load tool schemas based on what the planner returned.
     //   intentPlan === null      → planner failed  → full tools (safe fallback)
     //   intentPlan.skills = []   → planner: chat   → skip schema loading entirely, no tools
     //   intentPlan.skills = [...] → planner: tools  → load only selected schemas
