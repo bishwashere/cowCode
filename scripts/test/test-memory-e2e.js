@@ -226,7 +226,7 @@ async function main() {
   console.log('');
 
   const storeMessage = `Memory e2e test message at ${Date.now()}.`;
-  const storePhraseMessage = `Remember this exact phrase for the next message: ${STORED_PHRASE}.`;
+  const storePhraseMessage = `Please remember this for later: ${STORED_PHRASE}`;
   const recallQuery = 'What was that phrase I asked you to remember?';
 
   const tests = [

@@ -1,5 +1,7 @@
 # Basic agent E2E test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-basic-e2e.js` |

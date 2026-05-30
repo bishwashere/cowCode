@@ -21,8 +21,8 @@ const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 const SPEECH_QUERIES = [
-  'Convert this text to speech and confirm: Hello from E2E speech test.',
-  'Reply with a voice message saying exactly: E2E speech test OK.',
+  'Can you say this out loud: Hello from E2E speech test?',
+  'Send me a voice note that says E2E speech test OK.',
 ];
 
 function createTempStateDir() {

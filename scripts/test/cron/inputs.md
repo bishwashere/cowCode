@@ -1,5 +1,7 @@
 # Cron skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-cron-e2e.js` |

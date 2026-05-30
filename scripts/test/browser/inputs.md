@@ -1,5 +1,7 @@
 # Browser skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-browser-e2e.js` |

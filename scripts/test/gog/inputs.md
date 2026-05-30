@@ -1,10 +1,12 @@
 # Gog skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-gog-e2e.js` |
 
 ## Inputs
 
-- List my next 2 calendar events using gog.
-- Search my Gmail for emails from the last 7 days and tell me how many you found.
+- What are my next two calendar events?
+- How many emails did I get in the last week?

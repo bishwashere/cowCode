@@ -45,7 +45,7 @@ const CASES = [
   },
   {
     label: 'Web search → search',
-    message: 'Search the web for the latest Node.js release notes.',
+    message: 'What are the latest Node.js release notes?',
     expectSkill: 'search',
   },
   {

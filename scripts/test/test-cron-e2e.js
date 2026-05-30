@@ -355,7 +355,7 @@ async function main() {
     {
       name: 'cron execute: run-job textToSend',
       run: async () => {
-        const message = 'Reply with exactly: Cron E2E execute test OK';
+        const message = 'Reminder: Cron E2E execute test OK';
         const result = await runJobOnce(message, { stateDir: DEFAULT_STATE_DIR });
         assert(!result.error, `run-job should not return error; got: ${result.error}`);
         assert(result.textToSend && result.textToSend.length > 0, `run-job should return non-empty textToSend; got: ${JSON.stringify(result)}`);
@@ -397,7 +397,7 @@ async function main() {
         };
         runner.startCron({ storePath, telegramBot: spyTelegramBot });
         const job = store.addJob(
-          { name: 'Channel send test', message: 'Reply with exactly: channel send test OK', schedule: { kind: 'at', at: new Date(Date.now() + 60_000).toISOString() }, jid: '999888777' },
+          { name: 'Channel send test', message: 'channel send test OK', schedule: { kind: 'at', at: new Date(Date.now() + 60_000).toISOString() }, jid: '999888777' },
           storePath
         );
         await runner.runJob({ job, sock: null, selfJid: null });

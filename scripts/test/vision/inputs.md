@@ -1,5 +1,7 @@
 # Vision skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-vision-e2e.js` |

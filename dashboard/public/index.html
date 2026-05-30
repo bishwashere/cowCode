@@ -1875,6 +1875,7 @@
         <h2 style="margin:0; font-size:1rem;">Skill tests</h2>
         <div style="display:flex; gap:0.5rem; align-items:center;">
           <span id="test-run-status" class="skill-meta" style="margin:0;"></span>
+          <button type="button" id="test-run-skill" style="font-size:0.8rem;" disabled title="Run E2E for the selected skill">Run skill</button>
           <button type="button" id="test-run-all" style="font-size:0.8rem;">Run all</button>
         </div>
       </div>
@@ -3191,6 +3192,22 @@
     var testInputsCache = {};
     var testStatusMap = {};
     var activeTestId = null;
+    var testRunBusy = false;
+
+    function updateTestRunSkillButton() {
+      var btn = document.getElementById('test-run-skill');
+      if (!btn) return;
+      btn.disabled = testRunBusy || !activeTestId;
+      btn.textContent = activeTestId ? ('Run ' + activeTestId) : 'Run skill';
+    }
+
+    function setTestRunBusy(busy) {
+      testRunBusy = busy;
+      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = busy; });
+      var runAll = document.getElementById('test-run-all');
+      if (runAll) runAll.disabled = busy;
+      updateTestRunSkillButton();
+    }
 
     function renderInputMessages(messages) {
       if (!messages || !messages.length) return '<div class="test-detail-empty">No inputs defined</div>';
@@ -3222,6 +3239,7 @@
 
     function showTestDetail(testId) {
       activeTestId = testId;
+      updateTestRunSkillButton();
       document.querySelectorAll('.test-sidebar-item').forEach(function (el) {
         el.classList.toggle('active', el.getAttribute('data-test-id') === testId);
       });
@@ -3307,8 +3325,7 @@
     async function runTest(id) {
       var statusEl = document.getElementById('test-run-status');
       statusEl.textContent = 'Running ' + id + '…';
-      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = true; });
-      document.getElementById('test-run-all').disabled = true;
+      setTestRunBusy(true);
       try {
         var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: id }) });
         var d = await r.json();
@@ -3323,15 +3340,13 @@
         setTestOutput(id, { stdout: err, stderr: '', exitCode: 1, durationMs: 0 }, false);
         statusEl.textContent = err;
       }
-      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = false; });
-      document.getElementById('test-run-all').disabled = false;
+      setTestRunBusy(false);
     }
 
     async function runAllTests() {
       var statusEl = document.getElementById('test-run-status');
       statusEl.textContent = 'Running all tests…';
-      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = true; });
-      document.getElementById('test-run-all').disabled = true;
+      setTestRunBusy(true);
       try {
         var r = await fetch(API + '/api/tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testId: 'all' }) });
         var d = await r.json();
@@ -3344,10 +3359,12 @@
       } catch (e) {
         statusEl.textContent = 'Error: ' + (e.message || '');
       }
-      document.querySelectorAll('.test-run-one').forEach(function (b) { b.disabled = false; });
-      document.getElementById('test-run-all').disabled = false;
+      setTestRunBusy(false);
     }
 
+    document.getElementById('test-run-skill').addEventListener('click', function () {
+      if (activeTestId) runTest(activeTestId);
+    });
     document.getElementById('test-run-all').addEventListener('click', function () { runAllTests(); });
 
     var selectedMemoryFileId = null;

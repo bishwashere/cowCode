@@ -1,12 +1,14 @@
 # Home Assistant skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-home-assistant-e2e.js` |
 
 ## Inputs
 
-- list my lights
+- List my lights
 - What lights do I have?
 - List all my devices
 

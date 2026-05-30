@@ -1,5 +1,7 @@
 # Server inspect (ssh-inspect) E2E test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-server-inspect-e2e.js` |

@@ -19,9 +19,9 @@ const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 const WRITE_QUERIES = [
-  'Write a file named e2e-hello.txt in the workspace with content: Hello from write E2E',
-  'Create notes.md in the workspace with exactly this content: # Test notes\n\nLine two.',
-  'Save to workspace/e2e-saved.txt the text: saved by E2E',
+  'Save a file called e2e-hello.txt with the text Hello from write E2E',
+  'Create notes.md with a heading # Test notes and a second line that says Line two.',
+  'Put the text saved by E2E into a file named e2e-saved.txt',
 ];
 
 function runE2E(userMessage, opts = {}) {

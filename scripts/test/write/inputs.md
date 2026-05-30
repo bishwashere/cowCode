@@ -1,11 +1,13 @@
 # Write skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-write-e2e.js` |
 
 ## Inputs
 
-- Write a file named e2e-hello.txt in the workspace with content: Hello from write E2E
-- Create notes.md in the workspace with exactly this content: # Test notes\n\nLine two.
-- Save to workspace/e2e-saved.txt the text: saved by E2E
+- Save a file called e2e-hello.txt with the text Hello from write E2E
+- Create notes.md with a heading # Test notes and a second line that says Line two.
+- Put the text saved by E2E into a file named e2e-saved.txt

@@ -16,6 +16,14 @@ if (html.includes('function parseTestOutput(result)')) {
   console.error('FAIL index.html should not duplicate parseTestOutput (use test-output-parse.js)');
   process.exit(1);
 }
+if (!html.includes('id="test-run-skill"')) {
+  console.error('FAIL index.html must have Run skill button (test-run-skill)');
+  process.exit(1);
+}
+if (!html.includes('class="test-run-one"')) {
+  console.error('FAIL index.html must have per-skill Run buttons in test sidebar');
+  process.exit(1);
+}
 
 const cases = [
   {

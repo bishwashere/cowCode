@@ -113,7 +113,7 @@ async function main() {
       expectMode: 'actual',
       skill: 'home-assistant',
       run: async () => {
-        const userMessage = 'list my lights';
+        const userMessage = 'List my lights';
         const result = await runE2E(userMessage);
         const reply = result.reply;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(userMessage, reply, DEFAULT_STATE_DIR, { skillHint: 'home-assistant' });

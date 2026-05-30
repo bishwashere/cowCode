@@ -24,8 +24,8 @@ const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 const GOG_QUERIES = [
-  'List my next 2 calendar events using gog.',
-  'Search my Gmail for emails from the last 7 days and tell me how many you found.',
+  'What are my next two calendar events?',
+  'How many emails did I get in the last week?',
 ];
 
 function createTempStateDir() {

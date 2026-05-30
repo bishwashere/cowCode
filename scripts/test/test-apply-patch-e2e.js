@@ -93,7 +93,7 @@ async function main() {
       run: async () => {
         const { stateDir } = createTempStateDir('a\nb\n');
         const query =
-          'Apply this patch to workspace/e2e-patch-target.txt: the hunk adds a new line at the end. Context: line "b" then add line "c". So remove nothing, add one line "c" after "b".';
+          'In e2e-patch-target.txt, add a new line "c" right after the line that says b.';
         const result = await runE2E(query, { stateDir });
         const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'apply-patch' });
@@ -112,7 +112,7 @@ async function main() {
       run: async () => {
         const { stateDir } = createTempStateDir('old first\nold second\n');
         const query =
-          'Apply a patch to workspace/e2e-patch-target.txt: replace the line "old second" with "new second". Use a unified diff hunk with minus and plus.';
+          'In e2e-patch-target.txt, change the line old second to new second.';
         const result = await runE2E(query, { stateDir });
         const reply = result.reply ?? result;
         const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'apply-patch' });

@@ -20,9 +20,9 @@ const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 const GO_READ_QUERIES = [
-  'List the files in the workspace directory.',
-  'What is the current working directory? Use go-read to run pwd.',
-  'Show me the contents of config.json in the workspace using cat.',
+  'What files are in the workspace folder?',
+  'What directory are we in?',
+  "Show me what's in config.json in the workspace.",
 ];
 
 function createTempStateDir() {

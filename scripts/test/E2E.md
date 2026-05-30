@@ -47,6 +47,8 @@ See **[E2E_EXPECT.md](E2E_EXPECT.md)** and `e2e-expect.js`.
 
 ## Skill test inputs
 
+Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Those strings must match the test file and must read like real chat (no skill/tool names unless testing a slash command). Sub-agent `SOUL.md` / fixture text may pin expected answers for stability; that is not a user message.
+
 | Folder | Test file | Entry |
 |--------|-----------|--------|
 | [cron/](cron/inputs.md) | `test-cron-e2e.js` | `--test` |

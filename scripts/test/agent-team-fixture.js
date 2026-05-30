@@ -59,7 +59,7 @@ export async function setupAgentTeamFixture(stateDir, opts = {}) {
 
   writeFileSync(
     join(getAgentWorkspaceDir('marketer'), 'SOUL.md'),
-    `You are the marketer agent. When asked about the company tagline, reply with exactly: "${MARKETER_TAGLINE}"`,
+    `You are the marketer agent. When asked about the company tagline, answer: "${MARKETER_TAGLINE}"`,
     'utf8',
   );
   writeFileSync(

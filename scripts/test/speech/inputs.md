@@ -1,10 +1,12 @@
 # Speech skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-speech-e2e.js` |
 
 ## Inputs
 
-- Convert this text to speech and confirm: Hello from E2E speech test.
-- Reply with a voice message saying exactly: E2E speech test OK.
+- Can you say this out loud: Hello from E2E speech test?
+- Send me a voice note that says E2E speech test OK.

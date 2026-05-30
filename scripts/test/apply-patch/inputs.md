@@ -1,10 +1,12 @@
 # Apply-patch skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-apply-patch-e2e.js` |
 
 ## Inputs
 
-- Add line at end: apply a patch that adds one line to workspace/e2e-patch-target.txt.
-- Replace a line: apply a unified diff hunk that replaces "old second" with "new second".
+- In e2e-patch-target.txt, add a new line "c" right after the line that says b.
+- In e2e-patch-target.txt, change the line old second to new second.

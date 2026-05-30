@@ -1,5 +1,7 @@
 # Agent test (multi-skill scenarios)
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-agent.js` |

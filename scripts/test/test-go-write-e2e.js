@@ -92,9 +92,10 @@ async function main() {
       stateDir,
       actualChecks: { fileExists: 'workspace/e2e-touch.txt' },
       run: async () => {
-        const result = await runE2E('Create an empty file named e2e-touch.txt in the workspace using go-write touch.', { stateDir });
+        const query = 'Create an empty file named e2e-touch.txt in the workspace.';
+        const result = await runE2E(query, { stateDir });
         const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted('Create an empty file e2e-touch.txt in the workspace.', reply, stateDir, { skillHint: 'go-write' });
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'go-write' });
         if (!pass) {
           const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;
@@ -108,9 +109,10 @@ async function main() {
       name: 'go-write: copy file',
       expectMode: 'behavior',
       run: async () => {
-        const result = await runE2E('Copy workspace/e2e-touch.txt to workspace/e2e-copy.txt using go-write.', { stateDir });
+        const query = 'Copy e2e-touch.txt to e2e-copy.txt in the workspace.';
+        const result = await runE2E(query, { stateDir });
         const reply = result.reply ?? result;
-        const { pass, reason } = await judgeUserGotWhatTheyWanted('Copy e2e-touch.txt to e2e-copy.txt in the workspace.', reply, stateDir, { skillHint: 'go-write' });
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(query, reply, stateDir, { skillHint: 'go-write' });
         if (!pass) {
           const err = new Error(`Judge: ${reason || 'NO'}. Reply (first 400): ${(reply || '').slice(0, 400)}`);
           err.reply = reply;

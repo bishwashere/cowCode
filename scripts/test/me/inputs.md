@@ -1,5 +1,7 @@
 # Me (memory/identity) skill test
 
+Natural user messages only — see [E2E.md](../E2E.md).
+
 | | |
 |--|--|
 | **Test file** | `../test-me-e2e.js` |
