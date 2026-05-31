@@ -34,6 +34,9 @@ function checkInstallPs1() {
     return { ok: false, detail: 'install.ps1 missing' };
   }
   const src = readFileSync(ps1, 'utf8');
+  if (/[^\x09\x0A\x0D\x20-\x7E]/.test(src)) {
+    return { ok: false, detail: 'install.ps1 must be ASCII-only (PowerShell 5.1 default encoding)' };
+  }
   const depsIdx = src.indexOf('Installing dependencies');
   const setupIdx = src.indexOf('node setup.js');
   if (depsIdx < 0 || setupIdx < 0 || depsIdx > setupIdx) {
