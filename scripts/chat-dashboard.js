@@ -15,7 +15,8 @@ import dotenv from 'dotenv';
 import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '../skills/loader.js';
 import { runAgentTurn } from '../lib/agent.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
-import { planIntent, intentPlanToSystemBlock } from '../lib/intent-planner.js';
+import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from '../lib/intent-planner.js';
+import { isNonTaskMessage } from '../lib/evaluate-team-capability.js';
 import { buildDelegationContext } from '../lib/agent-delegation-router.js';
 import { executeSkill } from '../skills/executor.js';
 import { logTeamActivity } from '../lib/team-activity.js';
@@ -199,10 +200,13 @@ async function main() {
     });
   }
   // Step 3: intent planner — one small LLM call before loading any tool schemas.
-  const goalsIntentHint = !presetDelegationPlan
+  const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(message)
+    ? buildCasualChatIntentPlan()
+    : null;
+  const goalsIntentHint = !presetDelegationPlan && !casualIntentPlan
     ? getGoalsDiscoveryIntentHint(message, historyMessages, enabledSkillIds, agentId)
     : null;
-  const intentPlan = presetDelegationPlan || goalsIntentHint || (enabledSkillIds.length > 0
+  const intentPlan = presetDelegationPlan || casualIntentPlan || goalsIntentHint || (enabledSkillIds.length > 0
     ? await planIntent({
         userText: message,
         historyMessages,
@@ -234,11 +238,13 @@ async function main() {
   const memoryConfig = getMemoryConfig();
   const retroBlock = await buildRetrospectiveContextBlock(message, memoryConfig);
   if (retroBlock) systemPrompt += retroBlock;
-  const goalsBlock = buildGoalsContextBlock({ userText: message, historyMessages, agentId });
-  if (goalsBlock) systemPrompt += goalsBlock;
-  const projectsBlock = buildProjectsContextBlock({ userText: message, historyMessages });
-  if (projectsBlock) systemPrompt += projectsBlock;
-  systemPrompt = appendUserFacingPrompt(systemPrompt);
+  if (!isNonTaskMessage(message)) {
+    const goalsBlock = buildGoalsContextBlock({ userText: message, historyMessages, agentId });
+    if (goalsBlock) systemPrompt += goalsBlock;
+    const projectsBlock = buildProjectsContextBlock({ userText: message, historyMessages });
+    if (projectsBlock) systemPrompt += projectsBlock;
+    systemPrompt = appendUserFacingPrompt(systemPrompt);
+  }
 
   try {
     let textToSend = '';

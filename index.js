@@ -28,7 +28,8 @@ import { loadConfig, chat as llmChat } from './llm.js';
 import { runAgentTurn, stripThinking } from './lib/agent.js';
 import { runInternalAgentTurn } from './lib/internal-agent-turn.js';
 import { onAgentTurnStart, onAgentTurnDone } from './lib/agent-context-state.js';
-import { planIntent, intentPlanToSystemBlock } from './lib/intent-planner.js';
+import { planIntent, intentPlanToSystemBlock, buildCasualChatIntentPlan } from './lib/intent-planner.js';
+import { isNonTaskMessage } from './lib/evaluate-team-capability.js';
 import { buildDelegationContext } from './lib/agent-delegation-router.js';
 import { executeSkill } from './skills/executor.js';
 import { logTeamActivity } from './lib/team-activity.js';
@@ -1039,10 +1040,13 @@ async function main() {
       });
     }
     // Step 3: intent planner — one small LLM call before loading any tool schemas.
-    const goalsIntentHint = !presetDelegationPlan
+    const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(text)
+      ? buildCasualChatIntentPlan()
+      : null;
+    const goalsIntentHint = !presetDelegationPlan && !casualIntentPlan
       ? getGoalsDiscoveryIntentHint(text, historyMessages, enabledSkillIds, agentId)
       : null;
-    const intentPlan = presetDelegationPlan || goalsIntentHint || (enabledSkillIds.length > 0
+    const intentPlan = presetDelegationPlan || casualIntentPlan || goalsIntentHint || (enabledSkillIds.length > 0
       ? await planIntent({
           userText: text,
           historyMessages,
@@ -1089,11 +1093,13 @@ async function main() {
       const memoryConfig = getMemoryConfig();
       const retroBlock = await buildRetrospectiveContextBlock(text, memoryConfig);
       if (retroBlock) systemPromptWithPlan += retroBlock;
-      const goalsBlock = buildGoalsContextBlock({ userText: text, historyMessages, agentId });
-      if (goalsBlock) systemPromptWithPlan += goalsBlock;
-      const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
-      if (projectsBlock) systemPromptWithPlan += projectsBlock;
-      systemPromptWithPlan = appendUserFacingPrompt(systemPromptWithPlan);
+      if (!isNonTaskMessage(text)) {
+        const goalsBlock = buildGoalsContextBlock({ userText: text, historyMessages, agentId });
+        if (goalsBlock) systemPromptWithPlan += goalsBlock;
+        const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
+        if (projectsBlock) systemPromptWithPlan += projectsBlock;
+        systemPromptWithPlan = appendUserFacingPrompt(systemPromptWithPlan);
+      }
     }
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
@@ -1166,6 +1172,7 @@ async function main() {
       : replyForProbe;
     if (
       !isGroupJid &&
+      !isNonTaskMessage(text) &&
       (hasSearchOrBrowseTool || plannerSaysNoTools) &&
       !hasSearchOrBrowse(skillsCalledFromTurn) &&
       skillsCalledFromTurn.length === 0 &&
