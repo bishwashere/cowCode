@@ -27,6 +27,7 @@ const {
 import { loadConfig, chat as llmChat } from './llm.js';
 import { runAgentTurn, stripThinking } from './lib/agent.js';
 import { runInternalAgentTurn } from './lib/internal-agent-turn.js';
+import { onAgentTurnStart, onAgentTurnDone } from './lib/agent-context-state.js';
 import { planIntent, intentPlanToSystemBlock } from './lib/intent-planner.js';
 import { buildDelegationContext } from './lib/agent-delegation-router.js';
 import { executeSkill } from './skills/executor.js';
@@ -1088,6 +1089,14 @@ async function main() {
     let turnResult = null;
     if (presetDelegationPlan && delegatedTarget) {
       try {
+        logTeamActivity({
+          type: 'turn_start',
+          agentId,
+          depth: 0,
+          jid,
+          message: text,
+        });
+        onAgentTurnStart({ agentId, userText: text, ctx });
         console.log('[agent-router] forcing agent-send to', delegatedTarget);
         const forcedRaw = await executeSkill('agent-send', ctx, {
           agent: delegatedTarget,
@@ -1106,6 +1115,18 @@ async function main() {
             textToSend: `[CowCode] ${forced.error.trim()}`,
             skillsCalled: ['agent-send'],
           };
+        }
+        if (turnResult) {
+          const forcedSkills = Array.isArray(turnResult.skillsCalled) ? turnResult.skillsCalled : [];
+          logTeamActivity({
+            type: 'turn_done',
+            agentId,
+            depth: 0,
+            jid,
+            status: 'ok',
+            message: `Handled in forced route using ${forcedSkills.length} skill${forcedSkills.length === 1 ? '' : 's'}.`,
+          });
+          onAgentTurnDone({ agentId });
         }
       } catch (err) {
         console.log('[agent-router] forced agent-send exception:', getErrorMessageForLog(err));
