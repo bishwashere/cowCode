@@ -19,6 +19,10 @@ const ASK_COMPANY_TAGLINE = "What's our company tagline for marketing materials?
 const ASK_CI_FAILURE = 'Can you investigate why our GitHub CI check is failing and propose a fix?';
 /** Conversational team context only; turn 2 must not name any agent or skill. */
 const ESTABLISH_MARKETING_LANE = 'Taglines, campaigns, and brand stuff should go through whoever owns marketing on the team.';
+/** Initiative-style risk framing; should still use marketing specialist lane. */
+const ASK_ONBOARDING_RISK = 'Users drop off right after signup. What risk should we prioritize first, and what small experiment should we run this week?';
+/** Proactive collaboration framing; should pull in backend specialist for feasibility. */
+const ASK_FEASIBILITY_REVIEW = 'We have an onboarding improvement idea. Can you review technical feasibility and rollout risks before we proceed?';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -42,6 +46,14 @@ function assertNoHallucinatedAlex(reply, skillsCalled) {
   assert(
     !hallucinatedAlex,
     `Should not hallucinate Alex when backend specialist is not linked. skills=[${skillsCalled.join(',')}] reply=${(reply || '').slice(0, 200)}`,
+  );
+}
+
+function assertDelegatedAndNonEmpty(reply, skillsCalled, label = 'delegation expected') {
+  const delegated = skillsCalled.includes('agent-send') || /\breplied:\s/i.test(reply || '');
+  assert(
+    delegated && reply && reply.trim().length > 0,
+    `${label}. skills=[${skillsCalled.join(',')}] reply=${(reply || '').slice(0, 220)}`,
   );
 }
 
@@ -158,6 +170,39 @@ async function main() {
           (delegated && mentionsBackend) || pass,
           `Expected specialization delegation to backend agent. skills=[${skillsCalled.join(',') || 'none'}] judge=${reason || 'NO'} reply=${(reply || '').slice(0, 200)}`,
         );
+        return { reply, skillsCalled, stateDir };
+      },
+    },
+    {
+      name: 'initiative-style risk prompt delegates to marketer specialization',
+      input: ASK_ONBOARDING_RISK,
+      expectMode: 'behavior',
+      run: async () => {
+        const stateDir = createTempStateDir();
+        await setupAgentTeamFixture(stateDir);
+        const { reply, skillsCalled } = await runE2E(ASK_ONBOARDING_RISK, { stateDir });
+        assertDelegatedAndNonEmpty(reply, skillsCalled, 'Expected marketer-lane delegation for risk/experiment prompt');
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(ASK_ONBOARDING_RISK, reply, stateDir, {
+          skillHint: 'agent-send',
+        });
+        assert(pass, `Judge: ${reason || 'NO'}`);
+        return { reply, skillsCalled, stateDir };
+      },
+    },
+    {
+      name: 'proactive feasibility review delegates to backend specialist',
+      input: ASK_FEASIBILITY_REVIEW,
+      expectMode: 'behavior',
+      run: async () => {
+        const stateDir = createTempStateDir();
+        await setupAgentTeamFixture(stateDir);
+        const { reply, skillsCalled } = await runE2E(ASK_FEASIBILITY_REVIEW, { stateDir });
+        assertDelegatedAndNonEmpty(reply, skillsCalled, 'Expected backend specialist delegation for feasibility review');
+        const mentionsTechnical = /technical|backend|rollout|risk|ci|infrastructure/i.test(reply || '');
+        const { pass, reason } = await judgeUserGotWhatTheyWanted(ASK_FEASIBILITY_REVIEW, reply, stateDir, {
+          skillHint: 'agent-send',
+        });
+        assert(pass || mentionsTechnical, `Expected technical feasibility context. Judge=${reason || 'NO'} reply=${(reply || '').slice(0, 220)}`);
         return { reply, skillsCalled, stateDir };
       },
     },
