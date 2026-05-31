@@ -189,9 +189,15 @@
       color: var(--text);
       margin-bottom: 0.2rem;
     }
-    .team-agent-card-last,
+    .team-agent-card-step,
     .team-agent-card-today {
       color: var(--muted);
+    }
+    .team-agent-card-step {
+      min-height: 0.95rem;
+      margin-bottom: 0.15rem;
+      line-height: 1.3;
+      word-break: break-word;
     }
     .team-page-card .team-cards-view + .team-agent-panel,
     .team-page-card .team-tree-view + .team-agent-panel {
@@ -2219,7 +2225,7 @@
           <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
           <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
         </div>
-        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click a card for Inbox, Active Context, or Stats. Use ✎ to edit. Switch to Tree for hierarchy view.</p>
+        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click a card for Active Context, Inbox, or Stats. Use ✎ to edit. Switch to Tree for hierarchy view.</p>
       </div>
       <div class="team-page-body">
         <div class="team-map-wrap">
@@ -2244,21 +2250,12 @@
           </div>
           <div id="team-agent-panel" class="team-agent-panel">
             <div class="team-agent-panel-tabs" role="tablist">
-              <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab active" data-tab="inbox" role="tab" aria-selected="true">Inbox</button>
-              <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab" data-tab="context" role="tab" aria-selected="false">Active Context</button>
+              <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
+              <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
               <button type="button" id="team-agent-tab-stats" class="team-agent-panel-tab" data-tab="stats" role="tab" aria-selected="false">Stats</button>
             </div>
             <div class="team-agent-panel-body">
-              <div id="team-agent-inbox-pane" class="team-agent-panel-pane" role="tabpanel">
-                <div class="team-agent-inbox-head">
-                  <h3 id="team-agent-inbox-title">Agent Inbox</h3>
-                  <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
-                </div>
-                <div id="team-agent-inbox-list" class="team-agent-inbox-list">
-                  <p class="team-agent-inbox-empty">Select an agent to view per-agent activity.</p>
-                </div>
-              </div>
-              <div id="team-agent-context-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+              <div id="team-agent-context-pane" class="team-agent-panel-pane" role="tabpanel">
                 <div class="team-agent-inbox-head">
                   <h3 id="team-agent-context-title">Active Context</h3>
                   <span id="team-agent-context-subtitle" class="team-agent-inbox-sub">Present working memory</span>
@@ -2266,6 +2263,15 @@
                 <div id="team-agent-context-overview" class="team-agent-context-overview"></div>
                 <div id="team-agent-context-detail" class="team-agent-context-list">
                   <p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>
+                </div>
+              </div>
+              <div id="team-agent-inbox-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+                <div class="team-agent-inbox-head">
+                  <h3 id="team-agent-inbox-title">Agent Inbox</h3>
+                  <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Click an agent above</span>
+                </div>
+                <div id="team-agent-inbox-list" class="team-agent-inbox-list">
+                  <p class="team-agent-inbox-empty">Select an agent to view per-agent activity.</p>
                 </div>
               </div>
               <div id="team-agent-stats-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
@@ -2532,7 +2538,7 @@
     var teamActivityLastTs = 0;
     var teamActivityPollTimer = null;
     var selectedTeamInboxAgentId = '';
-    var teamAgentPanelTab = 'inbox';
+    var teamAgentPanelTab = 'context';
     var teamViewMode = 'cards';
     var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
     var teamAgentMetricsSnapshot = { agents: {}, updatedAt: 0 };
@@ -5020,14 +5026,17 @@
         var emoji = getStateEmoji(ctx.state);
         var stateLabel = getStateTextLabel(ctx.state);
         var metrics = (teamAgentMetricsSnapshot.agents || {})[id] || {};
-        var lastLabel = metrics.lastActivity ? ('Last: ' + String(metrics.lastActivity)) : 'Last: —';
+        var stepText = (ctx.currentStep && String(ctx.currentStep).trim()) ? String(ctx.currentStep).trim() : '';
         var todayCount = Number(metrics.tasksToday) || 0;
         var sel = id === selectedTeamInboxAgentId ? ' selected' : '';
+        var stepHtml = stepText
+          ? '<div class="team-agent-card-step">' + escapeHtml(stepText) + '</div>'
+          : '';
         return '<div class="team-agent-card' + sel + '" data-agent-id="' + escapeHtml(id) + '" role="button" tabindex="0" title="Open ' + shortName + '">' +
           '<button type="button" class="team-agent-card-edit" data-agent-id="' + escapeHtml(id) + '" aria-label="Edit ' + escapeHtml(id) + '" title="Edit agent">✎</button>' +
           '<div class="team-agent-card-head">' + shortName + ' ' + emoji + '</div>' +
           '<div class="team-agent-card-state">' + escapeHtml(stateLabel) + '</div>' +
-          '<div class="team-agent-card-last">' + escapeHtml(lastLabel) + '</div>' +
+          stepHtml +
           '<div class="team-agent-card-today">' + escapeHtml(String(todayCount)) + ' today</div>' +
         '</div>';
       }).join('');
@@ -5601,7 +5610,7 @@
     if (teamAgentTabStatsEl) {
       teamAgentTabStatsEl.addEventListener('click', function () { setTeamAgentPanelTab('stats'); });
     }
-    setTeamAgentPanelTab('inbox');
+    setTeamAgentPanelTab('context');
 
     var teamViewTabCardsEl = document.getElementById('team-view-tab-cards');
     var teamViewTabTreeEl = document.getElementById('team-view-tab-tree');

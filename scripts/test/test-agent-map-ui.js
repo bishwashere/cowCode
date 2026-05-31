@@ -99,11 +99,12 @@ const checks = [
       html.includes('setTeamViewTab'),
   },
   {
-    name: 'Team agent cards show state last and today',
+    name: 'Team agent cards show step and today',
     ok: html.includes('team-agent-card') &&
-      html.includes('team-agent-card-last') &&
+      html.includes('team-agent-card-step') &&
       html.includes(' today</div>') &&
-      html.includes('renderTeamAgentCards'),
+      html.includes('renderTeamAgentCards') &&
+      html.includes('ctx.currentStep'),
   },
   {
     name: 'Team map nodes show live agent state',
