@@ -269,9 +269,13 @@
       background: rgba(34, 197, 94, 0.15);
       color: #22c55e;
     }
-    .team-agent-context-state.blocked {
+    .team-agent-context-state.waiting {
       background: rgba(250, 204, 21, 0.15);
       color: #eab308;
+    }
+    .team-agent-context-state.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
     }
     .team-agent-metrics-list {
       flex: 1 1 0;
@@ -617,6 +621,16 @@
       margin-top: 0.3rem;
       line-height: 1.35;
     }
+    .agent-map-node-state {
+      font-size: 0.68rem;
+      margin-top: 0.28rem;
+      line-height: 1.35;
+      font-weight: 500;
+    }
+    .agent-map-node-state.working { color: #22c55e; }
+    .agent-map-node-state.waiting { color: #eab308; }
+    .agent-map-node-state.error { color: #ef4444; }
+    .agent-map-node-state.idle { color: var(--muted); }
     .agent-map-tree-line {
       stroke: var(--muted);
       stroke-width: 1.5;
@@ -4678,7 +4692,10 @@
           : '<div class="agent-map-node-id">' + id + '</div>';
         var skillCount = Array.isArray(a.skillsEnabled) ? a.skillsEnabled.length : 0;
         var isMain = a.id === 'main';
-        var meta = isMain ? 'root' : 'agent';
+        var meta = mode === 'edit-page'
+          ? (skillCount + ' skill' + (skillCount === 1 ? '' : 's'))
+          : (skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + (isMain ? 'root' : 'agent'));
+        var stateHtml = renderAgentMapStateHtml(a.id, mode);
         var selectedId = mode === 'edit-page' ? selectedTeamInboxAgentId : selectedChatAgentId;
         var sel = a.id === selectedId ? ' selected' : '';
         var chatLabel = rawTitle ? rawTitle + ' (' + a.id + ')' : a.id;
@@ -4696,7 +4713,8 @@
           '<button type="button" class="agent-map-node-edit" data-agent-id="' + id + '" aria-label="Edit ' + id + '" title="Edit agent">✎</button>' +
           titleHtml +
           inboundHtml +
-          '<div class="agent-map-node-meta">' + skillCount + ' skill' + (skillCount === 1 ? '' : 's') + ' · ' + escapeHtml(meta) + '</div></div>';
+          stateHtml +
+          '<div class="agent-map-node-meta">' + escapeHtml(meta) + '</div></div>';
       }).join('');
 
       els.nodes.querySelectorAll('.agent-map-node-edit').forEach(function(btn) {
@@ -4776,6 +4794,26 @@
       return id;
     }
 
+    function formatAgentStateDisplay(state) {
+      var s = String(state || 'idle').toLowerCase();
+      if (s === 'blocked') s = 'waiting';
+      if (s === 'working') return { className: 'working', text: '🟢 Working' };
+      if (s === 'waiting') return { className: 'waiting', text: '🟡 Waiting' };
+      if (s === 'error') return { className: 'error', text: '🔴 Error' };
+      return { className: 'idle', text: '⚪ Idle' };
+    }
+
+    function formatAgentMapStateLabel(state) {
+      return formatAgentStateDisplay(state);
+    }
+
+    function renderAgentMapStateHtml(agentId, mode) {
+      if (mode !== 'edit-page') return '';
+      var ctx = (teamAgentContextSnapshot.agents || {})[String(agentId || '').trim()] || { state: 'idle' };
+      var stateInfo = formatAgentMapStateLabel(ctx.state);
+      return '<div class="agent-map-node-state ' + stateInfo.className + '">' + escapeHtml(stateInfo.text) + '</div>';
+    }
+
     function formatInboxTime(ts) {
       var d = new Date(Number(ts) || Date.now());
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -4824,9 +4862,8 @@
     }
 
     function formatContextStateBadge(state) {
-      var s = String(state || 'idle').toLowerCase();
-      if (s !== 'working' && s !== 'blocked') s = 'idle';
-      return '<span class="team-agent-context-state ' + s + '">' + escapeHtml(s) + '</span>';
+      var info = formatAgentStateDisplay(state);
+      return '<span class="team-agent-context-state ' + info.className + '">' + escapeHtml(info.text) + '</span>';
     }
 
     function renderAgentContextCard(agentId, ctx) {
@@ -4866,15 +4903,18 @@
         var ctx = (teamAgentContextSnapshot.agents || {})[id] || { state: 'idle' };
         var label = agentDisplayLabel(a);
         var state = String(ctx.state || 'idle');
+        if (state === 'blocked') state = 'waiting';
         var detail = '';
-        if (state === 'blocked' && ctx.waitingFor) {
+        if (state === 'waiting' && ctx.waitingFor) {
           detail = ' — waiting for ' + agentNameById(ctx.waitingFor);
         } else if (state === 'working' && ctx.currentStep) {
           detail = ' — ' + ctx.currentStep;
         } else if (state === 'working' && ctx.currentGoal) {
           detail = ' — ' + ctx.currentGoal;
+        } else if (state === 'error' && ctx.currentStep) {
+          detail = ' — ' + ctx.currentStep;
         }
-        return '<span class="accent">' + escapeHtml(label) + '</span>: ' + escapeHtml(state) + escapeHtml(detail);
+        return '<span class="accent">' + escapeHtml(label) + '</span>: ' + escapeHtml(formatAgentStateDisplay(state).text) + escapeHtml(detail);
       }).join('<br>');
     }
 
@@ -5298,6 +5338,7 @@
         };
       } catch (_) {}
       renderAgentContext();
+      renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
     }
 
     async function fetchTeamMetricsFeed() {

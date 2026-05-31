@@ -92,6 +92,14 @@ const checks = [
       html.includes('/api/team/context'),
   },
   {
+    name: 'Team map nodes show live agent state',
+    ok: html.includes('agent-map-node-state') &&
+      html.includes('🟢 Working') &&
+      html.includes('🟡 Waiting') &&
+      html.includes('🔴 Error') &&
+      html.includes('formatAgentStateDisplay'),
+  },
+  {
     name: 'Team page includes agent metrics stats tab',
     ok: html.includes('id="team-agent-tab-stats"') &&
       html.includes('id="team-agent-stats-detail"') &&

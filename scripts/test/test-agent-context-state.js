@@ -17,6 +17,8 @@ async function main() {
       onAgentWaitingFor,
       onAgentDelegationDone,
       onAgentTurnDone,
+      onAgentDelegationError,
+      onAgentSkillError,
       readAllAgentContext,
       readAgentContext,
     } = await import('../../lib/agent-context-state.js');
@@ -39,7 +41,7 @@ async function main() {
     });
     main = readAgentContext('main');
     const marketer = readAgentContext('marketer');
-    assert(main.state === 'blocked', 'main blocked while waiting');
+    assert(main.state === 'waiting', 'main waiting while waiting');
     assert(main.waitingFor === 'marketer', 'main waiting for marketer');
     assert(marketer.state === 'working', 'marketer working');
     assert(marketer.currentGoal === 'Generate marketing ideas', 'marketer goal set');
@@ -57,6 +59,15 @@ async function main() {
     onAgentDelegationDone({ callerAgentId: 'main', targetAgentId: 'marketer' });
     assert(readAgentContext('marketer').state === 'idle', 'marketer idle after delegation');
     assert(readAgentContext('main').currentStep === 'Synthesizing team reply', 'main synthesizing');
+
+    onAgentDelegationError({
+      callerAgentId: 'main',
+      targetAgentId: 'marketer',
+      message: 'Agent not linked',
+    });
+    assert(readAgentContext('main').state === 'error', 'main error on delegation failure');
+    onAgentSkillError({ agentId: 'developer', skillId: 'search', message: 'timeout' });
+    assert(readAgentContext('developer').state === 'error', 'developer error on skill failure');
 
     onAgentTurnStart({
       agentId: 'developer',
