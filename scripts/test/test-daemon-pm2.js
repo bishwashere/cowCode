@@ -26,32 +26,62 @@ function checkCliUsesPm2OnWindows() {
   return { ok: true, detail: 'cli.js routes win32 start/stop/update/uninstall without bash' };
 }
 
-function checkInstallPs1() {
-  const ps1 = join(ROOT, 'install.ps1');
+function checkWindowsPs1(filename, opts) {
+  const path = join(ROOT, filename);
+  let src;
   try {
-    readFileSync(ps1, 'utf8');
+    src = readFileSync(path, 'utf8');
   } catch {
-    return { ok: false, detail: 'install.ps1 missing' };
+    return { ok: false, detail: `${filename} missing` };
   }
-  const src = readFileSync(ps1, 'utf8');
   if (/[^\x09\x0A\x0D\x20-\x7E]/.test(src)) {
-    return { ok: false, detail: 'install.ps1 must be ASCII-only (PowerShell 5.1 default encoding)' };
-  }
-  const depsIdx = src.indexOf('Installing dependencies');
-  const setupIdx = src.indexOf('node setup.js');
-  if (depsIdx < 0 || setupIdx < 0 || depsIdx > setupIdx) {
-    return { ok: false, detail: 'install.ps1 must install dependencies before setup.js' };
-  }
-  if (!src.includes('cowcode.cmd')) {
-    return { ok: false, detail: 'install.ps1 must create cowcode.cmd launcher' };
+    return { ok: false, detail: `${filename} must be ASCII-only (PowerShell 5.1)` };
   }
   if (src.includes('$ErrorActionPreference = "Stop"')) {
-    return { ok: false, detail: 'install.ps1 must not use Stop (breaks npm/tar on PS 5.1)' };
+    return { ok: false, detail: `${filename} must not use Stop (breaks npm/tar on PS 5.1)` };
   }
-  if (!src.includes('Exit-Install') || !src.includes('npm')) {
-    return { ok: false, detail: 'install.ps1 must preflight npm and pause on failure' };
+  const required = [
+    'Encode-GitHubBranchPath',
+    'Get-CowcodeRequestHeaders',
+    'Save-CowcodeDownload',
+    'Read-PackageJsonVersion',
+    'ConvertFrom-Json',
+    'Cache-Control',
+    'User-Agent',
+  ];
+  for (const token of required) {
+    if (!src.includes(token)) {
+      return { ok: false, detail: `${filename} missing ${token}` };
+    }
   }
-  return { ok: true, detail: 'install.ps1 order, launcher, and PS5.1-safe errors OK' };
+  if (opts.depsBeforeSetup) {
+    const depsIdx = src.indexOf('Installing dependencies');
+    const setupIdx = src.indexOf('node setup.js');
+    if (depsIdx < 0 || setupIdx < 0 || depsIdx > setupIdx) {
+      return { ok: false, detail: `${filename} must install dependencies before setup.js` };
+    }
+  }
+  if (opts.launcher && !src.includes('cowcode.cmd')) {
+    return { ok: false, detail: `${filename} must create cowcode.cmd launcher` };
+  }
+  if (opts.exitHelper && !src.includes(opts.exitHelper)) {
+    return { ok: false, detail: `${filename} must define ${opts.exitHelper}` };
+  }
+  return { ok: true, detail: `${filename} hardened for PS 5.1` };
+}
+
+function checkInstallPs1() {
+  return checkWindowsPs1('install.ps1', {
+    depsBeforeSetup: true,
+    launcher: true,
+    exitHelper: 'Exit-Install',
+  });
+}
+
+function checkUpdatePs1() {
+  return checkWindowsPs1('update.ps1', {
+    exitHelper: 'Exit-Update',
+  });
 }
 
 function checkDaemonLog() {
@@ -85,7 +115,10 @@ async function main() {
   recordCase({ name: 'cli.js win32', input: 'pm2 routing', output: cli.detail, status: cli.ok ? 'pass' : 'fail' });
 
   const ps1 = checkInstallPs1();
-  recordCase({ name: 'install.ps1', input: 'deps before setup', output: ps1.detail, status: ps1.ok ? 'pass' : 'fail' });
+  recordCase({ name: 'install.ps1', input: 'headers/json/errors', output: ps1.detail, status: ps1.ok ? 'pass' : 'fail' });
+
+  const upd = checkUpdatePs1();
+  recordCase({ name: 'update.ps1', input: 'headers/json/errors', output: upd.detail, status: upd.ok ? 'pass' : 'fail' });
 
   const log = checkDaemonLog();
   recordCase({ name: 'daemonLog', input: 'write line', output: log.detail, status: log.ok ? 'pass' : 'fail' });
@@ -103,7 +136,7 @@ async function main() {
   });
 
   endReport();
-  process.exit(cli.ok && ps1.ok && log.ok && missing.ok && fnOk ? 0 : 1);
+  process.exit(cli.ok && ps1.ok && upd.ok && log.ok && missing.ok && fnOk ? 0 : 1);
 }
 
 main();
