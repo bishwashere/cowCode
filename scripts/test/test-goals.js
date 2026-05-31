@@ -47,8 +47,10 @@ async function main() {
     assert(/5\) Reflection & Memory Update/.test(prompt), 'prompt includes reflection section');
     assert(/6\) User Input Check/.test(prompt), 'prompt includes user input check section');
     assert(/7\) Waiting \/ Watchers \/ Conditions/.test(prompt), 'prompt includes waiting section');
+    assert(/8\) Opportunity Detection/.test(prompt), 'prompt includes opportunity detection section');
     assert(/"userInputRequired": false/.test(prompt), 'prompt includes user input required flag');
     assert(/"wait":/.test(prompt), 'prompt includes wait schema');
+    assert(/"initiatives": \[\{/.test(prompt), 'prompt includes initiatives schema');
     const memoryPath = getGoalMemoryPath(created.id);
     assert(existsSync(memoryPath), 'goal memory file created');
     assert(/Per-goal memory file path/.test(prompt), 'prompt includes memory path');

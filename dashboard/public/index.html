@@ -100,7 +100,8 @@
       gap: 0.65rem;
     }
     .team-roster-view,
-    .team-goals-view {
+    .team-goals-view,
+    .team-initiatives-view {
       flex: 1 1 0;
       min-height: 0;
       min-width: 0;
@@ -108,7 +109,8 @@
       gap: 0.65rem;
     }
     .team-roster-view[hidden],
-    .team-goals-view[hidden] {
+    .team-goals-view[hidden],
+    .team-initiatives-view[hidden] {
       display: none !important;
     }
     .team-map-wrap {
@@ -414,6 +416,75 @@
     .team-goal-subgoal-status.doing { background: rgba(234, 179, 8, 0.2); color: #facc15; }
     .team-goal-subgoal-status.done { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
     .team-goal-subgoal-status.blocked { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .team-initiatives-main {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      padding: 0.55rem;
+    }
+    .team-initiatives-list {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+      gap: 0.55rem;
+      padding: 0.1rem;
+    }
+    .team-initiative-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      padding: 0.55rem;
+      font-size: 0.72rem;
+      line-height: 1.35;
+      cursor: pointer;
+    }
+    .team-initiative-card.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(91, 181, 255, 0.28);
+    }
+    .team-initiative-type {
+      font-size: 0.65rem;
+      border-radius: 999px;
+      padding: 0.05rem 0.35rem;
+      text-transform: capitalize;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+    }
+    .team-initiative-status.open { color: #facc15; }
+    .team-initiative-status.accepted { color: #60a5fa; }
+    .team-initiative-status.rejected { color: #ef4444; }
+    .team-initiative-status.completed { color: #22c55e; }
+    .team-initiative-detail {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      padding: 0.6rem;
+      font-size: 0.72rem;
+      line-height: 1.4;
+      min-height: 8rem;
+    }
+    .team-initiative-detail h4 {
+      margin: 0 0 0.35rem 0;
+      font-size: 0.8rem;
+    }
+    .team-initiative-row {
+      margin: 0.18rem 0;
+      color: var(--muted);
+    }
+    .team-initiative-actions {
+      margin-top: 0.45rem;
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
     .team-goals-new {
       display: grid;
       grid-template-columns: 1fr 1fr auto auto;
@@ -2456,6 +2527,7 @@
         <div class="team-top-tabs" role="tablist">
           <button type="button" id="team-top-tab-roster" class="team-top-tab active" data-team-top="roster" role="tab" aria-selected="true">Roster</button>
           <button type="button" id="team-top-tab-goals" class="team-top-tab" data-team-top="goals" role="tab" aria-selected="false">Goals</button>
+          <button type="button" id="team-top-tab-initiatives" class="team-top-tab" data-team-top="initiatives" role="tab" aria-selected="false">Initiatives</button>
         </div>
         <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click a card for Active Context, Inbox, or Stats. Use ✎ to edit. Switch to Tree for hierarchy view.</p>
       </div>
@@ -2555,6 +2627,20 @@
             </div>
             <div id="team-goal-detail" class="team-goal-detail">
               <p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a goal to view details and subgoals.</p>
+            </div>
+          </div>
+        </div>
+        <div id="team-initiatives-view" class="team-initiatives-view" hidden>
+          <div class="team-initiatives-main">
+            <div class="team-goals-head">
+              <h3 style="margin:0; font-size:0.9rem;">Initiatives</h3>
+              <button type="button" id="team-initiatives-refresh" class="secondary" style="margin:0;">Refresh</button>
+            </div>
+            <div id="team-initiatives-list" class="team-initiatives-list">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No initiatives yet.</p>
+            </div>
+            <div id="team-initiative-detail" class="team-initiative-detail">
+              <p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select an initiative to review and promote.</p>
             </div>
           </div>
         </div>
@@ -2805,7 +2891,9 @@
     var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
     var teamAgentMetricsSnapshot = { agents: {}, updatedAt: 0 };
     var teamGoalsSnapshot = { goals: [], updatedAt: 0 };
+    var teamInitiativesSnapshot = { initiatives: [], updatedAt: 0 };
     var selectedTeamGoalId = '';
+    var selectedTeamInitiativeId = '';
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
     }
@@ -5303,11 +5391,13 @@
     }
 
     function setTeamTopTab(tab) {
-      teamTopTab = tab === 'goals' ? 'goals' : 'roster';
+      teamTopTab = tab === 'goals' ? 'goals' : (tab === 'initiatives' ? 'initiatives' : 'roster');
       var rosterTab = document.getElementById('team-top-tab-roster');
       var goalsTab = document.getElementById('team-top-tab-goals');
+      var initiativesTab = document.getElementById('team-top-tab-initiatives');
       var rosterView = document.getElementById('team-roster-view');
       var goalsView = document.getElementById('team-goals-view');
+      var initiativesView = document.getElementById('team-initiatives-view');
       if (rosterTab) {
         rosterTab.classList.toggle('active', teamTopTab === 'roster');
         rosterTab.setAttribute('aria-selected', teamTopTab === 'roster' ? 'true' : 'false');
@@ -5316,10 +5406,18 @@
         goalsTab.classList.toggle('active', teamTopTab === 'goals');
         goalsTab.setAttribute('aria-selected', teamTopTab === 'goals' ? 'true' : 'false');
       }
+      if (initiativesTab) {
+        initiativesTab.classList.toggle('active', teamTopTab === 'initiatives');
+        initiativesTab.setAttribute('aria-selected', teamTopTab === 'initiatives' ? 'true' : 'false');
+      }
       if (rosterView) rosterView.hidden = teamTopTab !== 'roster';
       if (goalsView) goalsView.hidden = teamTopTab !== 'goals';
+      if (initiativesView) initiativesView.hidden = teamTopTab !== 'initiatives';
       if (teamTopTab === 'goals' && (!teamGoalsSnapshot.goals || !teamGoalsSnapshot.goals.length)) {
         fetchGoalsSnapshot();
+      }
+      if (teamTopTab === 'initiatives' && (!teamInitiativesSnapshot.initiatives || !teamInitiativesSnapshot.initiatives.length)) {
+        fetchInitiativesSnapshot();
       }
     }
 
@@ -5458,6 +5556,11 @@
         var running = !!g.running;
         var selected = id === selectedTeamGoalId ? ' selected' : '';
         var subgoalCount = countGoalSubgoals(g.subgoals);
+        var openInitiativesCount = (Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : []).filter(function (it) {
+          var related = Array.isArray(it.relatedGoalIds) ? it.relatedGoalIds : [];
+          var status = String(it.status || 'open').toLowerCase();
+          return related.indexOf(id) >= 0 && (status === 'open' || status === 'accepted');
+        }).length;
         var runningTxt = running ? ('Working: ' + escapeHtml(goalOwnerLabel(g))) : '';
         var last = formatGoalTs(g.lastRunAt);
         var next = formatGoalTs(g.nextRunAt);
@@ -5469,6 +5572,7 @@
           '<div class="team-goal-meta"><strong>Owner:</strong> ' + escapeHtml(goalOwnerLabel(g)) + '</div>' +
           '<div class="team-goal-meta"><strong>Objective:</strong> ' + escapeHtml(String(g.objective || '').slice(0, 180)) + '</div>' +
           '<div class="team-goal-meta"><strong>Subgoals:</strong> ' + escapeHtml(String(subgoalCount)) + '</div>' +
+          '<div class="team-goal-meta"><strong>Open Initiatives:</strong> ' + escapeHtml(String(openInitiativesCount)) + '</div>' +
           '<div class="team-goal-progress"><span style="width:' + pct + '%"></span></div>' +
           '<div class="team-goal-meta"><strong>Progress:</strong> ' + pct + '%</div>' +
           '<div class="team-goal-meta"><strong>Last:</strong> ' + escapeHtml(last) + ' <strong>Next:</strong> ' + escapeHtml(next) + '</div>' +
@@ -5523,6 +5627,126 @@
           if (!id) return;
           selectedTeamGoalId = id;
           renderGoalsList();
+        });
+      });
+    }
+
+    function renderInitiativeDetail(initiative) {
+      var detail = document.getElementById('team-initiative-detail');
+      if (!detail) return;
+      if (!initiative || typeof initiative !== 'object') {
+        detail.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select an initiative to review and promote.</p>';
+        return;
+      }
+      var relatedGoals = Array.isArray(initiative.relatedGoalIds) ? initiative.relatedGoalIds : [];
+      var relatedLabel = relatedGoals.length ? relatedGoals.map(function (gid) {
+        var goal = (teamGoalsSnapshot.goals || []).find(function (g) { return String(g.id || '') === String(gid); });
+        return goal ? goal.title : gid;
+      }).join(', ') : '—';
+      detail.innerHTML = '' +
+        '<h4>' + escapeHtml(initiative.title || 'Untitled initiative') + '</h4>' +
+        '<div class="team-initiative-row"><strong>Type:</strong> <span class="team-initiative-type">' + escapeHtml(initiative.type || 'observation') + '</span></div>' +
+        '<div class="team-initiative-row"><strong>Status:</strong> <span class="team-initiative-status ' + escapeHtml(String(initiative.status || 'open').toLowerCase()) + '">' + escapeHtml(initiative.status || 'open') + '</span></div>' +
+        '<div class="team-initiative-row"><strong>Confidence:</strong> ' + escapeHtml(String(Math.round((Number(initiative.confidence) || 0) * 100))) + '%</div>' +
+        '<div class="team-initiative-row"><strong>Description:</strong> ' + escapeHtml(initiative.description || '') + '</div>' +
+        '<div class="team-initiative-row"><strong>Source:</strong> ' + escapeHtml(initiative.source || '') + '</div>' +
+        '<div class="team-initiative-row"><strong>Created by:</strong> ' + escapeHtml(agentNameById(initiative.createdBy || 'main')) + '</div>' +
+        '<div class="team-initiative-row"><strong>Related goals:</strong> ' + escapeHtml(relatedLabel) + '</div>' +
+        '<div class="team-initiative-row"><strong>Activity:</strong> ' + escapeHtml((initiative.activity || []).join(' | ') || '—') + '</div>' +
+        '<div class="team-initiative-row"><strong>Specialist reviews:</strong> ' + escapeHtml((initiative.specialistReviews || []).join(' | ') || '—') + '</div>' +
+        '<div class="team-initiative-actions">' +
+          '<button type="button" class="secondary" id="team-init-accept">Accept</button>' +
+          '<button type="button" class="secondary" id="team-init-reject">Reject</button>' +
+          '<button type="button" class="secondary" id="team-init-promote-goal">Promote to Goal</button>' +
+          '<button type="button" class="secondary" id="team-init-promote-subgoal">Promote to Subgoal</button>' +
+        '</div>';
+      var acceptBtn = document.getElementById('team-init-accept');
+      var rejectBtn = document.getElementById('team-init-reject');
+      var promoteGoalBtn = document.getElementById('team-init-promote-goal');
+      var promoteSubgoalBtn = document.getElementById('team-init-promote-subgoal');
+      if (acceptBtn) {
+        acceptBtn.addEventListener('click', async function () {
+          await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'accepted' }),
+          }).catch(function () {});
+          fetchInitiativesSnapshot();
+        });
+      }
+      if (rejectBtn) {
+        rejectBtn.addEventListener('click', async function () {
+          await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'rejected' }),
+          }).catch(function () {});
+          fetchInitiativesSnapshot();
+        });
+      }
+      if (promoteGoalBtn) {
+        promoteGoalBtn.addEventListener('click', async function () {
+          await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'goal' }),
+          }).catch(function () {});
+          fetchGoalsSnapshot();
+          fetchInitiativesSnapshot();
+        });
+      }
+      if (promoteSubgoalBtn) {
+        promoteSubgoalBtn.addEventListener('click', async function () {
+          var goalId = relatedGoals[0] || ((teamGoalsSnapshot.goals || [])[0] && (teamGoalsSnapshot.goals || [])[0].id);
+          if (!goalId) return;
+          await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'subgoal', goalId: goalId }),
+          }).catch(function () {});
+          fetchGoalsSnapshot();
+          fetchInitiativesSnapshot();
+        });
+      }
+    }
+
+    function renderInitiativesList() {
+      var wrap = document.getElementById('team-initiatives-list');
+      if (!wrap) return;
+      var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives.slice() : [];
+      initiatives.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
+      if (!initiatives.length) {
+        selectedTeamInitiativeId = '';
+        wrap.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No initiatives yet.</p>';
+        renderInitiativeDetail(null);
+        return;
+      }
+      if (!selectedTeamInitiativeId || !initiatives.some(function (i) { return String(i.id || '') === selectedTeamInitiativeId; })) {
+        selectedTeamInitiativeId = String(initiatives[0].id || '');
+      }
+      wrap.innerHTML = initiatives.map(function (it) {
+        var id = String(it.id || '');
+        var selected = id === selectedTeamInitiativeId ? ' selected' : '';
+        var confidence = Math.round((Number(it.confidence) || 0) * 100);
+        var status = String(it.status || 'open').toLowerCase();
+        return '<div class="team-initiative-card' + selected + '" data-initiative-id="' + escapeHtml(id) + '">' +
+          '<div class="team-goal-card-head">' +
+            '<h4 class="team-goal-card-title">' + escapeHtml(it.title || 'Untitled initiative') + '</h4>' +
+            '<span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+          '</div>' +
+          '<div class="team-goal-meta"><span class="team-initiative-type">' + escapeHtml(it.type || 'observation') + '</span></div>' +
+          '<div class="team-goal-meta"><strong>Confidence:</strong> ' + escapeHtml(String(confidence)) + '%</div>' +
+          '<div class="team-goal-meta"><strong>Source:</strong> ' + escapeHtml(it.source || '') + '</div>' +
+          '<div class="team-goal-meta">' + escapeHtml(String(it.description || '').slice(0, 180)) + '</div>' +
+        '</div>';
+      }).join('');
+      renderInitiativeDetail(initiatives.find(function (i) { return String(i.id || '') === selectedTeamInitiativeId; }) || initiatives[0]);
+      wrap.querySelectorAll('.team-initiative-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          var id = String(card.getAttribute('data-initiative-id') || '').trim();
+          if (!id) return;
+          selectedTeamInitiativeId = id;
+          renderInitiativesList();
         });
       });
     }
@@ -6117,17 +6341,33 @@
       renderGoalsList();
     }
 
+    async function fetchInitiativesSnapshot() {
+      try {
+        var r = await fetch(API + '/api/initiatives');
+        if (!r.ok) return;
+        var d = await r.json().catch(function () { return {}; });
+        teamInitiativesSnapshot = {
+          initiatives: Array.isArray(d.initiatives) ? d.initiatives : [],
+          updatedAt: Number(d.updatedAt) || 0,
+        };
+      } catch (_) {}
+      renderInitiativesList();
+      renderGoalsList();
+    }
+
     function startTeamActivityFeed() {
       if (teamActivityPollTimer) return;
       fetchTeamActivityFeed();
       fetchTeamContextFeed();
       fetchTeamMetricsFeed();
       fetchGoalsSnapshot();
+      fetchInitiativesSnapshot();
       teamActivityPollTimer = setInterval(function () {
         fetchTeamActivityFeed();
         fetchTeamContextFeed();
         fetchTeamMetricsFeed();
         fetchGoalsSnapshot();
+        fetchInitiativesSnapshot();
       }, TEAM_ACTIVITY_POLL_MS);
     }
 
@@ -6157,11 +6397,15 @@
 
     var teamTopTabRosterEl = document.getElementById('team-top-tab-roster');
     var teamTopTabGoalsEl = document.getElementById('team-top-tab-goals');
+    var teamTopTabInitiativesEl = document.getElementById('team-top-tab-initiatives');
     if (teamTopTabRosterEl) {
       teamTopTabRosterEl.addEventListener('click', function () { setTeamTopTab('roster'); });
     }
     if (teamTopTabGoalsEl) {
       teamTopTabGoalsEl.addEventListener('click', function () { setTeamTopTab('goals'); });
+    }
+    if (teamTopTabInitiativesEl) {
+      teamTopTabInitiativesEl.addEventListener('click', function () { setTeamTopTab('initiatives'); });
     }
     setTeamTopTab('roster');
 
@@ -6175,6 +6419,10 @@
     var teamGoalsRefreshEl = document.getElementById('team-goals-refresh');
     if (teamGoalsRefreshEl) {
       teamGoalsRefreshEl.addEventListener('click', function () { fetchGoalsSnapshot(); });
+    }
+    var teamInitiativesRefreshEl = document.getElementById('team-initiatives-refresh');
+    if (teamInitiativesRefreshEl) {
+      teamInitiativesRefreshEl.addEventListener('click', function () { fetchInitiativesSnapshot(); });
     }
     var teamGoalCreateEl = document.getElementById('team-goal-create');
     if (teamGoalCreateEl) {

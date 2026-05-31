@@ -17,6 +17,7 @@ import { readTeamActivity } from '../lib/team-activity.js';
 import { readAllAgentContext } from '../lib/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent-metrics.js';
 import { listGoals, createGoal, updateGoal, getGoal, runGoalTick } from '../lib/goals.js';
+import { listInitiatives, getInitiative, updateInitiative } from '../lib/initiatives.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 
 // Use same state dir as main app (e.g. COWCODE_STATE_DIR from ~/.cowcode/.env)
@@ -487,6 +488,15 @@ app.get('/api/goals', (_req, res) => {
   }
 });
 
+app.get('/api/initiatives', (_req, res) => {
+  try {
+    const snapshot = listInitiatives();
+    res.json({ ...snapshot, now: Date.now() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/goals', async (req, res) => {
   try {
     const title = String(req.body?.title || '').trim();
@@ -542,6 +552,91 @@ app.patch('/api/goals/:id', (req, res) => {
       res.status(404).json({ error: err.message });
       return;
     }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/initiatives/:id', (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'initiative id is required' });
+      return;
+    }
+    const patch = req.body || {};
+    const initiative = updateInitiative(id, patch);
+    res.json({ initiative });
+  } catch (err) {
+    if (/not found/i.test(String(err?.message || ''))) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/initiatives/:id/promote', (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const mode = String(req.body?.mode || '').trim().toLowerCase();
+    if (!id) {
+      res.status(400).json({ error: 'initiative id is required' });
+      return;
+    }
+    const initiative = getInitiative(id);
+    if (!initiative) {
+      res.status(404).json({ error: 'Initiative not found' });
+      return;
+    }
+    if (mode !== 'goal' && mode !== 'subgoal') {
+      res.status(400).json({ error: 'mode must be goal or subgoal' });
+      return;
+    }
+    if (mode === 'goal') {
+      const goal = createGoal({
+        title: initiative.title,
+        objective: initiative.description || initiative.title,
+        ownerAgentId: initiative.createdBy || DEFAULT_AGENT_ID,
+        status: 'active',
+        currentPlan: { steps: [{ title: `Start from initiative: ${initiative.title}`, status: 'todo' }] },
+        memoryAnchors: [`initiative=${initiative.id}`],
+      });
+      const updated = updateInitiative(initiative.id, {
+        status: 'accepted',
+        relatedGoalIds: [goal.id],
+        activity: [`Promoted to goal ${goal.id}`],
+      });
+      res.json({ initiative: updated, goal });
+      return;
+    }
+    const targetGoalId = String(req.body?.goalId || '').trim();
+    if (!targetGoalId) {
+      res.status(400).json({ error: 'goalId is required for subgoal promotion' });
+      return;
+    }
+    const goal = getGoal(targetGoalId);
+    if (!goal) {
+      res.status(404).json({ error: 'Goal not found' });
+      return;
+    }
+    const subgoals = Array.isArray(goal.subgoals) ? goal.subgoals.slice() : [];
+    subgoals.push({
+      id: `init-${initiative.id}`,
+      title: initiative.title,
+      status: 'todo',
+      progress: 0,
+      assignee: initiative.createdBy || '',
+      depends_on: [],
+      subgoals: [],
+    });
+    const updatedGoal = updateGoal(goal.id, { subgoals });
+    const updatedInitiative = updateInitiative(initiative.id, {
+      status: 'accepted',
+      relatedGoalIds: [goal.id],
+      activity: [`Promoted to subgoal in ${goal.id}`],
+    });
+    res.json({ initiative: updatedInitiative, goal: updatedGoal });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

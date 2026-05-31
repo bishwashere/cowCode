@@ -59,9 +59,10 @@ const checks = [
     ok: html.includes('id="page-team"') && html.includes('id="team-map-canvas"'),
   },
   {
-    name: 'Team page has top-level Roster and Goals tabs',
+    name: 'Team page has top-level Roster Goals Initiatives tabs',
     ok: html.includes('id="team-top-tab-roster"') &&
       html.includes('id="team-top-tab-goals"') &&
+      html.includes('id="team-top-tab-initiatives"') &&
       html.includes('setTeamTopTab'),
   },
   {
@@ -77,6 +78,15 @@ const checks = [
       html.includes('renderGoalDetail') &&
       html.includes('renderGoalSubgoalTree') &&
       html.includes('depends_on'),
+  },
+  {
+    name: 'Initiatives tab includes list detail and API hooks',
+    ok: html.includes('id="team-initiatives-view"') &&
+      html.includes('id="team-initiatives-list"') &&
+      html.includes('id="team-initiative-detail"') &&
+      html.includes('/api/initiatives') &&
+      html.includes('fetchInitiativesSnapshot') &&
+      html.includes('renderInitiativesList'),
   },
   {
     name: 'Team page includes live activity panel',
