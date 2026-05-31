@@ -1,7 +1,7 @@
 ---
 id: me
 name: Me
-description: Build a profile of what CowCode knows about the user from MEMORY.md, memory/*.md, and recent chat logs. Use when the user asks "what do you know about me?", "what have you learned about me?", "summarize what you know about me", or similar.
+description: Build a profile of what CowCode knows about the user from MEMORY.md, memory/*.md, dashboard Projects tracker, and recent chat logs. Use when the user asks "what do you know about me?", "what projects do I have?", "what have you learned about me?", "summarize what you know about me", or similar.
 ---
 
 # Me
@@ -18,12 +18,14 @@ Call **run_skill** with **skill: "me"** when the user asks things like:
 - "Tell me about myself"
 - "What's in your memory about me?"
 - "What do you remember about me?"
+- "What projects do I have?" / "Do you know my projects?"
 
-No arguments are required. The skill reads **MEMORY.md**, **memory/*.md**, and **recent chat logs** (today, yesterday, and the last few days), then returns a concise, human-readable profile.
+No arguments are required. The skill reads **MEMORY.md**, **memory/*.md**, the dashboard **Projects** tracker, and **recent chat logs** (today, yesterday, and the last few days), then returns a concise, human-readable profile.
 
 ## What it does
 
 - Reads your notes: **MEMORY.md** and any **memory/*.md** in the workspace.
+- Includes projects from the dashboard **Projects** page (`projects.db`).
 - Reads **chat logs** from the last several days (date-based and, when available, this chat’s private log).
 - Combines them into a short profile (notes, recent topics, and any explicit facts) so you can see what CowCode knows about you at a glance.
 

@@ -32,6 +32,7 @@ import {
   beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from '../lib/retrospective.js';
+import { buildProjectsContextBlock } from '../lib/projects-context.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = Math.max(
@@ -225,6 +226,8 @@ async function main() {
   const memoryConfig = getMemoryConfig();
   const retroBlock = await buildRetrospectiveContextBlock(message, memoryConfig);
   if (retroBlock) systemPrompt += retroBlock;
+  const projectsBlock = buildProjectsContextBlock();
+  if (projectsBlock) systemPrompt += projectsBlock;
 
   try {
     let textToSend = '';

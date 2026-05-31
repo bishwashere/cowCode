@@ -47,6 +47,10 @@ updates   - id, project_id, branch_id (null = main track), parent_update_id, tex
 branches  - id, project_id, parent_update_id (which update it branches from), name, created_at
 ```
 
+## Agents (main, developer, etc.)
+
+Projects in this tracker are injected into the **system prompt** on every private chat turn and included in the **me** skill profile. When you ask "what projects do I have?", agents should answer from this list—not claim they don't know if projects exist here.
+
 ## How to use
 
 1. **Add a project** - type a name, optional URL, and optional description in the toolbar, click **+ Add Project**.

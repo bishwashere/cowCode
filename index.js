@@ -63,6 +63,7 @@ import {
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
+import { buildProjectsContextBlock } from './lib/projects-context.js';
 import { toLogJid, getOwnerLogJid } from './lib/owner-config.js';
 import { handleTelegramPrivateMessage } from './lib/telegram-private-handler.js';
 import { handleTelegramGroupMessage } from './lib/telegram-group-handler.js';
@@ -1079,6 +1080,8 @@ async function main() {
       const memoryConfig = getMemoryConfig();
       const retroBlock = await buildRetrospectiveContextBlock(text, memoryConfig);
       if (retroBlock) systemPromptWithPlan += retroBlock;
+      const projectsBlock = buildProjectsContextBlock();
+      if (projectsBlock) systemPromptWithPlan += projectsBlock;
     }
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
