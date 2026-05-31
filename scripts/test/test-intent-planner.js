@@ -52,6 +52,7 @@ const CASES = [
     label: 'Plain greeting → chat, no tools',
     message: 'Hi',
     expectMode: 'chat',
+    expectNoSkills: true,
   },
 ];
 
@@ -85,6 +86,9 @@ async function runCase(tc) {
     throw new Error(
       `Skill "${tc.forbidSkill}" should NOT be selected, but was. Skills: [${plan.skills.join(', ')}]. Plan: ${JSON.stringify(plan)}`
     );
+  }
+  if (tc.expectNoSkills && plan.skills.length > 0) {
+    throw new Error(`Expected no skills but got [${plan.skills.join(', ')}]. Plan: ${JSON.stringify(plan)}`);
   }
   return plan;
 }
