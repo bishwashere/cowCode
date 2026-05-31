@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -18,6 +18,8 @@ async function main() {
       listDueGoals,
       runGoalTick,
       buildGoalTickPrompt,
+      getGoalMemoryPath,
+      readGoalMemory,
     } = await import('../../lib/goals.js');
 
     const created = createGoal({
@@ -31,6 +33,9 @@ async function main() {
 
     const prompt = buildGoalTickPrompt(created);
     assert(/Goal ID/.test(prompt) && /STRICT JSON/.test(prompt), 'goal tick prompt generated');
+    const memoryPath = getGoalMemoryPath(created.id);
+    assert(existsSync(memoryPath), 'goal memory file created');
+    assert(/Per-goal memory file path/.test(prompt), 'prompt includes memory path');
 
     updateGoal(created.id, { nextRunAt: Date.now() - 1 });
     assert(listDueGoals().length === 1, 'goal is due');
@@ -46,6 +51,10 @@ async function main() {
           nextRunInSec: 45,
           contextSnapshot: 'UI and API partially implemented',
           memoryAnchors: ['goal=ship-goals', 'phase=ui'],
+          learnings: ['Scoring should happen before planning'],
+          decisions: ['Keep Team tab as default agent space'],
+          userPreferences: ['Prefer concise status cards'],
+          failedAttempts: ['Initial goals card had no owner badge'],
           planSteps: [
             { title: 'Implement store', status: 'done' },
             { title: 'Implement UI', status: 'doing' },
@@ -62,6 +71,11 @@ async function main() {
     assert(runResult.goal.running === false, 'goal not left running');
     assert(Array.isArray(runResult.createdSubgoals) && runResult.createdSubgoals.length === 1, 'subgoal created');
     assert(listGoals().goals.length === 2, 'goal + subgoal in store');
+    const memoryAfterRun = readGoalMemory(created.id, { maxChars: 5000 });
+    assert(/Learned:/.test(memoryAfterRun), 'memory stores learnings');
+    assert(/Decisions:/.test(memoryAfterRun), 'memory stores decisions');
+    assert(/User preferences:/.test(memoryAfterRun), 'memory stores user preferences');
+    assert(/Did not work:/.test(memoryAfterRun), 'memory stores failed attempts');
 
     await runGoalTick(created.id, {
       runGoalTurn: async () => {
@@ -70,6 +84,8 @@ async function main() {
     });
     const afterError = listGoals().goals.find((g) => g.id === created.id);
     assert(afterError.status === 'blocked', `status blocked after error, got ${afterError.status}`);
+    const memoryAfterError = readFileSync(memoryPath, 'utf8');
+    assert(/Tick failed/.test(memoryAfterError), 'memory stores failure notes');
 
     console.log('goals tests passed');
   } finally {
