@@ -36,8 +36,11 @@ import {
 } from '../lib/retrospective.js';
 import {
   buildProjectsContextBlock,
-  enrichMessageWithProjectContext,
 } from '../lib/projects-context.js';
+import {
+  enrichDelegationMessage,
+  shouldSkipForcedDelegation,
+} from '../lib/conversation-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from '../lib/goals-context.js';
 import { getGithubSourceIntentHint } from '../lib/github-context.js';
 import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
@@ -155,7 +158,14 @@ async function main() {
         answer_style: 'short',
       }
     : null;
-  if (presetDelegationPlan && delegationDecision) {
+  const skipForcedDelegation = presetDelegationPlan && shouldSkipForcedDelegation(message, historyMessages);
+  const activePresetDelegationPlan = skipForcedDelegation ? null : presetDelegationPlan;
+  const activeDelegatedTarget = skipForcedDelegation ? '' : delegatedTarget;
+  if (skipForcedDelegation) {
+    process.stderr.write('[agent-router] referential follow-up — handling on caller with chat history\n');
+  }
+  ctx.delegationHistoryMessages = historyMessages;
+  if (activePresetDelegationPlan && delegationDecision) {
     logTeamActivity({
       type: 'delegation_decision',
       agentId,
@@ -178,16 +188,16 @@ async function main() {
     });
   }
   // Step 3: intent planner — one small LLM call before loading any tool schemas.
-  const casualIntentPlan = !presetDelegationPlan && isNonTaskMessage(message)
+  const casualIntentPlan = !activePresetDelegationPlan && isNonTaskMessage(message)
     ? buildCasualChatIntentPlan()
     : null;
-  const goalsIntentHint = !presetDelegationPlan && !casualIntentPlan
+  const goalsIntentHint = !activePresetDelegationPlan && !casualIntentPlan
     ? getGoalsDiscoveryIntentHint(message, historyMessages, enabledSkillIds, agentId)
     : null;
-  const githubIntentHint = !presetDelegationPlan && !casualIntentPlan
+  const githubIntentHint = !activePresetDelegationPlan && !casualIntentPlan
     ? getGithubSourceIntentHint(message, enabledSkillIds)
     : null;
-  const intentPlan = presetDelegationPlan || casualIntentPlan || goalsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
+  const intentPlan = activePresetDelegationPlan || casualIntentPlan || goalsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
     ? await planIntent({
         userText: message,
         historyMessages,
@@ -230,12 +240,12 @@ async function main() {
   try {
     let textToSend = '';
     let skillsCalled = [];
-    if (presetDelegationPlan && delegatedTarget) {
+    if (activePresetDelegationPlan && activeDelegatedTarget) {
       try {
         if (delegationDecision) ctx.delegationRouting = delegationDecision;
         const forcedRaw = await executeSkill('agent-send', ctx, {
-          agent: delegatedTarget,
-          message: enrichMessageWithProjectContext(message, historyMessages),
+          agent: activeDelegatedTarget,
+          message: enrichDelegationMessage(message, historyMessages),
         });
         const forced = JSON.parse(forcedRaw || '{}');
         if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {

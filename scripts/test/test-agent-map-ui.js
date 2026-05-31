@@ -112,6 +112,10 @@ const checks = [
     ok: html.includes('class="team-page-body"') && /\.team-activity-wrap\s*\{[^}]*border-left:\s*1px/s.test(html),
   },
   {
+    name: 'Team agent panel tabs wrap so Outbox is visible',
+    ok: /\.team-agent-panel-tabs\s*\{[^}]*flex-wrap:\s*wrap/s.test(html),
+  },
+  {
     name: 'Team page has activity feed polling hooks',
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
