@@ -2570,6 +2570,7 @@
       if (name === 'groups') fetchGroups();
       if (name === 'home') fetchChatAgents();
       if (name === 'team') {
+        setTeamAgentPanelTab('context');
         startTeamActivityFeed();
         fetchAgentMapData().then(function () {
           if (teamAgentId) {

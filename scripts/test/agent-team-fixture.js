@@ -8,6 +8,23 @@ import { join } from 'path';
 
 export const MARKETER_TAGLINE = 'Ship faster, moo less.';
 
+/** Distinct specialist skills so delegation router can match by topic, not agent name. */
+export async function configureSpecialistSkills() {
+  const { loadAgentConfig, saveAgentConfig, syncAgentSendSkillInConfig } = await import('../../lib/agent-config.js');
+
+  const marketerCfg = loadAgentConfig('marketer');
+  marketerCfg.skills = marketerCfg.skills || {};
+  marketerCfg.skills.enabled = ['calendar', 'gmail'];
+  syncAgentSendSkillInConfig(marketerCfg);
+  saveAgentConfig('marketer', marketerCfg);
+
+  const alexCfg = loadAgentConfig('alex');
+  alexCfg.skills = alexCfg.skills || {};
+  alexCfg.skills.enabled = ['github', 'go-read'];
+  syncAgentSendSkillInConfig(alexCfg);
+  saveAgentConfig('alex', alexCfg);
+}
+
 /** Mirror dashboard PATCH /api/agents/:id/config */
 export async function patchAgentConfig(agentId, patch) {
   const {
@@ -64,9 +81,11 @@ export async function setupAgentTeamFixture(stateDir, opts = {}) {
   );
   writeFileSync(
     join(getAgentWorkspaceDir('alex'), 'SOUL.md'),
-    'You are Alex the backend agent. When asked if you are there, reply: "Alex here — ready to help with backend work."',
+    'You are Alex the backend agent. For GitHub/CI/backend questions, give a brief helpful answer and sign off: "Alex here — ready to help with backend work."',
     'utf8',
   );
+
+  await configureSpecialistSkills();
 
   if (opts.renameMarketerToChloe) {
     await patchAgentConfig('marketer', { title: 'Chloe' });

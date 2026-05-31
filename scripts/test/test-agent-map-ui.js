@@ -85,6 +85,18 @@ const checks = [
       html.includes('selectTeamInboxAgent'),
   },
   {
+    name: 'Active Context is first agent panel tab',
+    ok: (() => {
+      var contextIdx = html.indexOf('id="team-agent-tab-context"');
+      var inboxIdx = html.indexOf('id="team-agent-tab-inbox"');
+      return contextIdx >= 0 && inboxIdx > contextIdx &&
+        html.includes('id="team-agent-tab-context" class="team-agent-panel-tab active"') &&
+        html.includes("setTeamAgentPanelTab('context')") &&
+        html.includes("setTeamAgentPanelTab('context');") &&
+        /if \(name === 'team'\)[\s\S]*setTeamAgentPanelTab\('context'\)/.test(html);
+    })(),
+  },
+  {
     name: 'Team page includes active context view',
     ok: html.includes('id="team-agent-tab-context"') &&
       html.includes('id="team-agent-context-detail"') &&

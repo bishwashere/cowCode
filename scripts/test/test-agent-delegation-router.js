@@ -10,27 +10,10 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-async function configureSpecialistSkills() {
-  const { loadAgentConfig, saveAgentConfig, syncAgentSendSkillInConfig } = await import('../../lib/agent-config.js');
-
-  const marketerCfg = loadAgentConfig('marketer');
-  marketerCfg.skills = marketerCfg.skills || {};
-  marketerCfg.skills.enabled = ['calendar', 'gmail'];
-  syncAgentSendSkillInConfig(marketerCfg);
-  saveAgentConfig('marketer', marketerCfg);
-
-  const alexCfg = loadAgentConfig('alex');
-  alexCfg.skills = alexCfg.skills || {};
-  alexCfg.skills.enabled = ['github', 'go-read'];
-  syncAgentSendSkillInConfig(alexCfg);
-  saveAgentConfig('alex', alexCfg);
-}
-
 async function run() {
   const stateDir = createTempStateDir();
   process.env.COWCODE_STATE_DIR = stateDir;
   await setupAgentTeamFixture(stateDir);
-  await configureSpecialistSkills();
 
   const { getEnabledSkillIds } = await import('../../skills/loader.js');
   const { buildDelegationContext } = await import('../../lib/agent-delegation-router.js');
