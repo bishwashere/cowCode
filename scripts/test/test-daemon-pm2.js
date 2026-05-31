@@ -3,11 +3,10 @@
  * Unit tests for lib/daemon-pm2.js (Windows daemon without bash).
  */
 
-import { readFileSync, rmSync } from 'fs';
+import { readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
-import { mkdtempSync } from 'fs';
 import { startReport, recordCase, endReport } from './e2e-report.js';
 import { runPm2DaemonAction, daemonLog, ensurePm2 } from '../../lib/daemon-pm2.js';
 
@@ -36,7 +35,7 @@ function checkInstallPs1() {
   }
   const src = readFileSync(ps1, 'utf8');
   const depsIdx = src.indexOf('Installing dependencies');
-  const setupIdx = src.indexOf('setup.js');
+  const setupIdx = src.indexOf('node setup.js');
   if (depsIdx < 0 || setupIdx < 0 || depsIdx > setupIdx) {
     return { ok: false, detail: 'install.ps1 must install dependencies before setup.js' };
   }

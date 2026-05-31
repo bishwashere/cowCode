@@ -108,6 +108,8 @@ cowcode update     # pull the latest version
 cowcode uninstall  # remove cowCode
 ```
 
+On **Windows**, `cowcode start|stop|restart|status` uses **pm2** directly (no Git Bash). Logs: `cowcode logs` or `pm2 logs cowcode`.
+
 ### Option B - From a git clone
 
 ```bash
