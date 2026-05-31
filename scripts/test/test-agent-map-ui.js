@@ -72,6 +72,13 @@ const checks = [
       html.includes('fetchGoalsSnapshot'),
   },
   {
+    name: 'Goals tab includes detail pane with subgoal tree',
+    ok: html.includes('id="team-goal-detail"') &&
+      html.includes('renderGoalDetail') &&
+      html.includes('renderGoalSubgoalTree') &&
+      html.includes('depends_on'),
+  },
+  {
     name: 'Team page includes live activity panel',
     ok: html.includes('id="team-activity-list"') && html.includes('Live agent activity'),
   },
