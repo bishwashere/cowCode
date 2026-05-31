@@ -4510,6 +4510,37 @@
       var skill = String(event && event.skillId || '');
       var action = String(event && event.action || '');
       var msg = String(event && event.message || '');
+      var details = event && typeof event.details === 'object' ? event.details : null;
+      function fmtConfidence(value) {
+        var n = Number(value);
+        if (!isFinite(n)) return '0.00';
+        if (n < 0) n = 0;
+        if (n > 1) n = 1;
+        return n.toFixed(2);
+      }
+      function renderDecisionDetails() {
+        if (!details) return '';
+        var reason = String(details.reason || '').trim();
+        var selected = details.selected ? agentNameById(String(details.selected)) : target;
+        var selectedConf = Number(details.selectedConfidence);
+        var candidates = Array.isArray(details.candidates) ? details.candidates : [];
+        var candidateLines = candidates.map(function (c) {
+          var label = agentNameById(String(c && c.agentId || ''));
+          var conf = fmtConfidence(c && c.confidence);
+          return '- ' + escapeHtml(label || 'agent') + ' (' + conf + ')';
+        });
+        var out = '';
+        if (reason) out += '<br><strong>Reason:</strong> ' + escapeHtml(reason);
+        if (candidateLines.length) out += '<br><strong>Candidate Agents:</strong><br>' + candidateLines.join('<br>');
+        if (selected) {
+          out += '<br><strong>Selected:</strong> ' + escapeHtml(selected);
+          if (isFinite(selectedConf)) out += ' (' + fmtConfidence(selectedConf) + ')';
+        }
+        return out;
+      }
+      if (type === 'delegation_decision') {
+        return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> delegated to <span class="accent">' + escapeHtml(target || 'agent') + '</span>.' + renderDecisionDetails();
+      }
       if (type === 'delegation_start') {
         var routeNote = msg ? ' ' + escapeHtml(msg) + '.' : '';
         return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> delegated to <span class="accent">' + escapeHtml(target || 'agent') + '</span>.' + routeNote;

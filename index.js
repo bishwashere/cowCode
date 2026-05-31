@@ -30,6 +30,7 @@ import { runInternalAgentTurn } from './lib/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock } from './lib/intent-planner.js';
 import { buildDelegationContext } from './lib/agent-delegation-router.js';
 import { executeSkill } from './skills/executor.js';
+import { logTeamActivity } from './lib/team-activity.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
@@ -939,6 +940,21 @@ async function main() {
         })
       : null;
     const delegatedTarget = delegationContext?.recommendation?.targetAgentId || '';
+    const delegationDecision = delegationContext?.recommendation
+      ? {
+          reason: String(delegationContext.recommendation.reason || '').trim(),
+          selected: delegatedTarget || '',
+          selectedConfidence: Number(delegationContext.recommendation.confidence || 0),
+          candidates: Array.isArray(delegationContext.candidates)
+            ? delegationContext.candidates.slice(0, 5).map((c) => ({
+                agentId: String(c.agentId || '').trim(),
+                title: String(c.title || '').trim(),
+                confidence: Number(c.confidence || 0),
+                score: Number(c.score || 0),
+              }))
+            : [],
+        }
+      : null;
     const presetDelegationPlan = delegatedTarget
       ? {
           mode: 'tool',
@@ -947,13 +963,17 @@ async function main() {
           answer_style: 'short',
         }
       : null;
-    if (presetDelegationPlan) {
-      console.log('[agent-router]', JSON.stringify({
-        target: delegatedTarget,
-        score: delegationContext?.recommendation?.score ?? 0,
-        matchedSkills: delegationContext?.recommendation?.matchedSkills || [],
-        blocked: delegationContext?.recommendation?.blocked === true,
-      }));
+    if (presetDelegationPlan && delegationDecision) {
+      logTeamActivity({
+        type: 'delegation_decision',
+        agentId,
+        targetAgentId: delegatedTarget,
+        status: delegationContext?.recommendation?.blocked ? 'blocked' : 'ok',
+        depth: 0,
+        jid,
+        message: `Delegation decision selected ${delegatedTarget}`,
+        details: delegationDecision,
+      });
     }
     // Step 3: intent planner — one small LLM call before loading any tool schemas.
     const intentPlan = presetDelegationPlan || (enabledSkillIds.length > 0

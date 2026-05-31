@@ -79,6 +79,13 @@ const checks = [
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
   {
+    name: 'Team activity renders delegation decision confidence details',
+    ok: html.includes("type === 'delegation_decision'") &&
+      html.includes('<strong>Reason:</strong>') &&
+      html.includes('<strong>Candidate Agents:</strong>') &&
+      html.includes('selectedConfidence'),
+  },
+  {
     name: 'Team hash route without agent id opens map page',
     ok: /if \(!subFile\)[\s\S]*name: 'team'/.test(html),
   },

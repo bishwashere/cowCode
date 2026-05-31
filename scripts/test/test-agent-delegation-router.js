@@ -44,6 +44,12 @@ async function run() {
     availableSkillIds,
   });
   assert(marketing?.recommendation?.targetAgentId === 'marketer', `Expected marketer recommendation, got ${marketing?.recommendation?.targetAgentId || 'none'}`);
+  assert(typeof marketing?.recommendation?.confidence === 'number', 'Expected confidence score on recommendation');
+  assert(
+    (marketing?.recommendation?.reason || '').toLowerCase().includes('request contains'),
+    `Expected natural-language reason, got: ${marketing?.recommendation?.reason || 'none'}`,
+  );
+  assert(Array.isArray(marketing?.candidates) && marketing.candidates.length >= 1, 'Expected ranked candidate list');
 
   const engineering = buildDelegationContext({
     agentId: 'main',
