@@ -23,7 +23,7 @@ import { executeSkill } from '../skills/executor.js';
 import { logTeamActivity } from '../lib/team-activity.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
 import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig, buildAgentTeamPromptBlock } from '../lib/agent-config.js';
-import { appendExchange, readLastPrivateExchanges } from '../lib/chat-log.js';
+import { appendExchange, readLastPrivateExchanges, resolveChatHistoryExchanges } from '../lib/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from '../lib/chat-session.js';
 import { buildSessionBootstrapContext } from '../lib/session-bootstrap.js';
 import { getOwnerLogJid } from '../lib/owner-config.js';
@@ -45,10 +45,7 @@ import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditR
 import { buildToolAuditRewriteInstruction } from '../lib/user-reply-style.js';
 
 // Match Telegram/WhatsApp default. Override via COWCODE_DASHBOARD_HISTORY env if needed.
-const DASHBOARD_HISTORY_EXCHANGES = Math.max(
-  1,
-  Math.floor(Number(process.env.COWCODE_DASHBOARD_HISTORY)) || 5
-);
+const DASHBOARD_HISTORY_EXCHANGES = resolveChatHistoryExchanges(process.env.COWCODE_DASHBOARD_HISTORY);
 
 dotenv.config({ path: getEnvPath() });
 

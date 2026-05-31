@@ -35,6 +35,7 @@
     "test:tide": "node scripts/test/test-tide.js",
     "test:tide-checklist": "node scripts/test/test-tide-checklist.js",
     "test:chat-session": "node scripts/test/test-chat-session.js",
+    "test:chat-history": "node scripts/test/test-chat-history.js",
     "test:session-bootstrap": "node scripts/test/test-session-bootstrap.js",
     "test:memory-index-files": "node scripts/test/test-memory-index-files.js",
     "test:workspace-chat-days": "node scripts/test/test-workspace-chat-days.js",

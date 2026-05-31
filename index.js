@@ -63,7 +63,7 @@ import {
   beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from './lib/retrospective.js';
-import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges } from './lib/chat-log.js';
+import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, resolveChatHistoryExchanges } from './lib/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
 import {
@@ -488,7 +488,7 @@ async function main() {
 
   const MAX_REPLIED_IDS = 500;
   const MAX_OUR_SENT_IDS = 200;
-  const MAX_CHAT_HISTORY_EXCHANGES = Math.max(1, Math.floor(Number(config.chatHistoryExchanges)) || 5);
+  const MAX_CHAT_HISTORY_EXCHANGES = resolveChatHistoryExchanges(config.chatHistoryExchanges);
 
   /** Pending WhatsApp replies when send failed (e.g. disconnected); flushed when connection reopens. */
   const pendingReplies = [];
@@ -587,8 +587,8 @@ async function main() {
       logJid: isTgGroup ? undefined : tideLogJid,
     }).block;
     const historyMessages = isTgGroup
-      ? readLastGroupExchanges(getWorkspaceDir(), tideJid, 5, tideSessionId)
-      : readLastPrivateExchanges(getWorkspaceDir(), tideLogJid, 5, tideSessionId);
+      ? readLastGroupExchanges(getWorkspaceDir(), tideJid, MAX_CHAT_HISTORY_EXCHANGES, tideSessionId)
+      : readLastPrivateExchanges(getWorkspaceDir(), tideLogJid, MAX_CHAT_HISTORY_EXCHANGES, tideSessionId);
     // Old UX preserved: only send one follow-up per "round". Once we've sent a Tide message,
     // don't send another until the user replies. The health check above still runs every cycle.
     const lastUserMsg = historyMessages.length >= 2 ? historyMessages[historyMessages.length - 2] : null;
