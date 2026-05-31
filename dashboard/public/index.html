@@ -273,6 +273,30 @@
       background: rgba(250, 204, 21, 0.15);
       color: #eab308;
     }
+    .team-agent-metrics-list {
+      flex: 1 1 0;
+      overflow: auto;
+      padding: 0.55rem 0.65rem;
+    }
+    .team-agent-metrics-card {
+      font-size: 0.74rem;
+      line-height: 1.45;
+    }
+    .team-agent-metrics-card h4 {
+      margin: 0 0 0.55rem 0;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .team-agent-metrics-row {
+      margin-bottom: 0.4rem;
+    }
+    .team-agent-metrics-row strong {
+      font-weight: 600;
+    }
+    .team-agent-metrics-skills {
+      margin: 0.15rem 0 0 0;
+      padding-left: 1.1rem;
+    }
     .team-activity-wrap {
       flex: 0 0 2.4rem;
       width: 2.4rem;
@@ -2066,7 +2090,7 @@
           <h2 class="chat-upper-right-title" style="margin:0;">Agent team</h2>
           <button type="button" id="team-page-create-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
         </div>
-        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent to open Inbox (history) or Active Context (live brain state). Use ✎ to edit.</p>
+        <p class="skill-meta" style="margin:0 0 0.45rem 0;">Click an agent for Inbox, Active Context, or Stats. Use ✎ to edit.</p>
       </div>
       <div class="team-page-body">
         <div class="team-map-wrap">
@@ -2082,6 +2106,7 @@
             <div class="team-agent-panel-tabs" role="tablist">
               <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab active" data-tab="inbox" role="tab" aria-selected="true">Inbox</button>
               <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab" data-tab="context" role="tab" aria-selected="false">Active Context</button>
+              <button type="button" id="team-agent-tab-stats" class="team-agent-panel-tab" data-tab="stats" role="tab" aria-selected="false">Stats</button>
             </div>
             <div class="team-agent-panel-body">
               <div id="team-agent-inbox-pane" class="team-agent-panel-pane" role="tabpanel">
@@ -2101,6 +2126,15 @@
                 <div id="team-agent-context-overview" class="team-agent-context-overview"></div>
                 <div id="team-agent-context-detail" class="team-agent-context-list">
                   <p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>
+                </div>
+              </div>
+              <div id="team-agent-stats-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+                <div class="team-agent-inbox-head">
+                  <h3 id="team-agent-stats-title">Agent Metrics</h3>
+                  <span id="team-agent-stats-subtitle" class="team-agent-inbox-sub">Historical performance</span>
+                </div>
+                <div id="team-agent-stats-detail" class="team-agent-metrics-list">
+                  <p class="team-agent-inbox-empty">Select an agent to view task and skill statistics.</p>
                 </div>
               </div>
             </div>
@@ -2360,6 +2394,7 @@
     var selectedTeamInboxAgentId = '';
     var teamAgentPanelTab = 'inbox';
     var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
+    var teamAgentMetricsSnapshot = { agents: {}, updatedAt: 0 };
     function isMemoryNotesFile(id) {
       return id === 'MEMORY.md';
     }
@@ -4720,6 +4755,7 @@
         renderTeamActivity();
         renderAgentInbox();
         renderAgentContext();
+        renderAgentMetrics();
         return agentMapData;
       } catch (_) {
         agentMapData = [{ id: 'main' }];
@@ -4727,6 +4763,7 @@
         renderTeamActivity();
         renderAgentInbox();
         renderAgentContext();
+        renderAgentMetrics();
         return agentMapData;
       }
     }
@@ -4751,14 +4788,17 @@
       });
       renderAgentInbox();
       renderAgentContext();
+      renderAgentMetrics();
     }
 
     function setTeamAgentPanelTab(tab) {
-      teamAgentPanelTab = tab === 'context' ? 'context' : 'inbox';
+      teamAgentPanelTab = tab === 'context' ? 'context' : (tab === 'stats' ? 'stats' : 'inbox');
       var inboxTab = document.getElementById('team-agent-tab-inbox');
       var contextTab = document.getElementById('team-agent-tab-context');
+      var statsTab = document.getElementById('team-agent-tab-stats');
       var inboxPane = document.getElementById('team-agent-inbox-pane');
       var contextPane = document.getElementById('team-agent-context-pane');
+      var statsPane = document.getElementById('team-agent-stats-pane');
       if (inboxTab) {
         inboxTab.classList.toggle('active', teamAgentPanelTab === 'inbox');
         inboxTab.setAttribute('aria-selected', teamAgentPanelTab === 'inbox' ? 'true' : 'false');
@@ -4767,8 +4807,13 @@
         contextTab.classList.toggle('active', teamAgentPanelTab === 'context');
         contextTab.setAttribute('aria-selected', teamAgentPanelTab === 'context' ? 'true' : 'false');
       }
+      if (statsTab) {
+        statsTab.classList.toggle('active', teamAgentPanelTab === 'stats');
+        statsTab.setAttribute('aria-selected', teamAgentPanelTab === 'stats' ? 'true' : 'false');
+      }
       if (inboxPane) inboxPane.hidden = teamAgentPanelTab !== 'inbox';
       if (contextPane) contextPane.hidden = teamAgentPanelTab !== 'context';
+      if (statsPane) statsPane.hidden = teamAgentPanelTab !== 'stats';
     }
 
     function renderAgentContextBullets(items) {
@@ -4850,6 +4895,59 @@
       if (subEl) subEl.textContent = 'What this agent is thinking about right now';
       var ctx = (teamAgentContextSnapshot.agents || {})[selectedTeamInboxAgentId] || { state: 'idle' };
       detail.innerHTML = renderAgentContextCard(selectedTeamInboxAgentId, ctx);
+    }
+
+    function renderAgentMetricsCard(agentId, metrics) {
+      var label = agentNameById(agentId);
+      var row = metrics || {
+        tasksHandled: 0,
+        delegatedOut: 0,
+        receivedFromOthers: 0,
+        averageExecutionSec: '0s',
+        mostUsedSkills: [],
+      };
+      var html = '<div class="team-agent-metrics-card"><h4>' + escapeHtml(label) + '</h4>';
+      html += '<div class="team-agent-metrics-row"><strong>Tasks handled:</strong> ' + escapeHtml(String(row.tasksHandled || 0)) + '</div>';
+      html += '<div class="team-agent-metrics-row"><strong>Delegated out:</strong> ' + escapeHtml(String(row.delegatedOut || 0)) + '</div>';
+      html += '<div class="team-agent-metrics-row"><strong>Received from others:</strong> ' + escapeHtml(String(row.receivedFromOthers || 0)) + '</div>';
+      html += '<div class="team-agent-metrics-row"><strong>Average execution:</strong> ' + escapeHtml(String(row.averageExecutionSec || '0s')) + '</div>';
+      html += '<div class="team-agent-metrics-row"><strong>Most used skills:</strong>';
+      var skills = Array.isArray(row.mostUsedSkills) ? row.mostUsedSkills : [];
+      if (!skills.length) {
+        html += '<br><span class="skill-meta">No skill usage recorded yet.</span>';
+      } else {
+        html += '<ul class="team-agent-metrics-skills">';
+        skills.forEach(function (s) {
+          var sid = typeof s === 'string' ? s : (s && s.skillId ? s.skillId : '');
+          if (!sid) return;
+          html += '<li>' + escapeHtml(sid) + '</li>';
+        });
+        html += '</ul>';
+      }
+      html += '</div></div>';
+      return html;
+    }
+
+    function renderAgentMetrics() {
+      var detail = document.getElementById('team-agent-stats-detail');
+      var titleEl = document.getElementById('team-agent-stats-title');
+      var subEl = document.getElementById('team-agent-stats-subtitle');
+      if (!detail) return;
+      if (!selectedTeamInboxAgentId) {
+        if (titleEl) titleEl.textContent = 'Agent Metrics';
+        if (subEl) subEl.textContent = 'Historical performance';
+        detail.innerHTML = '<p class="team-agent-inbox-empty">Select an agent to view task and skill statistics.</p>';
+        return;
+      }
+      var label = agentNameById(selectedTeamInboxAgentId);
+      if (titleEl) titleEl.textContent = label + ' — Stats';
+      if (subEl) subEl.textContent = 'Tasks, delegation, and skill usage';
+      var metrics = (teamAgentMetricsSnapshot.agents || {})[selectedTeamInboxAgentId] || null;
+      if (!metrics) {
+        detail.innerHTML = '<p class="team-agent-inbox-empty">Loading stats for ' + escapeHtml(label) + '…</p>';
+        return;
+      }
+      detail.innerHTML = renderAgentMetricsCard(selectedTeamInboxAgentId, metrics);
     }
 
     function buildAgentInboxFlows(agentId) {
@@ -5202,23 +5300,42 @@
       renderAgentContext();
     }
 
+    async function fetchTeamMetricsFeed() {
+      try {
+        var r = await fetch(API + '/api/team/metrics');
+        if (!r.ok) return;
+        var d = await r.json().catch(function () { return {}; });
+        teamAgentMetricsSnapshot = {
+          agents: d.agents && typeof d.agents === 'object' ? d.agents : {},
+          updatedAt: Number(d.updatedAt) || 0,
+        };
+      } catch (_) {}
+      renderAgentMetrics();
+    }
+
     function startTeamActivityFeed() {
       if (teamActivityPollTimer) return;
       fetchTeamActivityFeed();
       fetchTeamContextFeed();
+      fetchTeamMetricsFeed();
       teamActivityPollTimer = setInterval(function () {
         fetchTeamActivityFeed();
         fetchTeamContextFeed();
+        fetchTeamMetricsFeed();
       }, TEAM_ACTIVITY_POLL_MS);
     }
 
     var teamAgentTabInboxEl = document.getElementById('team-agent-tab-inbox');
     var teamAgentTabContextEl = document.getElementById('team-agent-tab-context');
+    var teamAgentTabStatsEl = document.getElementById('team-agent-tab-stats');
     if (teamAgentTabInboxEl) {
       teamAgentTabInboxEl.addEventListener('click', function () { setTeamAgentPanelTab('inbox'); });
     }
     if (teamAgentTabContextEl) {
       teamAgentTabContextEl.addEventListener('click', function () { setTeamAgentPanelTab('context'); });
+    }
+    if (teamAgentTabStatsEl) {
+      teamAgentTabStatsEl.addEventListener('click', function () { setTeamAgentPanelTab('stats'); });
     }
     setTeamAgentPanelTab('inbox');
 

@@ -92,12 +92,19 @@ const checks = [
       html.includes('/api/team/context'),
   },
   {
-    name: 'Active context shows goal step waiting facts state',
-    ok: html.includes('Current Goal:') &&
-      html.includes('Current Step:') &&
-      html.includes('Waiting For:') &&
-      html.includes('Known Facts:') &&
-      html.includes('team-agent-context-state'),
+    name: 'Team page includes agent metrics stats tab',
+    ok: html.includes('id="team-agent-tab-stats"') &&
+      html.includes('id="team-agent-stats-detail"') &&
+      html.includes('renderAgentMetrics') &&
+      html.includes('/api/team/metrics'),
+  },
+  {
+    name: 'Agent metrics shows tasks delegation and skills',
+    ok: html.includes('Tasks handled:') &&
+      html.includes('Delegated out:') &&
+      html.includes('Received from others:') &&
+      html.includes('Average execution:') &&
+      html.includes('Most used skills:'),
   },
   {
     name: 'Team activity renders delegation decision confidence details',
