@@ -11,7 +11,23 @@ import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { spawnSync, spawn } from 'child_process';
 import { getConfigPath, getEnvPath, getAuthDir, getCronStorePath, ensureStateDir, getWorkspaceDir } from './lib/paths.js';
-import { defaultTideChecklistBlock } from './lib/tide-checklist.js';
+
+/** Default Tide checklist block — inlined so setup.js does not import tide-checklist.js (needs dotenv) before deps install. */
+function defaultTideChecklistBlock() {
+  return {
+    enabled: false,
+    triggers: { onRestart: true, onCycle: true, onFollowUp: false },
+    items: [
+      {
+        id: 'telegram-polling',
+        label: 'Telegram polling health',
+        prompt:
+          'Confirm Telegram bot polling is healthy and the daemon can receive messages. Use tools if needed. Report OK or FAIL briefly.',
+        enabled: true,
+      },
+    ],
+  };
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = __dirname;
