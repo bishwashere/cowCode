@@ -23,7 +23,7 @@ Natural user messages only — see [E2E.md](../E2E.md).
 ### Browser (search/navigate)
 - summarize the Wikipedia page on quantum computing
 - what's the current price of Bitcoin?
-- search for flights from Kathmandu to New York next week
+- find flights from Kathmandu to New York next week
 - find the latest iPhone 16 reviews on tech sites
 - go to nytimes.com and give me today's top stories
 - weather forecast for Camp Hill, Pennsylvania tomorrow

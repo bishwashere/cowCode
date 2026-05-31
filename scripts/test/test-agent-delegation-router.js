@@ -58,15 +58,37 @@ async function run() {
     `Expected marketer recommendation for marketing typo, got ${marketingTypo?.recommendation?.targetAgentId || 'none'}`,
   );
 
+  await patchAgentConfig('marketer', { title: 'Chloe' });
+  const afterRename = buildDelegationContext({
+    agentId: 'main',
+    userText: "What's our company tagline for marketing materials?",
+    availableSkillIds,
+  });
+  assert(
+    afterRename?.recommendation?.targetAgentId === 'marketer',
+    `Expected marketer after title rename to Chloe, got ${afterRename?.recommendation?.targetAgentId || 'none'} (score=${afterRename?.candidates?.[0]?.score})`,
+  );
+
   await patchAgentConfig('main', { agentMessaging: { allow: ['marketer'] } });
-  const alexNotLinked = buildDelegationContext({
+  const backendNotLinkedNatural = buildDelegationContext({
+    agentId: 'main',
+    userText: 'Can you investigate why our GitHub CI check is failing and propose a fix?',
+    availableSkillIds,
+  });
+  assert(
+    backendNotLinkedNatural?.recommendation?.targetAgentId !== 'alex',
+    `Expected no alex recommendation when backend agent is not linked, got ${JSON.stringify(backendNotLinkedNatural?.recommendation || null)}`,
+  );
+
+  // Unit contract only: explicit agent name when target exists but is not linked.
+  const alexNotLinkedExplicit = buildDelegationContext({
     agentId: 'main',
     userText: "Can you check with Alex if he's around?",
     availableSkillIds,
   });
   assert(
-    alexNotLinked?.recommendation?.targetAgentId === 'alex' && alexNotLinked?.recommendation?.blocked === true,
-    `Expected blocked explicit alex recommendation, got ${JSON.stringify(alexNotLinked?.recommendation || null)}`,
+    alexNotLinkedExplicit?.recommendation?.targetAgentId === 'alex' && alexNotLinkedExplicit?.recommendation?.blocked === true,
+    `Expected blocked explicit alex recommendation, got ${JSON.stringify(alexNotLinkedExplicit?.recommendation || null)}`,
   );
 
   console.log('agent-delegation-router tests passed');

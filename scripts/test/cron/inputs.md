@@ -11,12 +11,12 @@ Natural user messages only — see [E2E.md](../E2E.md).
 ### List
 - List my reminders
 - What's scheduled?
-- Which crons are set?
+- Do I have anything scheduled?
 - Do I have any reminders?
-- Show my scheduled jobs
+- Show my scheduled reminders
 
 ### Add
-- Remind me in 2 minutes to test the cron
+- Remind me in 2 minutes to water the plants
 - Remind me to call John in 3 minutes
 - Send me a hello message in 1 minute
 - remind me in 5 minutes to drink water

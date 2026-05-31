@@ -20,7 +20,7 @@ const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 const READ_QUERIES = [
-  'Read the file config.json in the workspace and tell me what is in it.',
+  "What's in config.json in the workspace?",
   'Show me the first 15 lines of workspace/config.json.',
 ];
 

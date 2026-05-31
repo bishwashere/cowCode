@@ -30,14 +30,14 @@ const PER_TEST_TIMEOUT_MS = 120_000;
 const CRON_LIST_QUERIES = [
   "List my reminders",
   "What's scheduled?",
-  "Which crons are set?",
+  "Do I have anything scheduled?",
   "Do I have any reminders?",
-  "Show my scheduled jobs",
+  "Show my scheduled reminders",
 ];
 
 // Cron add: user asks to create a reminder (cron tool action "add").
 const CRON_ADD_QUERIES = [
-  "Remind me in 2 minutes to test the cron",
+  "Remind me in 2 minutes to water the plants",
   "Remind me to call John in 3 minutes",
   "Send me a hello message in 1 minute",
   "remind me in 5 minutes to drink water",

@@ -86,10 +86,32 @@
       flex-direction: column;
       gap: 0.55rem;
     }
+    .team-view-toolbar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.65rem;
+    }
     .team-view-tabs {
       flex-shrink: 0;
       display: flex;
       gap: 0.35rem;
+    }
+    .team-view-active-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 0;
+      font-size: 0.72rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .team-view-active-toggle input {
+      margin: 0;
+      accent-color: var(--accent);
     }
     .team-view-tab {
       margin: 0;
@@ -2229,9 +2251,15 @@
       </div>
       <div class="team-page-body">
         <div class="team-map-wrap">
-          <div class="team-view-tabs" role="tablist">
-            <button type="button" id="team-view-tab-cards" class="team-view-tab active" data-view="cards" role="tab" aria-selected="true">Cards</button>
-            <button type="button" id="team-view-tab-tree" class="team-view-tab" data-view="tree" role="tab" aria-selected="false">Tree</button>
+          <div class="team-view-toolbar">
+            <div class="team-view-tabs" role="tablist">
+              <button type="button" id="team-view-tab-cards" class="team-view-tab active" data-view="cards" role="tab" aria-selected="true">Cards</button>
+              <button type="button" id="team-view-tab-tree" class="team-view-tab" data-view="tree" role="tab" aria-selected="false">Tree</button>
+            </div>
+            <label class="team-view-active-toggle" for="team-view-active-only">
+              <input type="checkbox" id="team-view-active-only">
+              View Active Only
+            </label>
           </div>
           <div id="team-cards-view" class="team-cards-view">
             <div id="team-agent-cards" class="team-agent-cards-row">
@@ -2540,6 +2568,7 @@
     var selectedTeamInboxAgentId = '';
     var teamAgentPanelTab = 'context';
     var teamViewMode = 'cards';
+    var teamViewActiveOnly = false;
     var teamAgentContextSnapshot = { agents: {}, updatedAt: 0 };
     var teamAgentMetricsSnapshot = { agents: {}, updatedAt: 0 };
     function isMemoryNotesFile(id) {
@@ -2963,6 +2992,28 @@
       var text = formatAgentStateDisplay(state).text;
       var sp = text.indexOf(' ');
       return sp >= 0 ? text.slice(sp + 1) : text;
+    }
+
+    function isAgentContextActive(agentId) {
+      var ctx = (teamAgentContextSnapshot.agents || {})[String(agentId || '').trim()] || { state: 'idle' };
+      var s = String(ctx.state || 'idle').toLowerCase();
+      if (s === 'blocked') s = 'waiting';
+      return s !== 'idle';
+    }
+
+    function getTeamAgentsForView(agents) {
+      var list = Array.isArray(agents) ? agents.slice() : [];
+      if (!teamViewActiveOnly) return list;
+      return list.filter(function (a) { return isAgentContextActive(a && a.id); });
+    }
+
+    function setTeamViewActiveOnly(enabled) {
+      teamViewActiveOnly = !!enabled;
+      var input = document.getElementById('team-view-active-only');
+      if (input) input.checked = teamViewActiveOnly;
+      renderTeamAgentCards();
+      renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
+      renderAgentContextOverview();
     }
 
     var agentCreateModalOpen = false;
@@ -4820,6 +4871,7 @@
       if (!els.nodes || !els.inner) return;
       var agents = agentMapData || [];
       var markerPrefix = prefix === 'agent-map' ? 'agent' : 'team';
+      if (mode === 'edit-page') agents = getTeamAgentsForView(agents);
       if (!agents.length) {
         els.nodes.innerHTML = '';
         agentMapLastLayouts[prefix] = null;
@@ -5015,9 +5067,11 @@
     function renderTeamAgentCards() {
       var row = document.getElementById('team-agent-cards');
       if (!row) return;
-      var agents = agentMapData || [];
+      var agents = getTeamAgentsForView(agentMapData || []);
       if (!agents.length) {
-        row.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No agents yet.</p>';
+        row.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">' +
+          (teamViewActiveOnly ? 'No active agents right now.' : 'No agents yet.') +
+        '</p>';
         return;
       }
       row.innerHTML = agents.map(function (a) {
@@ -5124,9 +5178,9 @@
     function renderAgentContextOverview() {
       var el = document.getElementById('team-agent-context-overview');
       if (!el) return;
-      var agents = agentMapData || [];
+      var agents = getTeamAgentsForView(agentMapData || []);
       if (!agents.length) {
-        el.innerHTML = '';
+        el.innerHTML = teamViewActiveOnly ? 'No active agents.' : '';
         return;
       }
       el.innerHTML = agents.map(function (a) {
@@ -5622,6 +5676,13 @@
       teamViewTabTreeEl.addEventListener('click', function () { setTeamViewTab('tree'); });
     }
     setTeamViewTab('cards');
+
+    var teamViewActiveOnlyEl = document.getElementById('team-view-active-only');
+    if (teamViewActiveOnlyEl) {
+      teamViewActiveOnlyEl.addEventListener('change', function () {
+        setTeamViewActiveOnly(!!teamViewActiveOnlyEl.checked);
+      });
+    }
 
     var teamActivityToggleEl = document.getElementById('team-activity-toggle');
     if (teamActivityToggleEl) {

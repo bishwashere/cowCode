@@ -13,4 +13,4 @@ Natural user messages only — see [E2E.md](../E2E.md).
 ### Queries
 - In e2e-edit-target.txt replace Hello with Hi
 - In the file e2e-edit-target.txt change world to planet
-- Edit e2e-edit-target.txt: replace "Edit this line" with "Edited line"
+- In e2e-edit-target.txt, replace "Edit this line" with "Edited line"

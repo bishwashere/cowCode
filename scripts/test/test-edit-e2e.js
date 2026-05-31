@@ -25,7 +25,7 @@ const EDIT_INITIAL_CONTENT = 'Hello world\nEdit this line for E2E.\n';
 const EDIT_QUERIES = [
   `In ${EDIT_TARGET_FILE} replace Hello with Hi`,
   `In the file ${EDIT_TARGET_FILE} change world to planet`,
-  `Edit ${EDIT_TARGET_FILE}: replace "Edit this line" with "Edited line"`,
+  `In ${EDIT_TARGET_FILE}, replace "Edit this line" with "Edited line"`,
 ];
 
 function runE2E(userMessage, opts = {}) {

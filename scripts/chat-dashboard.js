@@ -16,6 +16,9 @@ import { getSkillContext, getEnabledSkillIds, getEnabledSkillSummaries } from '.
 import { runAgentTurn } from '../lib/agent.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 import { planIntent, intentPlanToSystemBlock } from '../lib/intent-planner.js';
+import { buildDelegationContext } from '../lib/agent-delegation-router.js';
+import { executeSkill } from '../skills/executor.js';
+import { logTeamActivity } from '../lib/team-activity.js';
 import { buildOneOnOneSystemPrompt } from '../lib/system-prompt.js';
 import { DEFAULT_AGENT_ID, ensureMainAgentInitialized, loadAgentConfig, buildAgentTeamPromptBlock } from '../lib/agent-config.js';
 import { appendExchange, readLastPrivateExchanges } from '../lib/chat-log.js';
@@ -125,18 +128,61 @@ async function main() {
   // Step 1: cheap config-only skill ID list (no SKILL.md reads yet).
   const enabledSkillIds = getEnabledSkillIds({ agentId });
   const enabledSkillSummaries = getEnabledSkillSummaries({ agentId });
-  // Step 2: intent planner — one small LLM call before loading any tool schemas.
-  const intentPlan = enabledSkillIds.length > 0
+  // Step 2: specialization-aware delegation check before planner (same as index.js private chat).
+  const delegationContext = buildDelegationContext({
+    agentId,
+    userText: message,
+    availableSkillIds: enabledSkillIds,
+  });
+  const delegatedTarget = delegationContext?.recommendation?.targetAgentId || '';
+  const delegationDecision = delegationContext?.recommendation
+    ? {
+        reason: String(delegationContext.recommendation.reason || '').trim(),
+        selected: delegatedTarget || '',
+        selectedConfidence: Number(delegationContext.recommendation.confidence || 0),
+        candidates: Array.isArray(delegationContext.candidates)
+          ? delegationContext.candidates.slice(0, 5).map((c) => ({
+              agentId: String(c.agentId || '').trim(),
+              title: String(c.title || '').trim(),
+              confidence: Number(c.confidence || 0),
+              score: Number(c.score || 0),
+            }))
+          : [],
+      }
+    : null;
+  const presetDelegationPlan = delegatedTarget
+    ? {
+        mode: 'tool',
+        skills: ['agent-send'],
+        plan: `Delegate to ${delegatedTarget} via agent-send first; that agent is the best specialization match for this request.`,
+        answer_style: 'short',
+      }
+    : null;
+  if (presetDelegationPlan && delegationDecision) {
+    logTeamActivity({
+      type: 'delegation_decision',
+      agentId,
+      targetAgentId: delegatedTarget,
+      status: delegationContext?.recommendation?.blocked ? 'blocked' : 'ok',
+      depth: 0,
+      jid: dashboardJid,
+      message: `Delegation decision selected ${delegatedTarget}`,
+      details: delegationDecision,
+    });
+  }
+  // Step 3: intent planner — one small LLM call before loading any tool schemas.
+  const intentPlan = presetDelegationPlan || (enabledSkillIds.length > 0
     ? await planIntent({
         userText: message,
         historyMessages,
         availableSkillIds: enabledSkillIds,
         availableSkillSummaries: enabledSkillSummaries,
         agentId,
+        delegationContext,
       })
-    : null;
+    : null);
   if (intentPlan) process.stderr.write('[intent-planner] ' + JSON.stringify(intentPlan) + '\n');
-  // Step 3: load tool schemas based on what the planner returned.
+  // Step 4: load tool schemas based on what the planner returned.
   //   intentPlan === null      → planner failed  → full tools (safe fallback)
   //   intentPlan.skills = []   → planner: chat   → skip schema loading entirely, no tools
   //   intentPlan.skills = [...] → planner: tools  → load only selected schemas
@@ -159,19 +205,45 @@ async function main() {
   if (retroBlock) systemPrompt += retroBlock;
 
   try {
-    const { textToSend } = await runAgentTurn({
-      userText: message,
-      ctx,
-      systemPrompt,
-      tools: toolsToUse,
-      historyMessages,
-      getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
-      resolveToolName: skillContext?.resolveToolName ?? (() => null),
-      onToolProgress: (msg) => {
-        const m = msg != null ? String(msg).trim() : '';
-        if (m) writeNdjsonLine({ type: 'progress', message: m });
-      },
-    });
+    let textToSend = '';
+    let skillsCalled = [];
+    if (presetDelegationPlan && delegatedTarget) {
+      try {
+        const forcedRaw = await executeSkill('agent-send', ctx, {
+          agent: delegatedTarget,
+          message,
+        });
+        const forced = JSON.parse(forcedRaw || '{}');
+        if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {
+          const label = forced.agentTitle || forced.agent || delegatedTarget;
+          textToSend = `[CowCode] ${label} replied: ${forced.reply.trim()}`;
+          skillsCalled = ['agent-send'];
+        } else if (forced && typeof forced.error === 'string') {
+          textToSend = `[CowCode] ${forced.error.trim()}`;
+          skillsCalled = ['agent-send'];
+        }
+      } catch (_) {}
+    }
+    if (!textToSend) {
+      const turn = await runAgentTurn({
+        userText: message,
+        ctx,
+        systemPrompt,
+        tools: toolsToUse,
+        historyMessages,
+        getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
+        resolveToolName: skillContext?.resolveToolName ?? (() => null),
+        onToolProgress: (msg) => {
+          const m = msg != null ? String(msg).trim() : '';
+          if (m) writeNdjsonLine({ type: 'progress', message: m });
+        },
+      });
+      textToSend = turn?.textToSend || '';
+      skillsCalled = Array.isArray(turn?.skillsCalled) ? turn.skillsCalled : [];
+    }
+    if (skillsCalled.length) {
+      process.stderr.write('[dashboard-skills] ' + skillsCalled.join(',') + '\n');
+    }
     const reply = formatDashboardReply(textToSend);
     const exchange = {
       user: message,

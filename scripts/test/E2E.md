@@ -17,7 +17,7 @@ Only **transport** is skipped (mock socket instead of Telegram send). Routing, p
 2. **Skill / delegation behavior** — real tool calls when the model chooses them (not because the test text names a skill).
 3. **Whether the user got what they wanted** — a separate LLM **judge** reads the user message and bot reply (YES/NO).
 
-**Test prompts must sound like real users.** Do not put tool names (`agent-send`, `search`, etc.) or meta-instructions (`Reply with their exact answer`) in user messages unless the scenario is explicitly about testing a command (e.g. `/browse-reset`).
+**Test prompts must sound like real users.** Do not put tool names (`agent-send`, `search`, `browse`, `cron`, etc.), agent names (`ask Alex`, `ask the marketer`), or meta-instructions (`Reply with their exact answer`, `use the X skill`) in user messages unless the scenario is explicitly about testing a slash command (e.g. `/browse-reset`) or a **unit contract** that documents why the literal string is required.
 
 ## What we are NOT doing in E2E tests
 

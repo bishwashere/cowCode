@@ -104,6 +104,13 @@ const checks = [
       html.includes('/api/team/context'),
   },
   {
+    name: 'Team page has View Active Only toggle',
+    ok: html.includes('id="team-view-active-only"') &&
+      html.includes('View Active Only') &&
+      html.includes('setTeamViewActiveOnly') &&
+      html.includes('getTeamAgentsForView'),
+  },
+  {
     name: 'Team page has cards and tree view tabs',
     ok: html.includes('id="team-view-tab-cards"') &&
       html.includes('id="team-view-tab-tree"') &&

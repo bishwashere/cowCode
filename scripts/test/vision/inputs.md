@@ -8,5 +8,5 @@ Natural user messages only — see [E2E.md](../E2E.md).
 
 ## Inputs
 
-- Generate a simple image of a blue circle and tell me when it is done.
-- Create an image of a sunset and confirm you created it.
+- I need a simple blue circle image — let me know when it is ready.
+- Make me a picture of a sunset and tell me when it is done.

@@ -137,12 +137,16 @@ export function runDashboardE2E(message, opts = {}) {
           if (evt.type === 'done' && evt.reply) reply = String(evt.reply).trim();
         } catch (_) {}
       }
-      const skillsMatch = stderr.match(/\[intent-planner\]\s*(\{[\s\S]*?\})/);
+      const skillsMatch = stderr.match(/\[dashboard-skills\]\s*(.+)/) || stderr.match(/\[intent-planner\]\s*(\{[\s\S]*?\})/);
       if (skillsMatch) {
-        try {
-          const plan = JSON.parse(skillsMatch[1]);
-          if (Array.isArray(plan.skills)) skillsCalled = plan.skills;
-        } catch (_) {}
+        if (skillsMatch[1].startsWith('{')) {
+          try {
+            const plan = JSON.parse(skillsMatch[1]);
+            if (Array.isArray(plan.skills)) skillsCalled = plan.skills;
+          } catch (_) {}
+        } else {
+          skillsCalled = skillsMatch[1].trim().split(',').map((s) => s.trim()).filter(Boolean);
+        }
       }
       if (!reply) {
         reject(new Error(`No dashboard reply (code ${code}). stderr: ${stderr.slice(-500)}`));

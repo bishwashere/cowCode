@@ -8,5 +8,5 @@ Natural user messages only — see [E2E.md](../E2E.md).
 
 ## Inputs
 
-- Read the file config.json in the workspace and tell me what is in it.
+- What's in config.json in the workspace?
 - Show me the first 15 lines of workspace/config.json.

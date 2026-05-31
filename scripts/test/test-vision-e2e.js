@@ -24,8 +24,8 @@ const E2E_REPLY_MARKER_END = 'E2E_REPLY_END';
 const PER_TEST_TIMEOUT_MS = 120_000;
 
 const VISION_QUERIES = [
-  'Generate a simple image of a blue circle and tell me when it is done.',
-  'Create an image of a sunset and confirm you created it.',
+  'I need a simple blue circle image — let me know when it is ready.',
+  'Make me a picture of a sunset and tell me when it is done.',
 ];
 
 function createTempStateDir() {
