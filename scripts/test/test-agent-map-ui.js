@@ -112,7 +112,7 @@ const checks = [
     name: 'Team page uses right-side split layout',
     ok: html.includes('class="team-page-body"') &&
       html.includes('id="team-roster-side"') &&
-      /\.team-roster-side\s*\{[^}]*flex-direction:\s*row/s.test(html) &&
+      /\.team-roster-side\s*\{[^}]*flex-direction:\s*column/s.test(html) &&
       /\.team-roster-side\s*\{[^}]*border-left:\s*1px/s.test(html),
   },
   {

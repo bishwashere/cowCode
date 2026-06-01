@@ -386,29 +386,35 @@
       flex: 1 1 0;
     }
     .team-roster-side {
-      flex: 0 0 auto;
-      min-height: 0;
-      display: flex;
-      flex-direction: row;
-      align-items: stretch;
-      gap: 0.45rem;
-      border-left: 1px solid var(--border);
-      padding-left: 0.55rem;
-    }
-    .team-rail-wrap {
       flex: 0 0 2.4rem;
       width: 2.4rem;
       min-width: 2.4rem;
       min-height: 0;
-      overflow: hidden;
       display: flex;
       flex-direction: column;
+      align-items: stretch;
+      gap: 0.45rem;
+      border-left: 1px solid var(--border);
+      padding-left: 0.55rem;
       transition: width 0.2s ease, flex-basis 0.2s ease;
     }
-    .team-rail-wrap.expanded {
+    .team-roster-side:has(.team-rail-wrap.expanded) {
       flex-basis: min(20vw, 14rem);
       width: min(20vw, 14rem);
       min-width: 11rem;
+    }
+    .team-rail-wrap {
+      flex: 0 0 auto;
+      width: 100%;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .team-roster-side:has(.team-rail-wrap.expanded) .team-rail-wrap.expanded {
+      flex: 1 1 0;
+      min-height: 6rem;
     }
     .team-rail-wrap.expanded .team-rail-body,
     .team-rail-wrap.expanded .team-activity-list {
