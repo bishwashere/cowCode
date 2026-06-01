@@ -410,47 +410,18 @@
       width: min(20vw, 14rem);
       min-width: 11rem;
     }
-    .team-agent-panel-slot {
-      flex: 0 0 2.4rem;
-      width: 2.4rem;
-      min-width: 2.4rem;
+    .team-rail-wrap.expanded .team-rail-body,
+    .team-rail-wrap.expanded .team-activity-list {
       min-height: 0;
+      flex: 1 1 0;
+      overflow: auto;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-      transition: width 0.2s ease, flex-basis 0.2s ease;
     }
-    .team-agent-panel-slot.expanded {
-      flex-basis: min(24vw, 18rem);
-      width: min(24vw, 18rem);
-      min-width: 13rem;
-    }
-    .team-agent-panel-slot.collapsed .team-agent-panel-ranges,
-    .team-agent-panel-slot.collapsed .team-agent-panel-body {
-      display: none;
-    }
-    .team-agent-panel-slot.collapsed .team-agent-panel-tabs {
-      flex-direction: column;
-      flex-wrap: nowrap;
-      align-items: center;
-      padding: 0.35rem 0.15rem;
-      border-bottom: none;
-      gap: 0.25rem;
+    .team-agent-rail-scroll {
       flex: 1 1 0;
-    }
-    .team-agent-panel-slot.collapsed .team-agent-panel-tab {
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
-      padding: 0.35rem 0.15rem;
-      font-size: 0.62rem;
-      letter-spacing: 0.03em;
-      border-radius: 4px;
-      border: 1px solid transparent;
-      white-space: nowrap;
-    }
-    .team-agent-panel-slot.collapsed .team-agent-panel-tab.active {
-      border-color: var(--border);
-      background: rgba(167, 139, 250, 0.08);
+      min-height: 0;
+      overflow: auto;
     }
     .team-goals-main {
       flex: 1 1 0;
@@ -2852,55 +2823,91 @@
                 </div>
               </div>
             </div>
-            <div id="team-agent-panel" class="team-agent-panel team-agent-panel-slot collapsed">
-              <div class="team-agent-panel-tabs" role="tablist">
-                <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
-                <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
-                <button type="button" id="team-agent-tab-outbox" class="team-agent-panel-tab" data-tab="outbox" role="tab" aria-selected="false">Outbox</button>
-                <button type="button" id="team-agent-tab-stats" class="team-agent-panel-tab" data-tab="stats" role="tab" aria-selected="false">Stats</button>
-              </div>
-              <div class="team-agent-panel-ranges" id="team-agent-panel-ranges" role="group" aria-label="Time range">
-                <button type="button" class="team-agent-panel-range active" data-range="today">Today</button>
-                <button type="button" class="team-agent-panel-range" data-range="yesterday">Yesterday</button>
-                <button type="button" class="team-agent-panel-range" data-range="last7">Last week</button>
-                <button type="button" class="team-agent-panel-range" data-range="last30">Last 30 days</button>
-                <button type="button" class="team-agent-panel-range" data-range="all">All time</button>
-              </div>
-              <div class="team-agent-panel-body">
-                <div id="team-agent-context-pane" class="team-agent-panel-pane" role="tabpanel">
+            <div id="team-context-wrap" class="team-rail-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Active Context</h3>
+                  <button type="button" id="team-context-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand active context panel">Context</button>
+                </div>
+                <div class="team-rail-body">
                   <div class="team-agent-inbox-head">
                     <h3 id="team-agent-context-title">Active Context</h3>
                     <span id="team-agent-context-subtitle" class="team-agent-inbox-sub">Present working memory</span>
                   </div>
                   <div id="team-agent-context-overview" class="team-agent-context-overview"></div>
-                  <div id="team-agent-context-detail" class="team-agent-context-list">
+                  <div id="team-agent-context-detail" class="team-agent-context-list team-agent-rail-scroll">
                     <p class="team-agent-inbox-empty">Select an agent to see what they are thinking about right now.</p>
                   </div>
                 </div>
-                <div id="team-agent-inbox-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+              </div>
+            </div>
+            <div id="team-inbox-wrap" class="team-rail-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Inbox</h3>
+                  <button type="button" id="team-inbox-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand inbox panel">Inbox</button>
+                </div>
+                <div class="team-rail-body">
                   <div class="team-agent-inbox-head">
                     <h3 id="team-agent-inbox-title">Agent Inbox</h3>
                     <span id="team-agent-inbox-subtitle" class="team-agent-inbox-sub">Tasks and assignments received</span>
                   </div>
-                  <div id="team-agent-inbox-list" class="team-agent-inbox-list">
+                  <div class="team-agent-panel-ranges" role="group" aria-label="Inbox time range">
+                    <button type="button" class="team-agent-panel-range active" data-range="today">Today</button>
+                    <button type="button" class="team-agent-panel-range" data-range="yesterday">Yesterday</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last7">Last week</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last30">Last 30 days</button>
+                    <button type="button" class="team-agent-panel-range" data-range="all">All time</button>
+                  </div>
+                  <div id="team-agent-inbox-list" class="team-agent-inbox-list team-agent-rail-scroll">
                     <p class="team-agent-inbox-empty">Select an agent to view incoming activity.</p>
                   </div>
                 </div>
-                <div id="team-agent-outbox-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+              </div>
+            </div>
+            <div id="team-outbox-wrap" class="team-rail-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Outbox</h3>
+                  <button type="button" id="team-outbox-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand outbox panel">Outbox</button>
+                </div>
+                <div class="team-rail-body">
                   <div class="team-agent-inbox-head">
                     <h3 id="team-agent-outbox-title">Agent Outbox</h3>
                     <span id="team-agent-outbox-subtitle" class="team-agent-inbox-sub">Delegations and replies sent</span>
                   </div>
-                  <div id="team-agent-outbox-list" class="team-agent-inbox-list">
+                  <div class="team-agent-panel-ranges" role="group" aria-label="Outbox time range">
+                    <button type="button" class="team-agent-panel-range active" data-range="today">Today</button>
+                    <button type="button" class="team-agent-panel-range" data-range="yesterday">Yesterday</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last7">Last week</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last30">Last 30 days</button>
+                    <button type="button" class="team-agent-panel-range" data-range="all">All time</button>
+                  </div>
+                  <div id="team-agent-outbox-list" class="team-agent-inbox-list team-agent-rail-scroll">
                     <p class="team-agent-inbox-empty">Select an agent to view outgoing activity.</p>
                   </div>
                 </div>
-                <div id="team-agent-stats-pane" class="team-agent-panel-pane" role="tabpanel" hidden>
+              </div>
+            </div>
+            <div id="team-stats-wrap" class="team-rail-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Stats</h3>
+                  <button type="button" id="team-stats-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand stats panel">Stats</button>
+                </div>
+                <div class="team-rail-body">
                   <div class="team-agent-inbox-head">
                     <h3 id="team-agent-stats-title">Agent Metrics</h3>
                     <span id="team-agent-stats-subtitle" class="team-agent-inbox-sub">Historical performance</span>
                   </div>
-                  <div id="team-agent-stats-detail" class="team-agent-metrics-list">
+                  <div class="team-agent-panel-ranges" role="group" aria-label="Stats time range">
+                    <button type="button" class="team-agent-panel-range active" data-range="today">Today</button>
+                    <button type="button" class="team-agent-panel-range" data-range="yesterday">Yesterday</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last7">Last week</button>
+                    <button type="button" class="team-agent-panel-range" data-range="last30">Last 30 days</button>
+                    <button type="button" class="team-agent-panel-range" data-range="all">All time</button>
+                  </div>
+                  <div id="team-agent-stats-detail" class="team-agent-metrics-list team-agent-rail-scroll">
                     <p class="team-agent-inbox-empty">Select an agent to view task and skill statistics.</p>
                   </div>
                 </div>
@@ -3207,7 +3214,6 @@
     var teamActivityLastTs = 0;
     var teamActivityPollTimer = null;
     var selectedTeamInboxAgentId = '';
-    var teamAgentPanelTab = 'context';
     var teamAgentPanelRange = 'today';
     var teamTopTab = 'roster';
     var teamViewMode = 'cards';
@@ -3247,7 +3253,7 @@
       if (name === 'home') fetchChatAgents();
       if (name === 'team') {
         setTeamTopTab('roster');
-        setTeamAgentPanelTab('context');
+        setTeamRailExpanded('context', false);
         startTeamActivityFeed();
         fetchAgentMapData().then(function () {
           if (teamAgentId) {
@@ -5768,7 +5774,7 @@
       renderAgentMetrics();
       renderCurrentMission();
       renderTeamTaskSummary();
-      if (selectedTeamInboxAgentId) setTeamAgentPanelExpanded(true);
+      if (selectedTeamInboxAgentId) setTeamRailExpanded('context', true);
     }
 
     function setTeamViewTab(mode) {
@@ -6489,43 +6495,6 @@
       });
     }
 
-    function setTeamAgentPanelTab(tab) {
-      setTeamAgentPanelExpanded(true);
-      teamAgentPanelTab =
-        tab === 'context' ? 'context'
-          : tab === 'stats' ? 'stats'
-            : tab === 'outbox' ? 'outbox'
-              : 'inbox';
-      var inboxTab = document.getElementById('team-agent-tab-inbox');
-      var outboxTab = document.getElementById('team-agent-tab-outbox');
-      var contextTab = document.getElementById('team-agent-tab-context');
-      var statsTab = document.getElementById('team-agent-tab-stats');
-      var inboxPane = document.getElementById('team-agent-inbox-pane');
-      var outboxPane = document.getElementById('team-agent-outbox-pane');
-      var contextPane = document.getElementById('team-agent-context-pane');
-      var statsPane = document.getElementById('team-agent-stats-pane');
-      if (inboxTab) {
-        inboxTab.classList.toggle('active', teamAgentPanelTab === 'inbox');
-        inboxTab.setAttribute('aria-selected', teamAgentPanelTab === 'inbox' ? 'true' : 'false');
-      }
-      if (outboxTab) {
-        outboxTab.classList.toggle('active', teamAgentPanelTab === 'outbox');
-        outboxTab.setAttribute('aria-selected', teamAgentPanelTab === 'outbox' ? 'true' : 'false');
-      }
-      if (contextTab) {
-        contextTab.classList.toggle('active', teamAgentPanelTab === 'context');
-        contextTab.setAttribute('aria-selected', teamAgentPanelTab === 'context' ? 'true' : 'false');
-      }
-      if (statsTab) {
-        statsTab.classList.toggle('active', teamAgentPanelTab === 'stats');
-        statsTab.setAttribute('aria-selected', teamAgentPanelTab === 'stats' ? 'true' : 'false');
-      }
-      if (inboxPane) inboxPane.hidden = teamAgentPanelTab !== 'inbox';
-      if (outboxPane) outboxPane.hidden = teamAgentPanelTab !== 'outbox';
-      if (contextPane) contextPane.hidden = teamAgentPanelTab !== 'context';
-      if (statsPane) statsPane.hidden = teamAgentPanelTab !== 'stats';
-    }
-
     function renderAgentContextBullets(items) {
       if (!items || !items.length) return '';
       return '<ul class="team-agent-context-bullets">' + items.map(function (b) {
@@ -7164,27 +7133,39 @@
       list.innerHTML = rows || '<p class="team-activity-empty">No activity yet.</p>';
     }
 
-    var teamActivityExpanded = false;
-    var teamAgentPanelExpanded = false;
+    var teamRailExpanded = {
+      activity: false,
+      context: false,
+      inbox: false,
+      outbox: false,
+      stats: false,
+    };
+    var TEAM_RAIL_LABELS = {
+      activity: 'Activity',
+      context: 'Context',
+      inbox: 'Inbox',
+      outbox: 'Outbox',
+      stats: 'Stats',
+    };
 
-    function setTeamAgentPanelExpanded(nextExpanded) {
-      teamAgentPanelExpanded = !!nextExpanded;
-      var slot = document.getElementById('team-agent-panel');
-      if (!slot) return;
-      slot.classList.toggle('expanded', teamAgentPanelExpanded);
-      slot.classList.toggle('collapsed', !teamAgentPanelExpanded);
+    function setTeamRailExpanded(key, nextExpanded) {
+      if (!Object.prototype.hasOwnProperty.call(teamRailExpanded, key)) return;
+      teamRailExpanded[key] = !!nextExpanded;
+      var wrap = document.getElementById('team-' + key + '-wrap');
+      var toggle = document.getElementById('team-' + key + '-toggle');
+      if (!wrap || !toggle) return;
+      var label = TEAM_RAIL_LABELS[key] || key;
+      wrap.classList.toggle('expanded', teamRailExpanded[key]);
+      wrap.classList.toggle('collapsed', !teamRailExpanded[key]);
+      toggle.setAttribute('aria-expanded', teamRailExpanded[key] ? 'true' : 'false');
+      toggle.textContent = teamRailExpanded[key] ? 'Collapse' : label;
+      toggle.title = teamRailExpanded[key]
+        ? ('Collapse ' + label.toLowerCase() + ' panel')
+        : ('Expand ' + label.toLowerCase() + ' panel');
     }
 
     function setTeamActivityExpanded(nextExpanded) {
-      teamActivityExpanded = !!nextExpanded;
-      var wrap = document.getElementById('team-activity-wrap');
-      var toggle = document.getElementById('team-activity-toggle');
-      if (!wrap || !toggle) return;
-      wrap.classList.toggle('expanded', teamActivityExpanded);
-      wrap.classList.toggle('collapsed', !teamActivityExpanded);
-      toggle.setAttribute('aria-expanded', teamActivityExpanded ? 'true' : 'false');
-      toggle.textContent = teamActivityExpanded ? 'Collapse' : 'Activity';
-      toggle.title = teamActivityExpanded ? 'Collapse live activity panel' : 'Expand live activity panel';
+      setTeamRailExpanded('activity', nextExpanded);
     }
 
     async function fetchTeamActivityFeed() {
@@ -7301,28 +7282,21 @@
       }, TEAM_ACTIVITY_POLL_MS);
     }
 
-    var teamAgentTabInboxEl = document.getElementById('team-agent-tab-inbox');
-    var teamAgentTabOutboxEl = document.getElementById('team-agent-tab-outbox');
-    var teamAgentTabContextEl = document.getElementById('team-agent-tab-context');
-    var teamAgentTabStatsEl = document.getElementById('team-agent-tab-stats');
-    if (teamAgentTabInboxEl) {
-      teamAgentTabInboxEl.addEventListener('click', function () { setTeamAgentPanelTab('inbox'); });
-    }
-    if (teamAgentTabOutboxEl) {
-      teamAgentTabOutboxEl.addEventListener('click', function () { setTeamAgentPanelTab('outbox'); });
-    }
-    if (teamAgentTabContextEl) {
-      teamAgentTabContextEl.addEventListener('click', function () { setTeamAgentPanelTab('context'); });
-    }
-    if (teamAgentTabStatsEl) {
-      teamAgentTabStatsEl.addEventListener('click', function () { setTeamAgentPanelTab('stats'); });
-    }
+    Object.keys(TEAM_RAIL_LABELS).forEach(function (key) {
+      var toggle = document.getElementById('team-' + key + '-toggle');
+      if (!toggle) return;
+      toggle.addEventListener('click', function () {
+        setTeamRailExpanded(key, !teamRailExpanded[key]);
+      });
+    });
     document.querySelectorAll('.team-agent-panel-range').forEach(function (btn) {
       btn.addEventListener('click', function () {
         setTeamAgentPanelRange(btn.getAttribute('data-range'));
       });
     });
-    setTeamAgentPanelTab('context');
+    Object.keys(TEAM_RAIL_LABELS).forEach(function (key) {
+      setTeamRailExpanded(key, false);
+    });
     setTeamAgentPanelRange('today');
 
     var teamViewTabCardsEl = document.getElementById('team-view-tab-cards');
@@ -7394,15 +7368,6 @@
         teamGoalCreateEl.disabled = false;
       });
     }
-
-    var teamActivityToggleEl = document.getElementById('team-activity-toggle');
-    if (teamActivityToggleEl) {
-      teamActivityToggleEl.addEventListener('click', function () {
-        setTeamActivityExpanded(!teamActivityExpanded);
-      });
-    }
-    setTeamActivityExpanded(false);
-    setTeamAgentPanelExpanded(false);
 
     function stopTeamActivityFeed() {
       if (!teamActivityPollTimer) return;

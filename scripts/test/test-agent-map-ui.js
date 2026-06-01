@@ -105,7 +105,8 @@ const checks = [
   },
   {
     name: 'Team activity panel defaults to collapsed',
-    ok: html.includes('id="team-activity-wrap" class="team-rail-wrap team-activity-wrap collapsed"') && html.includes('setTeamActivityExpanded(false);'),
+    ok: html.includes('id="team-activity-wrap" class="team-rail-wrap team-activity-wrap collapsed"') &&
+      html.includes("setTeamRailExpanded(key, false)"),
   },
   {
     name: 'Team page uses right-side split layout',
@@ -115,33 +116,31 @@ const checks = [
       /\.team-roster-side\s*\{[^}]*border-left:\s*1px/s.test(html),
   },
   {
-    name: 'Team agent panel tabs wrap so Outbox is visible',
-    ok: /\.team-agent-panel-tabs\s*\{[^}]*flex-wrap:\s*wrap/s.test(html),
-  },
-  {
     name: 'Team page has activity feed polling hooks',
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
   {
-    name: 'Team agent panel sits beside activity on the right',
-    ok: html.includes('setTeamAgentPanelExpanded') &&
-      /id="team-roster-side"[\s\S]*id="team-activity-wrap"[\s\S]*id="team-agent-panel"/.test(html) &&
-      /\.team-agent-panel-slot[\s\S]*writing-mode:\s*vertical-rl/s.test(html) &&
-      html.includes('team-agent-inbox-list') &&
-      html.includes('selectTeamInboxAgent'),
+    name: 'Team side rails include activity context inbox outbox stats',
+    ok: html.includes('setTeamRailExpanded') &&
+      html.includes('id="team-activity-wrap"') &&
+      html.includes('id="team-context-wrap"') &&
+      html.includes('id="team-inbox-wrap"') &&
+      html.includes('id="team-outbox-wrap"') &&
+      html.includes('id="team-stats-wrap"') &&
+      /id="team-roster-side"[\s\S]*id="team-activity-wrap"[\s\S]*id="team-context-wrap"/.test(html),
   },
   {
-    name: 'Team page includes separate inbox and outbox tabs',
-    ok: html.includes('id="team-agent-tab-inbox"') &&
-      html.includes('id="team-agent-tab-outbox"') &&
+    name: 'Team page has separate inbox and outbox rails',
+    ok: html.includes('id="team-inbox-wrap"') &&
+      html.includes('id="team-outbox-wrap"') &&
       html.includes('renderAgentOutbox') &&
       html.includes('filterFlowsForMailbox') &&
-      html.includes("setTeamAgentPanelTab('outbox')"),
+      html.includes('team-agent-inbox-list') &&
+      html.includes('team-agent-outbox-list'),
   },
   {
-    name: 'Team agent panel has time range submenu',
-    ok: html.includes('id="team-agent-panel-ranges"') &&
-      html.includes('team-agent-panel-range') &&
+    name: 'Team agent rails have time range submenu',
+    ok: html.includes('team-agent-panel-range') &&
       html.includes('data-range="today"') &&
       html.includes('data-range="yesterday"') &&
       html.includes('data-range="last7"') &&
@@ -149,20 +148,19 @@ const checks = [
       html.includes('filterFlowsByTeamAgentRange'),
   },
   {
-    name: 'Active Context is first agent panel tab',
+    name: 'Active Context is first agent detail rail after activity',
     ok: (() => {
-      var contextIdx = html.indexOf('id="team-agent-tab-context"');
-      var inboxIdx = html.indexOf('id="team-agent-tab-inbox"');
-      return contextIdx >= 0 && inboxIdx > contextIdx &&
-        html.includes('id="team-agent-tab-context" class="team-agent-panel-tab active"') &&
-        html.includes("setTeamAgentPanelTab('context')") &&
-        html.includes("setTeamAgentPanelTab('context');") &&
-        /if \(name === 'team'\)[\s\S]*setTeamAgentPanelTab\('context'\)/.test(html);
+      var activityIdx = html.indexOf('id="team-activity-wrap"');
+      var contextIdx = html.indexOf('id="team-context-wrap"');
+      var inboxIdx = html.indexOf('id="team-inbox-wrap"');
+      return activityIdx >= 0 && contextIdx > activityIdx && inboxIdx > contextIdx &&
+        html.includes('id="team-context-toggle"') &&
+        /if \(name === 'team'\)[\s\S]*setTeamRailExpanded\('context', false\)/.test(html);
     })(),
   },
   {
     name: 'Team page includes active context view',
-    ok: html.includes('id="team-agent-tab-context"') &&
+    ok: html.includes('id="team-context-wrap"') &&
       html.includes('id="team-agent-context-detail"') &&
       html.includes('renderAgentContext') &&
       html.includes('/api/team/context'),
@@ -223,8 +221,8 @@ const checks = [
       html.includes('formatAgentStateDisplay'),
   },
   {
-    name: 'Team page includes agent metrics stats tab',
-    ok: html.includes('id="team-agent-tab-stats"') &&
+    name: 'Team page includes agent metrics stats rail',
+    ok: html.includes('id="team-stats-wrap"') &&
       html.includes('id="team-agent-stats-detail"') &&
       html.includes('renderAgentMetrics') &&
       html.includes('/api/team/metrics'),
