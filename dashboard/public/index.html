@@ -386,32 +386,71 @@
       flex: 1 1 0;
     }
     .team-roster-side {
+      flex: 0 0 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      gap: 0.45rem;
+      border-left: 1px solid var(--border);
+      padding-left: 0.55rem;
+    }
+    .team-rail-wrap {
+      flex: 0 0 2.4rem;
+      width: 2.4rem;
+      min-width: 2.4rem;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: width 0.2s ease, flex-basis 0.2s ease;
+    }
+    .team-rail-wrap.expanded {
+      flex-basis: min(20vw, 14rem);
+      width: min(20vw, 14rem);
+      min-width: 11rem;
+    }
+    .team-agent-panel-slot {
       flex: 0 0 2.4rem;
       width: 2.4rem;
       min-width: 2.4rem;
       min-height: 0;
       display: flex;
       flex-direction: column;
-      gap: 0.45rem;
-      border-left: 1px solid var(--border);
-      padding-left: 0.55rem;
+      overflow: hidden;
       transition: width 0.2s ease, flex-basis 0.2s ease;
     }
-    .team-roster-side.expanded {
-      flex-basis: min(34vw, 26rem);
-      width: min(34vw, 26rem);
-      min-width: 18rem;
+    .team-agent-panel-slot.expanded {
+      flex-basis: min(24vw, 18rem);
+      width: min(24vw, 18rem);
+      min-width: 13rem;
     }
-    .team-rail-wrap {
-      flex: 0 0 auto;
-      min-height: 0;
-      overflow: hidden;
-      display: flex;
+    .team-agent-panel-slot.collapsed .team-agent-panel-ranges,
+    .team-agent-panel-slot.collapsed .team-agent-panel-body {
+      display: none;
+    }
+    .team-agent-panel-slot.collapsed .team-agent-panel-tabs {
       flex-direction: column;
-    }
-    .team-roster-side.expanded .team-rail-wrap.expanded {
+      flex-wrap: nowrap;
+      align-items: center;
+      padding: 0.35rem 0.15rem;
+      border-bottom: none;
+      gap: 0.25rem;
       flex: 1 1 0;
-      min-height: 6rem;
+    }
+    .team-agent-panel-slot.collapsed .team-agent-panel-tab {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      padding: 0.35rem 0.15rem;
+      font-size: 0.62rem;
+      letter-spacing: 0.03em;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .team-agent-panel-slot.collapsed .team-agent-panel-tab.active {
+      border-color: var(--border);
+      background: rgba(167, 139, 250, 0.08);
     }
     .team-goals-main {
       flex: 1 1 0;
@@ -748,15 +787,6 @@
       border-radius: 6px;
       background: var(--bg);
       overflow: hidden;
-    }
-    .team-agent-panel-slot {
-      display: none;
-      min-height: 0;
-      overflow: hidden;
-    }
-    .team-roster-side.expanded .team-agent-panel-slot {
-      display: flex;
-      flex: 1 1 0;
     }
     .team-agent-panel-tabs {
       flex-shrink: 0;
@@ -2822,7 +2852,7 @@
                 </div>
               </div>
             </div>
-            <div id="team-agent-panel" class="team-agent-panel team-agent-panel-slot">
+            <div id="team-agent-panel" class="team-agent-panel team-agent-panel-slot collapsed">
               <div class="team-agent-panel-tabs" role="tablist">
                 <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
                 <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
@@ -5738,7 +5768,7 @@
       renderAgentMetrics();
       renderCurrentMission();
       renderTeamTaskSummary();
-      if (selectedTeamInboxAgentId) syncTeamRosterSide();
+      if (selectedTeamInboxAgentId) setTeamAgentPanelExpanded(true);
     }
 
     function setTeamViewTab(mode) {
@@ -6460,6 +6490,7 @@
     }
 
     function setTeamAgentPanelTab(tab) {
+      setTeamAgentPanelExpanded(true);
       teamAgentPanelTab =
         tab === 'context' ? 'context'
           : tab === 'stats' ? 'stats'
@@ -7134,11 +7165,14 @@
     }
 
     var teamActivityExpanded = false;
+    var teamAgentPanelExpanded = false;
 
-    function syncTeamRosterSide() {
-      var side = document.getElementById('team-roster-side');
-      if (!side) return;
-      side.classList.toggle('expanded', teamActivityExpanded || !!selectedTeamInboxAgentId);
+    function setTeamAgentPanelExpanded(nextExpanded) {
+      teamAgentPanelExpanded = !!nextExpanded;
+      var slot = document.getElementById('team-agent-panel');
+      if (!slot) return;
+      slot.classList.toggle('expanded', teamAgentPanelExpanded);
+      slot.classList.toggle('collapsed', !teamAgentPanelExpanded);
     }
 
     function setTeamActivityExpanded(nextExpanded) {
@@ -7151,7 +7185,6 @@
       toggle.setAttribute('aria-expanded', teamActivityExpanded ? 'true' : 'false');
       toggle.textContent = teamActivityExpanded ? 'Collapse' : 'Activity';
       toggle.title = teamActivityExpanded ? 'Collapse live activity panel' : 'Expand live activity panel';
-      syncTeamRosterSide();
     }
 
     async function fetchTeamActivityFeed() {
@@ -7369,6 +7402,7 @@
       });
     }
     setTeamActivityExpanded(false);
+    setTeamAgentPanelExpanded(false);
 
     function stopTeamActivityFeed() {
       if (!teamActivityPollTimer) return;

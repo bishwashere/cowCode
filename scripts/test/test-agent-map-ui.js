@@ -111,6 +111,7 @@ const checks = [
     name: 'Team page uses right-side split layout',
     ok: html.includes('class="team-page-body"') &&
       html.includes('id="team-roster-side"') &&
+      /\.team-roster-side\s*\{[^}]*flex-direction:\s*row/s.test(html) &&
       /\.team-roster-side\s*\{[^}]*border-left:\s*1px/s.test(html),
   },
   {
@@ -122,11 +123,10 @@ const checks = [
     ok: html.includes('startTeamActivityFeed') && html.includes('/api/team/activity'),
   },
   {
-    name: 'Team agent panel sits below activity on the right',
-    ok: html.includes('id="team-agent-panel" class="team-agent-panel team-agent-panel-slot"') &&
-      html.includes('syncTeamRosterSide') &&
+    name: 'Team agent panel sits beside activity on the right',
+    ok: html.includes('setTeamAgentPanelExpanded') &&
       /id="team-roster-side"[\s\S]*id="team-activity-wrap"[\s\S]*id="team-agent-panel"/.test(html) &&
-      !html.includes('id="team-agent-panel-toggle"') &&
+      /\.team-agent-panel-slot[\s\S]*writing-mode:\s*vertical-rl/s.test(html) &&
       html.includes('team-agent-inbox-list') &&
       html.includes('selectTeamInboxAgent'),
   },
