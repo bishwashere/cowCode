@@ -382,13 +382,36 @@
     .team-agent-card-active {
       color: var(--muted);
     }
-    .team-page-card .team-cards-view + .team-agent-panel,
-    .team-page-card .team-tree-view + .team-agent-panel {
+    .team-page-card .team-tree-view {
       flex: 1 1 0;
-      min-height: 9rem;
     }
-    .team-page-card .team-cards-view ~ .team-agent-panel {
-      max-height: none;
+    .team-roster-side {
+      flex: 0 0 2.4rem;
+      width: 2.4rem;
+      min-width: 2.4rem;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      border-left: 1px solid var(--border);
+      padding-left: 0.55rem;
+      transition: width 0.2s ease, flex-basis 0.2s ease;
+    }
+    .team-roster-side.expanded {
+      flex-basis: min(34vw, 26rem);
+      width: min(34vw, 26rem);
+      min-width: 18rem;
+    }
+    .team-rail-wrap {
+      flex: 0 0 auto;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .team-roster-side.expanded .team-rail-wrap.expanded {
+      flex: 1 1 0;
+      min-height: 6rem;
     }
     .team-goals-main {
       flex: 1 1 0;
@@ -717,14 +740,13 @@
       font-size: 0.72rem;
     }
     .team-agent-panel {
-      flex: 1 1 55%;
-      min-height: 9rem;
-      max-height: 52%;
+      flex: 1 1 0;
+      min-height: 0;
       display: flex;
       flex-direction: column;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg);
+      border: none;
+      border-radius: 0;
+      background: transparent;
       overflow: hidden;
     }
     .team-agent-panel-tabs {
@@ -902,21 +924,7 @@
       margin: 0.15rem 0 0 0;
       padding-left: 1.1rem;
     }
-    .team-activity-wrap {
-      flex: 0 0 2.4rem;
-      width: 2.4rem;
-      min-width: 2.4rem;
-      min-height: 0;
-      overflow: hidden;
-      border-left: 1px solid var(--border);
-      padding-left: 0.55rem;
-      transition: width 0.2s ease, flex-basis 0.2s ease;
-    }
-    .team-activity-wrap.expanded {
-      flex-basis: min(34vw, 26rem);
-      width: min(34vw, 26rem);
-      min-width: 18rem;
-    }
+    .team-rail-shell,
     .team-activity-shell {
       height: 100%;
       min-height: 0;
@@ -927,21 +935,29 @@
       border-radius: 6px;
       padding: 0.35rem;
     }
+    .team-rail-wrap.collapsed .team-rail-shell,
     .team-activity-wrap.collapsed .team-activity-shell {
       align-items: center;
       justify-content: flex-start;
       padding: 0.35rem 0.2rem;
     }
-    .team-activity-wrap.collapsed .team-activity-title,
-    .team-activity-wrap.collapsed .team-activity-status,
-    .team-activity-wrap.collapsed .team-activity-list {
+    .team-rail-wrap.collapsed .team-rail-title,
+    .team-rail-wrap.collapsed .team-activity-title,
+    .team-rail-wrap.collapsed .team-activity-status,
+    .team-rail-wrap.collapsed .team-rail-body,
+    .team-rail-wrap.collapsed .team-activity-list,
+    .team-rail-wrap.collapsed .team-agent-panel-tabs,
+    .team-rail-wrap.collapsed .team-agent-panel-ranges,
+    .team-rail-wrap.collapsed .team-agent-panel-body {
       display: none;
     }
-    .team-activity-wrap.collapsed .team-activity-head {
+    .team-rail-wrap.collapsed .team-rail-head,
+    .team-rail-wrap.collapsed .team-activity-head {
       margin-bottom: 0;
       width: 100%;
       justify-content: center;
     }
+    .team-rail-toggle,
     .team-activity-toggle {
       margin: 0;
       padding: 0.25rem 0.35rem;
@@ -955,10 +971,12 @@
       line-height: 1;
       font-size: 0.85rem;
     }
+    .team-rail-toggle:hover,
     .team-activity-toggle:hover {
       border-color: var(--accent);
       color: var(--accent);
     }
+    .team-rail-wrap.collapsed .team-rail-toggle,
     .team-activity-wrap.collapsed .team-activity-toggle {
       writing-mode: vertical-rl;
       transform: rotate(180deg);
@@ -968,13 +986,15 @@
       letter-spacing: 0.04em;
       white-space: nowrap;
     }
+    .team-rail-wrap.expanded .team-rail-toggle,
     .team-activity-wrap.expanded .team-activity-toggle {
       min-width: 1.7rem;
     }
-    .team-activity-wrap.expanded .team-activity-list {
+    .team-rail-wrap.expanded .team-activity-list {
       min-height: 0;
       flex: 1 1 0;
     }
+    .team-rail-head,
     .team-activity-head {
       display: flex;
       align-items: center;
@@ -2782,7 +2802,27 @@
               </div>
             </div>
             </div>
-            <div id="team-agent-panel" class="team-agent-panel">
+          </div>
+          <div id="team-roster-side" class="team-roster-side">
+            <div id="team-activity-wrap" class="team-rail-wrap team-activity-wrap collapsed">
+              <div class="team-rail-shell team-activity-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title team-activity-title">Live agent activity</h3>
+                  <span id="team-activity-status" class="team-activity-status">Idle</span>
+                  <button type="button" id="team-activity-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand live activity panel">Activity</button>
+                </div>
+                <div id="team-activity-list" class="team-rail-body team-activity-list">
+                  <p class="team-activity-empty">No activity yet.</p>
+                </div>
+              </div>
+            </div>
+            <div id="team-agent-panel-wrap" class="team-rail-wrap team-agent-panel-wrap collapsed">
+              <div class="team-rail-shell">
+                <div class="team-rail-head team-activity-head">
+                  <h3 class="team-rail-title">Agent details</h3>
+                  <button type="button" id="team-agent-panel-toggle" class="team-rail-toggle team-activity-toggle" aria-expanded="false" title="Expand agent details panel">Agent</button>
+                </div>
+                <div id="team-agent-panel" class="team-agent-panel team-rail-body">
               <div class="team-agent-panel-tabs" role="tablist">
                 <button type="button" id="team-agent-tab-context" class="team-agent-panel-tab active" data-tab="context" role="tab" aria-selected="true">Active Context</button>
                 <button type="button" id="team-agent-tab-inbox" class="team-agent-panel-tab" data-tab="inbox" role="tab" aria-selected="false">Inbox</button>
@@ -2836,17 +2876,7 @@
                 </div>
               </div>
             </div>
-          </div>
-          <div id="team-activity-wrap" class="team-activity-wrap collapsed">
-            <div class="team-activity-shell">
-              <div class="team-activity-head">
-                <h3 class="team-activity-title">Live agent activity</h3>
-                <span id="team-activity-status" class="team-activity-status">Idle</span>
-                <button type="button" id="team-activity-toggle" class="team-activity-toggle" aria-expanded="false" title="Expand live activity panel">Activity</button>
-              </div>
-              <div id="team-activity-list" class="team-activity-list">
-                <p class="team-activity-empty">No activity yet.</p>
-              </div>
+            </div>
             </div>
           </div>
         </div>
@@ -5710,6 +5740,7 @@
       renderAgentMetrics();
       renderCurrentMission();
       renderTeamTaskSummary();
+      if (selectedTeamInboxAgentId) setTeamAgentPanelExpanded(true);
     }
 
     function setTeamViewTab(mode) {
@@ -7105,6 +7136,13 @@
     }
 
     var teamActivityExpanded = false;
+    var teamAgentPanelExpanded = false;
+
+    function syncTeamRosterSide() {
+      var side = document.getElementById('team-roster-side');
+      if (!side) return;
+      side.classList.toggle('expanded', teamActivityExpanded || teamAgentPanelExpanded);
+    }
 
     function setTeamActivityExpanded(nextExpanded) {
       teamActivityExpanded = !!nextExpanded;
@@ -7116,6 +7154,20 @@
       toggle.setAttribute('aria-expanded', teamActivityExpanded ? 'true' : 'false');
       toggle.textContent = teamActivityExpanded ? 'Collapse' : 'Activity';
       toggle.title = teamActivityExpanded ? 'Collapse live activity panel' : 'Expand live activity panel';
+      syncTeamRosterSide();
+    }
+
+    function setTeamAgentPanelExpanded(nextExpanded) {
+      teamAgentPanelExpanded = !!nextExpanded;
+      var wrap = document.getElementById('team-agent-panel-wrap');
+      var toggle = document.getElementById('team-agent-panel-toggle');
+      if (!wrap || !toggle) return;
+      wrap.classList.toggle('expanded', teamAgentPanelExpanded);
+      wrap.classList.toggle('collapsed', !teamAgentPanelExpanded);
+      toggle.setAttribute('aria-expanded', teamAgentPanelExpanded ? 'true' : 'false');
+      toggle.textContent = teamAgentPanelExpanded ? 'Collapse' : 'Agent';
+      toggle.title = teamAgentPanelExpanded ? 'Collapse agent details panel' : 'Expand agent details panel';
+      syncTeamRosterSide();
     }
 
     async function fetchTeamActivityFeed() {
@@ -7333,6 +7385,14 @@
       });
     }
     setTeamActivityExpanded(false);
+
+    var teamAgentPanelToggleEl = document.getElementById('team-agent-panel-toggle');
+    if (teamAgentPanelToggleEl) {
+      teamAgentPanelToggleEl.addEventListener('click', function () {
+        setTeamAgentPanelExpanded(!teamAgentPanelExpanded);
+      });
+    }
+    setTeamAgentPanelExpanded(false);
 
     function stopTeamActivityFeed() {
       if (!teamActivityPollTimer) return;
