@@ -197,18 +197,18 @@ const checks = [
       html.includes('getCurrentMission') &&
       html.includes('getLiveMissionFromTeamContext') &&
       html.includes('missionSubgoalIcon') &&
-      html.includes('Current Focus:') &&
+      html.includes('Blocked:') &&
       html.includes('Completed Today') &&
       /\.team-page-summary[\s\S]*\.team-current-mission/.test(html) &&
       /\.team-task-summary[\s\S]*\.team-task-badge/.test(html),
   },
   {
-    name: 'Team agent cards show step and today',
+    name: 'Team agent cards show state and active count',
     ok: html.includes('team-agent-card') &&
-      html.includes('team-agent-card-step') &&
-      html.includes(' today</div>') &&
+      html.includes('team-agent-card-active') &&
+      html.includes(' active</div>') &&
       html.includes('renderTeamAgentCards') &&
-      html.includes('ctx.currentStep'),
+      html.includes('agentCardActiveCount'),
   },
   {
     name: 'Team map nodes show live agent state',

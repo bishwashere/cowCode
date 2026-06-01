@@ -90,6 +90,11 @@ async function main() {
     assert(mainMetrics.lastActivity === 'done', `main last: ${mainMetrics.lastActivity}`);
     assert(marketerMetrics.lastActivity === 'done', `marketer last: ${marketerMetrics.lastActivity}`);
     assert(mainMetrics.tasksToday >= 0, 'tasksToday present');
+    assert(mainMetrics.activeTasks === 0, `main activeTasks done: ${mainMetrics.activeTasks}`);
+    assert(marketerMetrics.activeTasks === 0, `marketer activeTasks done: ${marketerMetrics.activeTasks}`);
+
+    const inFlight = [{ type: 'turn_start', agentId: 'developer', ts: Date.now() }];
+    assert(computeAgentMetrics('developer', inFlight).activeTasks === 1, 'open turn counts as active');
 
     const memEvents = [
       { type: 'skill_done', agentId: 'developer', skillId: 'memory', ts: Date.now() },
