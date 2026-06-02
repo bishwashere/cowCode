@@ -13,10 +13,10 @@
           <button type="button" class="mc-nav-item" data-mc-nav="goals" aria-label="Initiatives">
             <span class="mc-nav-icon">ϟ</span><span class="mc-nav-label">Initiatives</span>
           </button>
-          <button type="button" class="mc-nav-item" data-mc-nav="activity" aria-label="Inbox">
+          <button type="button" class="mc-nav-item" data-mc-nav="inbox" aria-label="Inbox">
             <span class="mc-nav-icon">□</span><span class="mc-nav-label">Inbox</span><span class="mc-nav-badge" id="mc2-inbox-badge">3</span>
           </button>
-          <button type="button" class="mc-nav-item" data-mc-nav="activity" aria-label="Outbox">
+          <button type="button" class="mc-nav-item" data-mc-nav="outbox" aria-label="Outbox">
             <span class="mc-nav-icon">⇄</span><span class="mc-nav-label">Outbox</span><span class="mc-nav-badge" id="mc2-outbox-badge">2</span>
           </button>
           <button type="button" class="mc-nav-item" data-mc-nav="activity" aria-label="Activity">
@@ -170,7 +170,7 @@
         <!-- Activity view -->
         <div id="mc2-view-activity" class="mc-view" hidden>
           <div class="mc-activity-toolbar">
-            <p class="mc-section-title">LIVE ACTIVITY</p>
+            <p class="mc-section-title" id="mc2-activity-title">LIVE ACTIVITY</p>
             <label class="mc-agent-filter" for="mc2-inbox-agent-filter">
               <span>Agent</span>
               <select id="mc2-inbox-agent-filter" aria-label="Filter inbox by agent">

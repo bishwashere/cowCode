@@ -7059,6 +7059,7 @@
     /* ── Mission Control (#team2) ─────────────────────────────────────────── */
 
     var mc2ActiveView = 'mission';
+    var mc2InboxAgentFilter = '';
 
     function mc2El(id) { return document.getElementById(id); }
 
@@ -7117,15 +7118,16 @@
 
     function mc2SetView(view) {
       mc2ActiveView = view;
+      var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view;
       ['mission', 'agents', 'goals', 'activity'].forEach(function (v) {
         var el = mc2El('mc2-view-' + v);
-        if (el) el.hidden = v !== view;
+        if (el) el.hidden = v !== visibleView;
       });
       document.querySelectorAll('#page-team2 .mc-nav-item[data-mc-nav]').forEach(function (btn) {
         var nav = btn.getAttribute('data-mc-nav');
         btn.classList.toggle('active', nav === view);
       });
-      if (view === 'activity') mc2RenderActivity();
+      if (visibleView === 'activity') mc2RenderActivity();
       if (view === 'goals') mc2RenderGoals();
       if (view === 'agents') mc2RenderAgentsDetail();
     }
@@ -7318,8 +7320,23 @@
     function mc2RenderActivity() {
       var el = mc2El('mc2-activity-feed');
       if (!el) return;
-      var events = (teamActivityEvents || []).slice().reverse().slice(0, 60);
-      if (!events.length) { el.innerHTML = '<p class="mc-kanban-empty">No activity yet.</p>'; return; }
+      var titleEl = mc2El('mc2-activity-title');
+      if (titleEl) {
+        titleEl.textContent = mc2ActiveView === 'inbox'
+          ? 'INBOX'
+          : mc2ActiveView === 'outbox'
+            ? 'OUTBOX'
+            : 'LIVE ACTIVITY';
+      }
+      mc2SyncInboxAgentFilter();
+      var events = (teamActivityEvents || []).filter(function (ev) {
+        return mc2EventMatchesAgent(ev, mc2InboxAgentFilter);
+      }).slice().reverse().slice(0, 60);
+      if (!events.length) {
+        var emptyLabel = mc2InboxAgentFilter ? (' for ' + agentNameById(mc2InboxAgentFilter)) : '';
+        el.innerHTML = '<p class="mc-kanban-empty">No activity' + escapeHtml(emptyLabel) + ' yet.</p>';
+        return;
+      }
       el.innerHTML = events.map(function (ev) {
         var ts = Number(ev.ts) || 0;
         var text = formatTeamActivityText ? formatTeamActivityText(ev) : escapeHtml(String(ev.type || ''));
@@ -7331,6 +7348,36 @@
           '<span>' + text + '</span>' +
         '</div>';
       }).join('');
+    }
+
+    function mc2EventMatchesAgent(event, agentId) {
+      var id = String(agentId || '').trim();
+      if (!id) return true;
+      if (String(event && event.agentId || '') === id) return true;
+      if (String(event && event.targetAgentId || '') === id) return true;
+      var details = event && typeof event.details === 'object' ? event.details : null;
+      if (!details) return false;
+      if (String(details.selected || '') === id) return true;
+      var candidates = Array.isArray(details.candidates) ? details.candidates : [];
+      return candidates.some(function (c) { return String(c && c.agentId || '') === id; });
+    }
+
+    function mc2SyncInboxAgentFilter() {
+      var select = mc2El('mc2-inbox-agent-filter');
+      if (!select) return;
+      var agents = agentMapData && agentMapData.length ? agentMapData : [{ id: 'main' }];
+      var hasCurrent = !mc2InboxAgentFilter || agents.some(function (a) {
+        return String(a && a.id || '') === mc2InboxAgentFilter;
+      });
+      if (!hasCurrent) mc2InboxAgentFilter = '';
+      var html = '<option value="">All agents</option>' + agents.map(function (a) {
+        var id = String(a && a.id || '');
+        if (!id) return '';
+        var selected = id === mc2InboxAgentFilter ? ' selected' : '';
+        return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
+      }).join('');
+      if (select.innerHTML !== html) select.innerHTML = html;
+      if (select.value !== mc2InboxAgentFilter) select.value = mc2InboxAgentFilter;
     }
 
     function mc2RenderGoals() {
@@ -7379,7 +7426,7 @@
       mc2RenderMovement();
       mc2RenderAttention();
       mc2UpdateLiveBadge();
-      if (mc2ActiveView === 'activity') mc2RenderActivity();
+      if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
       if (mc2ActiveView === 'goals') mc2RenderGoals();
     }
 
@@ -7401,6 +7448,13 @@
     if (mc2AddAgentBtn) {
       mc2AddAgentBtn.addEventListener('click', function () {
         openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+      });
+    }
+    var mc2InboxAgentFilterEl = document.getElementById('mc2-inbox-agent-filter');
+    if (mc2InboxAgentFilterEl) {
+      mc2InboxAgentFilterEl.addEventListener('change', function () {
+        mc2InboxAgentFilter = String(mc2InboxAgentFilterEl.value || '');
+        mc2RenderActivity();
       });
     }
     document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);

@@ -230,6 +230,17 @@ const checks = [
       html.includes('Active mission'),
   },
   {
+    name: 'Team2 inbox can filter activity by agent',
+    ok: html.includes('data-mc-nav="inbox"') &&
+      html.includes('data-mc-nav="outbox"') &&
+      html.includes('id="mc2-inbox-agent-filter"') &&
+      html.includes('Filter inbox by agent') &&
+      html.includes('mc2InboxAgentFilter') &&
+      html.includes("var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view") &&
+      html.includes('mc2SyncInboxAgentFilter') &&
+      html.includes('mc2EventMatchesAgent'),
+  },
+  {
     name: 'Team agent cards show state and active count',
     ok: html.includes('team-agent-card') &&
       html.includes('team-agent-card-active') &&

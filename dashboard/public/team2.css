@@ -562,6 +562,39 @@ body.dashboard-team2-active > nav {
   text-align: left;
 }
 
+.mc-activity-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.mc-activity-toolbar .mc-section-title {
+  margin-bottom: 0;
+}
+
+.mc-agent-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.mc-agent-filter select {
+  min-width: 10rem;
+  margin: 0;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.66rem;
+}
+
 /* ── Mission Control visual pass (closer to reference) ────────────────── */
 
 body.dashboard-team2-active {
