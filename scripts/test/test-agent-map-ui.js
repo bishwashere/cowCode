@@ -280,6 +280,18 @@ const checks = [
       html.includes('mc2EventMatchesAgent'),
   },
   {
+    name: 'Team2 Done Today opens completed tasks cards view',
+    ok: html.includes('data-mc-nav="tasks"') &&
+      html.includes('mc-stat-card-action') &&
+      html.includes('id="mc2-view-tasks"') &&
+      html.includes('id="mc2-tasks-list"') &&
+      html.includes('id="mc2-tasks-agent-filter"') &&
+      html.includes('mc2RenderTasks') &&
+      html.includes('listCompletedTasks') &&
+      html.includes('mc-task-card') &&
+      html.includes('View tasks completed today'),
+  },
+  {
     name: 'Team agent cards show state and active count',
     ok: html.includes('team-agent-card') &&
       html.includes('team-agent-card-active') &&
