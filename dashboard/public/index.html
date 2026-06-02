@@ -69,12 +69,23 @@
       height: 100%;
     }
     #page-home.active,
-    #page-team.active {
+    #page-team.active,
+    #page-team2.active {
       flex: 1 1 0;
       display: flex;
       flex-direction: column;
       min-height: 0;
       overflow: hidden;
+    }
+    body.dashboard-team2-active {
+      height: 100dvh;
+      max-height: 100dvh;
+      overflow: hidden;
+      padding: 0;
+    }
+    body.dashboard-team2-active > h1,
+    body.dashboard-team2-active > nav {
+      display: none;
     }
     .team-page-card {
       flex: 1 1 0;
@@ -2994,6 +3005,164 @@
     </div>
   </div>
 
+  <div id="page-team2" class="page">
+    <div class="card mc-shell">
+      <!-- Sidebar -->
+      <nav class="mc-sidebar" aria-label="Mission Control navigation">
+        <div class="mc-sidebar-logo" aria-hidden="true">🚀</div>
+        <div class="mc-sidebar-nav">
+          <button type="button" class="mc-nav-item active" data-mc-nav="mission" aria-label="Mission">
+            <span class="mc-nav-icon">🏠</span>Mission
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Agents">
+            <span class="mc-nav-icon">🤖</span>Agents
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="goals" aria-label="Goals">
+            <span class="mc-nav-icon">🎯</span>Goals
+          </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="activity" aria-label="Activity">
+            <span class="mc-nav-icon">⚡</span>Activity
+          </button>
+          <div style="margin-top:auto;padding-top:0.5rem;border-top:1px solid var(--border);margin-bottom:0.35rem;"></div>
+          <button type="button" class="mc-nav-item" data-mc-nav="back" aria-label="Back to old Team view" title="Back to classic Team view">
+            <span class="mc-nav-icon">←</span>Classic
+          </button>
+        </div>
+        <div class="mc-sidebar-footer">
+          <strong id="mc2-actions-rate">—</strong>
+          actions/min
+        </div>
+      </nav>
+
+      <!-- Main content -->
+      <div class="mc-main">
+        <!-- Header -->
+        <header class="mc-header">
+          <h1 class="mc-header-title">MISSION CONTROL</h1>
+          <span class="mc-header-pulse" aria-hidden="true">〜</span>
+          <div class="mc-mission-select-wrap">
+            <select id="mc2-mission-select" class="mc-mission-select" aria-label="Active mission / goal">
+              <option value="">No active mission</option>
+            </select>
+          </div>
+          <div class="mc-header-actions">
+            <span class="mc-live-badge" id="mc2-live-badge">
+              <span class="mc-live-dot"></span>Live
+            </span>
+            <button type="button" id="mc2-add-agent-btn" class="chat-toolbar-btn" style="margin:0;" title="Create a new agent">+ Agent</button>
+          </div>
+        </header>
+
+        <!-- Mission view -->
+        <div id="mc2-view-mission" class="mc-view" role="main">
+          <!-- Progress row -->
+          <div class="mc-progress-row">
+            <div class="mc-progress-card">
+              <div class="mc-progress-head">
+                <h3>MISSION PROGRESS</h3>
+                <span class="mc-progress-meta" id="mc2-progress-label">— / — tasks completed</span>
+                <span class="mc-progress-meta" id="mc2-eta-label"></span>
+              </div>
+              <div class="mc-progress-bar"><span id="mc2-progress-bar-fill" style="width:0%"></span></div>
+              <div class="mc-stat-grid">
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Active</div>
+                  <div class="mc-stat-value active" id="mc2-stat-active">0</div>
+                </div>
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Waiting</div>
+                  <div class="mc-stat-value waiting" id="mc2-stat-waiting">0</div>
+                </div>
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Blocked</div>
+                  <div class="mc-stat-value blocked" id="mc2-stat-blocked">0</div>
+                </div>
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Done Today</div>
+                  <div class="mc-stat-value done" id="mc2-stat-done">0</div>
+                </div>
+                <div class="mc-stat-card">
+                  <div class="mc-stat-label">Team Pace</div>
+                  <div class="mc-stat-value pace" id="mc2-stat-pace">—/hr</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kanban columns -->
+          <div class="mc-kanban">
+            <div class="mc-kanban-col">
+              <div class="mc-kanban-col-head">NOW <span class="mc-kanban-col-count" id="mc2-col-count-working">0</span></div>
+              <div class="mc-kanban-col-body" id="mc2-col-working"><p class="mc-kanban-empty">No active work</p></div>
+            </div>
+            <div class="mc-kanban-col">
+              <div class="mc-kanban-col-head">NEXT <span class="mc-kanban-col-count" id="mc2-col-count-next">0</span></div>
+              <div class="mc-kanban-col-body" id="mc2-col-next"><p class="mc-kanban-empty">Nothing queued</p></div>
+            </div>
+            <div class="mc-kanban-col">
+              <div class="mc-kanban-col-head">WAITING <span class="mc-kanban-col-count" id="mc2-col-count-waiting">0</span></div>
+              <div class="mc-kanban-col-body" id="mc2-col-waiting"><p class="mc-kanban-empty">No agents waiting</p></div>
+            </div>
+            <div class="mc-kanban-col">
+              <div class="mc-kanban-col-head">BLOCKED <span class="mc-kanban-col-count" id="mc2-col-count-blocked">0</span></div>
+              <div class="mc-kanban-col-body" id="mc2-col-blocked"><p class="mc-kanban-empty">All clear</p></div>
+            </div>
+          </div>
+
+          <!-- Agents overview -->
+          <div>
+            <p class="mc-section-title">AGENTS OVERVIEW</p>
+            <div class="mc-agents-overview" id="mc2-agents-overview">
+              <p style="color:var(--muted);font-size:0.66rem;">Loading agents…</p>
+            </div>
+          </div>
+
+          <!-- Bottom row -->
+          <div class="mc-bottom-row">
+            <div class="mc-panel">
+              <p class="mc-section-title">RECENT MOVEMENT</p>
+              <div class="mc-panel-body" id="mc2-recent-movement">
+                <p class="mc-kanban-empty">No activity yet.</p>
+              </div>
+              <button type="button" class="mc-panel-link" data-mc-nav="activity">View all activity →</button>
+            </div>
+            <div class="mc-panel">
+              <p class="mc-section-title">ATTENTION NEEDED</p>
+              <div class="mc-panel-body" id="mc2-attention">
+                <p class="mc-kanban-empty">All clear.</p>
+              </div>
+              <button type="button" class="mc-panel-link" data-mc-nav="agents">View all blockers →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agents view -->
+        <div id="mc2-view-agents" class="mc-view" hidden>
+          <p class="mc-section-title">ALL AGENTS</p>
+          <div class="mc-agents-overview" id="mc2-agents-detail">
+            <p style="color:var(--muted);font-size:0.66rem;">Loading agents…</p>
+          </div>
+        </div>
+
+        <!-- Goals view -->
+        <div id="mc2-view-goals" class="mc-view" hidden>
+          <p class="mc-section-title">GOALS</p>
+          <div id="mc2-goals-list" style="display:flex;flex-direction:column;gap:0.45rem;">
+            <p style="color:var(--muted);font-size:0.66rem;">Loading goals…</p>
+          </div>
+        </div>
+
+        <!-- Activity view -->
+        <div id="mc2-view-activity" class="mc-view" hidden>
+          <p class="mc-section-title">LIVE ACTIVITY</p>
+          <div id="mc2-activity-feed" style="display:flex;flex-direction:column;gap:0.2rem;">
+            <p style="color:var(--muted);font-size:0.66rem;">No activity yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="page-team-agent" class="page">
     <div class="card team-agent-page">
       <div class="team-agent-page-head">
@@ -3237,7 +3406,7 @@
   <script type="module" src="test-output-parse.js"></script>
   <script>
     const API = '';
-    var validPages = ['home', 'chat', 'crons', 'skills', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team-agent'];
+    var validPages = ['home', 'chat', 'crons', 'skills', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team2', 'team-agent'];
     var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
     var IDENTITY_FILE_LABELS = {
       'SOUL.md': 'Soul',
@@ -3289,6 +3458,7 @@
       if (link) link.classList.add('active');
       document.body.classList.toggle('dashboard-home-active', name === 'home');
       document.body.classList.toggle('dashboard-team-active', name === 'team');
+      document.body.classList.toggle('dashboard-team2-active', name === 'team2');
       if (name === 'crons') fetchCrons();
       if (name === 'skills') fetchSkills();
       if (name === 'groups') fetchGroups();
@@ -3311,6 +3481,9 @@
             }
           }
         });
+      } else if (name === 'team2') {
+        startTeamActivityFeed();
+        fetchAgentMapData().then(function () { renderMissionControl(); });
       } else {
         stopTeamActivityFeed();
         setTeamPageFullscreen(false);
@@ -3338,6 +3511,9 @@
           return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null };
         }
         return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: decodeURIComponent(subFile) };
+      }
+      if (name === 'team2') {
+        return { name: 'team2', memoryFile: null, openIdentity: null, teamAgentId: null };
       }
       if (name === 'team-agent') {
         return {
@@ -7276,6 +7452,7 @@
       renderAgentOutbox();
       renderAgentContext();
       renderTeamTaskSummary();
+      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active')) renderMissionControl();
     }
 
     async function fetchTeamContextFeed() {
@@ -7293,6 +7470,7 @@
       renderCurrentMission();
       renderTeamTaskSummary();
       renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
+      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active')) renderMissionControl();
     }
 
     async function fetchTeamMetricsFeed() {
@@ -7678,6 +7856,352 @@
     document.getElementById('team-page-fullscreen-btn').addEventListener('click', function () {
       toggleTeamPageFullscreen();
     });
+
+    /* ── Mission Control (#team2) ─────────────────────────────────────────── */
+
+    var mc2ActiveView = 'mission';
+
+    function mc2El(id) { return document.getElementById(id); }
+
+    function mc2AgentInitials(a) {
+      var name = agentCardShortName(a);
+      return name.slice(0, 2).toUpperCase();
+    }
+
+    function mc2RelTime(ts) {
+      var ms = Date.now() - Number(ts || 0);
+      if (ms < 0) ms = 0;
+      var s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's ago';
+      var m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ago';
+      var h = Math.floor(m / 60);
+      return h + 'h ago';
+    }
+
+    function mc2AvatarHtml(a) {
+      var initials = mc2AgentInitials(a);
+      return '<div class="mc-agent-avatar">' + escapeHtml(initials) + '</div>';
+    }
+
+    function mc2KanbanCard(a, ctx) {
+      var id = String(a.id || '');
+      var name = escapeHtml(agentCardShortName(a));
+      var state = String(ctx.state || 'idle').toLowerCase();
+      var goal = String(ctx.currentGoal || ctx.currentStep || '').trim();
+      var thought = String(ctx.currentThought || ctx.currentStep || '').trim();
+      var lastTs = Number(ctx.updatedAt) || 0;
+      var isBlocked = state === 'error';
+      var pct = 0;
+      var tagHtml = isBlocked
+        ? '<span class="mc-kanban-card-tag blocked">⊘ Blocked ' + mc2RelTime(lastTs) + '</span>'
+        : '';
+      var progressHtml = (state === 'working' && pct > 0)
+        ? '<div class="mc-kanban-card-progress"><span style="width:' + pct + '%"></span></div>'
+        : '';
+      var goalLine = goal || thought;
+      var waitingFor = String(ctx.waitingFor || '').trim();
+      return '<div class="mc-kanban-card" data-mc-agent="' + escapeHtml(id) + '">' +
+        '<div class="mc-kanban-card-head">' +
+          mc2AvatarHtml(a) +
+          '<span class="mc-agent-role">' + name + '</span>' +
+        '</div>' +
+        '<div class="mc-kanban-card-title">' + escapeHtml(goalLine || 'Standing by') + '</div>' +
+        progressHtml +
+        (state === 'waiting' && waitingFor
+          ? '<div class="mc-kanban-card-meta">Next: ' + escapeHtml(agentNameById(waitingFor)) + ' approval</div>'
+          : '') +
+        (lastTs ? '<div class="mc-kanban-card-meta">Last action: ' + mc2RelTime(lastTs) + '</div>' : '') +
+        tagHtml +
+      '</div>';
+    }
+
+    function mc2SetView(view) {
+      mc2ActiveView = view;
+      ['mission', 'agents', 'goals', 'activity'].forEach(function (v) {
+        var el = mc2El('mc2-view-' + v);
+        if (el) el.hidden = v !== view;
+      });
+      document.querySelectorAll('#page-team2 .mc-nav-item[data-mc-nav]').forEach(function (btn) {
+        var nav = btn.getAttribute('data-mc-nav');
+        btn.classList.toggle('active', nav === view);
+      });
+      if (view === 'activity') mc2RenderActivity();
+      if (view === 'goals') mc2RenderGoals();
+      if (view === 'agents') mc2RenderAgentsDetail();
+    }
+
+    function mc2RenderMissionProgress() {
+      var summary = computeTeamTaskSummary();
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+      var activeGoal = getCurrentMissionGoal();
+      var pct = 0;
+      var progressLabel = '— / — tasks completed';
+      var etaLabel = '';
+      if (activeGoal) {
+        pct = Math.max(0, Math.min(100, Math.round(Number((activeGoal.progress && activeGoal.progress.pct) || 0))));
+        var label = String(activeGoal.title || activeGoal.objective || '').trim();
+        progressLabel = escapeHtml(label ? label : 'Active goal') + ' — ' + pct + '%';
+        var totalSubs = 0, doneSubs = 0;
+        (activeGoal.subgoals || []).forEach(function sg(s) {
+          totalSubs++;
+          if (String(s.status || '').toLowerCase() === 'done') doneSubs++;
+          (s.subgoals || []).forEach(sg);
+        });
+        if (totalSubs > 0) progressLabel = doneSubs + ' / ' + totalSubs + ' tasks completed';
+      }
+      var fill = mc2El('mc2-progress-bar-fill');
+      if (fill) fill.style.width = pct + '%';
+      var pl = mc2El('mc2-progress-label');
+      if (pl) pl.textContent = progressLabel;
+      var eta = mc2El('mc2-eta-label');
+      if (eta) eta.textContent = etaLabel;
+      var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = summary.active;
+      var statWaiting = mc2El('mc2-stat-waiting'); if (statWaiting) statWaiting.textContent = summary.waiting;
+      var statBlocked = mc2El('mc2-stat-blocked'); if (statBlocked) statBlocked.textContent = summary.blocked;
+      var statDone = mc2El('mc2-stat-done'); if (statDone) statDone.textContent = summary.completedToday;
+      var statPace = mc2El('mc2-stat-pace');
+      if (statPace) {
+        var events = teamActivityEvents || [];
+        var hourAgo = Date.now() - 3600000;
+        var recent = events.filter(function (e) { return Number(e.ts) > hourAgo && String(e.type) === 'turn_done'; }).length;
+        statPace.textContent = recent + '/hr';
+      }
+      var missionSel = mc2El('mc2-mission-select');
+      if (missionSel) {
+        var goalList = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+        var activeGoals = goalList.filter(function (g) { return String(g.status || 'active').toLowerCase() === 'active'; });
+        var currentMission = getCurrentMissionGoal();
+        missionSel.innerHTML = (activeGoals.length === 0 ? '<option value="">No active mission</option>' : '') +
+          activeGoals.map(function (g) {
+            var gid = String(g.id || '');
+            var sel = currentMission && String(currentMission.id || '') === gid ? ' selected' : '';
+            return '<option value="' + escapeHtml(gid) + '"' + sel + '>' + escapeHtml(String(g.title || g.objective || 'Untitled goal')) + '</option>';
+          }).join('');
+      }
+    }
+
+    function mc2RenderKanban() {
+      var agents = agentMapData || [];
+      var ctxMap = teamAgentContextSnapshot.agents || {};
+      var working = [], waiting = [], blocked = [], nextQueue = [];
+      agents.forEach(function (a) {
+        var id = String(a.id || '');
+        var ctx = ctxMap[id] || { state: 'idle' };
+        var s = String(ctx.state || 'idle').toLowerCase();
+        if (s === 'working') working.push({ a: a, ctx: ctx });
+        else if (s === 'waiting') waiting.push({ a: a, ctx: ctx });
+        else if (s === 'error') blocked.push({ a: a, ctx: ctx });
+        else if (String(ctx.currentGoal || ctx.currentStep || '').trim()) nextQueue.push({ a: a, ctx: ctx });
+      });
+      function renderCol(colId, countId, items, emptyMsg) {
+        var col = mc2El(colId);
+        var count = mc2El(countId);
+        if (!col) return;
+        if (count) count.textContent = items.length;
+        if (!items.length) { col.innerHTML = '<p class="mc-kanban-empty">' + emptyMsg + '</p>'; return; }
+        col.innerHTML = items.map(function (item) { return mc2KanbanCard(item.a, item.ctx); }).join('');
+        col.querySelectorAll('.mc-kanban-card[data-mc-agent]').forEach(function (card) {
+          card.addEventListener('click', function () {
+            var aid = card.getAttribute('data-mc-agent');
+            if (aid) openAgentEditModal(aid);
+          });
+        });
+      }
+      renderCol('mc2-col-working', 'mc2-col-count-working', working, 'No active work');
+      renderCol('mc2-col-next', 'mc2-col-count-next', nextQueue, 'Nothing queued');
+      renderCol('mc2-col-waiting', 'mc2-col-count-waiting', waiting, 'No agents waiting');
+      renderCol('mc2-col-blocked', 'mc2-col-count-blocked', blocked, 'All clear');
+    }
+
+    function mc2RenderAgentsOverview() {
+      function render(elId) {
+        var el = mc2El(elId);
+        if (!el) return;
+        var agents = agentMapData || [];
+        if (!agents.length) { el.innerHTML = '<p style="color:var(--muted);font-size:0.66rem;">No agents yet.</p>'; return; }
+        el.innerHTML = agents.map(function (a) {
+          var id = String(a.id || '');
+          var ctx = (teamAgentContextSnapshot.agents || {})[id] || { state: 'idle' };
+          var metrics = (teamAgentMetricsSnapshot.agents || {})[id] || {};
+          var name = escapeHtml(agentCardShortName(a));
+          var s = String(ctx.state || 'idle').toLowerCase();
+          var focus = String(ctx.currentGoal || ctx.currentStep || ctx.currentThought || '').trim();
+          if (!focus && s === 'idle') focus = 'Idle';
+          var active = agentCardActiveCount(ctx, metrics);
+          var done = Number(metrics.totalHandled || 0);
+          var waitingCount = s === 'waiting' ? 1 : 0;
+          var lastTs = Number(ctx.updatedAt) || 0;
+          return '<div class="mc-agent-overview-card" data-mc-agent="' + escapeHtml(id) + '">' +
+            '<div class="mc-kanban-card-head">' +
+              mc2AvatarHtml(a) +
+              '<span class="mc-agent-role">' + name + '</span>' +
+              '<span style="margin-left:auto;font-size:0.55rem;color:var(--muted);">' + (s === 'working' ? '🟢' : s === 'waiting' ? '🟡' : s === 'error' ? '🔴' : '⚪') + '</span>' +
+            '</div>' +
+            '<div class="mc-agent-overview-focus">Focus: ' + escapeHtml(focus.slice(0, 40)) + '</div>' +
+            '<div class="mc-agent-overview-stats">' +
+              '<span class="active">' + active + ' Active</span>' +
+              '<span>' + done + ' Done</span>' +
+              (waitingCount ? '<span class="waiting">' + waitingCount + ' Waiting</span>' : '') +
+            '</div>' +
+            (lastTs ? '<div style="font-size:0.55rem;color:var(--muted);margin-top:0.25rem;">Last active: ' + mc2RelTime(lastTs) + '</div>' : '') +
+          '</div>';
+        }).join('');
+        el.querySelectorAll('.mc-agent-overview-card[data-mc-agent]').forEach(function (card) {
+          card.addEventListener('click', function () {
+            var aid = card.getAttribute('data-mc-agent');
+            if (aid) openAgentEditModal(aid);
+          });
+        });
+      }
+      render('mc2-agents-overview');
+      render('mc2-agents-detail');
+    }
+
+    function mc2RenderMovement() {
+      var el = mc2El('mc2-recent-movement');
+      if (!el) return;
+      var events = (teamActivityEvents || []).slice().reverse().slice(0, 8);
+      if (!events.length) { el.innerHTML = '<p class="mc-kanban-empty">No activity yet.</p>'; return; }
+      el.innerHTML = events.map(function (ev) {
+        var ts = Number(ev.ts) || 0;
+        var text = formatTeamActivityText ? formatTeamActivityText(ev) : escapeHtml(String(ev.type || ''));
+        var agentId = String(ev.agentId || '');
+        var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
+        return '<div class="mc-movement-item">' +
+          '<span class="mc-movement-time">' + mc2RelTime(ts) + '</span>' +
+          mc2AvatarHtml(a) +
+          '<span>' + text + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    function mc2RenderAttention() {
+      var el = mc2El('mc2-attention');
+      if (!el) return;
+      var agents = agentMapData || [];
+      var ctxMap = teamAgentContextSnapshot.agents || {};
+      var items = [];
+      agents.forEach(function (a) {
+        var id = String(a.id || '');
+        var ctx = ctxMap[id] || { state: 'idle' };
+        var s = String(ctx.state || 'idle').toLowerCase();
+        var lastTs = Number(ctx.updatedAt) || 0;
+        if (s === 'error') {
+          var reason = String(ctx.currentThought || ctx.lastAction || '').trim() || 'blocked';
+          items.push({ kind: 'error', text: escapeHtml(agentCardShortName(a)) + ' blocked — ' + escapeHtml(reason.slice(0, 60)), ts: lastTs });
+        } else if (s === 'waiting') {
+          var waitFor = String(ctx.waitingFor || '').trim();
+          var desc = waitFor ? 'waiting for ' + escapeHtml(agentNameById(waitFor)) : 'waiting for response';
+          items.push({ kind: 'warning', text: escapeHtml(agentCardShortName(a)) + ' ' + desc, ts: lastTs });
+        }
+      });
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+      goals.forEach(function (g) {
+        if (String(g.status || '').toLowerCase() === 'blocked') {
+          items.push({ kind: 'error', text: 'Goal blocked: ' + escapeHtml(String(g.title || g.objective || '').slice(0, 60)), ts: Number(g.updatedAt) || 0 });
+        }
+      });
+      items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+      if (!items.length) { el.innerHTML = '<p class="mc-kanban-empty">All clear.</p>'; return; }
+      el.innerHTML = items.slice(0, 6).map(function (item) {
+        var icon = item.kind === 'error' ? '🔴' : '⚠️';
+        return '<div class="mc-attention-item ' + item.kind + '">' +
+          '<span class="mc-attention-icon">' + icon + '</span>' +
+          '<span class="mc-attention-text">' + item.text + '</span>' +
+          (item.ts ? '<span style="margin-left:auto;flex-shrink:0;font-size:0.58rem;color:var(--muted);">' + mc2RelTime(item.ts) + '</span>' : '') +
+        '</div>';
+      }).join('');
+    }
+
+    function mc2RenderActivity() {
+      var el = mc2El('mc2-activity-feed');
+      if (!el) return;
+      var events = (teamActivityEvents || []).slice().reverse().slice(0, 60);
+      if (!events.length) { el.innerHTML = '<p class="mc-kanban-empty">No activity yet.</p>'; return; }
+      el.innerHTML = events.map(function (ev) {
+        var ts = Number(ev.ts) || 0;
+        var text = formatTeamActivityText ? formatTeamActivityText(ev) : escapeHtml(String(ev.type || ''));
+        var agentId = String(ev.agentId || '');
+        var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
+        return '<div class="mc-movement-item">' +
+          '<span class="mc-movement-time">' + mc2RelTime(ts) + '</span>' +
+          mc2AvatarHtml(a) +
+          '<span>' + text + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    function mc2RenderGoals() {
+      var el = mc2El('mc2-goals-list');
+      if (!el) return;
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+      if (!goals.length) { el.innerHTML = '<p style="color:var(--muted);font-size:0.66rem;">No goals yet. Create one in the Goals tab.</p>'; return; }
+      el.innerHTML = goals.map(function (g) {
+        var status = String(g.status || 'active').toLowerCase();
+        var pct = Math.max(0, Math.min(100, Math.round(Number((g.progress && g.progress.pct) || 0))));
+        var colorClass = status === 'active' ? 'active' : status === 'blocked' ? 'blocked' : '';
+        return '<div class="mc-progress-card" style="cursor:default;">' +
+          '<div class="mc-progress-head">' +
+            '<h3>' + escapeHtml(String(g.title || g.objective || 'Untitled goal')) + '</h3>' +
+            '<span class="team-goal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+          '</div>' +
+          '<div class="mc-progress-bar"><span style="width:' + pct + '%"></span></div>' +
+          '<div class="mc-progress-meta">' + pct + '% · Owner: ' + escapeHtml(goalOwnerLabel(g)) + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function mc2RenderAgentsDetail() {
+      mc2RenderAgentsOverview();
+    }
+
+    function mc2UpdateLiveBadge() {
+      var badge = mc2El('mc2-live-badge');
+      if (!badge) return;
+      var events = teamActivityEvents || [];
+      var recentTs = events.length ? Number(events[events.length - 1].ts) || 0 : 0;
+      var live = recentTs > 0 && (Date.now() - recentTs) < 8000;
+      badge.style.opacity = live ? '1' : '0.5';
+      var rateEl = mc2El('mc2-actions-rate');
+      if (rateEl) {
+        var hourAgo = Date.now() - 3600000;
+        var cnt = events.filter(function (e) { return Number(e.ts) > hourAgo && String(e.type) === 'turn_done'; }).length;
+        rateEl.textContent = cnt;
+      }
+    }
+
+    function renderMissionControl() {
+      mc2RenderMissionProgress();
+      mc2RenderKanban();
+      mc2RenderAgentsOverview();
+      mc2RenderMovement();
+      mc2RenderAttention();
+      mc2UpdateLiveBadge();
+      if (mc2ActiveView === 'activity') mc2RenderActivity();
+      if (mc2ActiveView === 'goals') mc2RenderGoals();
+    }
+
+    /* Wire MC sidebar nav */
+    document.querySelectorAll('#page-team2 .mc-nav-item[data-mc-nav]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var nav = btn.getAttribute('data-mc-nav');
+        if (nav === 'back') { location.hash = '#team'; return; }
+        mc2SetView(nav);
+      });
+    });
+    document.querySelectorAll('#page-team2 .mc-panel-link[data-mc-nav]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var nav = btn.getAttribute('data-mc-nav');
+        if (nav) mc2SetView(nav);
+      });
+    });
+    var mc2AddAgentBtn = document.getElementById('mc2-add-agent-btn');
+    if (mc2AddAgentBtn) {
+      mc2AddAgentBtn.addEventListener('click', function () {
+        openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+      });
+    }
     document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);
     document.getElementById('agent-create-modal-submit').addEventListener('click', function () {
       submitAgentCreateModal(true);
