@@ -180,8 +180,8 @@ const checks = [
       html.includes('/api/team/context'),
   },
   {
-    name: 'Active context panel shows goal thought waiting and last action',
-    ok: html.includes('Current Goal:') &&
+    name: 'Active context panel shows mission thought waiting and last action',
+    ok: html.includes('Current Mission:') &&
       html.includes('Current Thought:') &&
       html.includes('Waiting On:') &&
       html.includes('Last Action:') &&
@@ -217,6 +217,17 @@ const checks = [
       html.includes('Completed Today') &&
       /\.team-page-summary[\s\S]*\.team-current-mission/.test(html) &&
       /\.team-task-summary[\s\S]*\.team-task-badge/.test(html),
+  },
+  {
+    name: 'Team2 presents saved goals as missions',
+    ok: html.includes('id="mc2-mission-select"') &&
+      html.includes('aria-label="Active mission"') &&
+      html.includes('aria-label="Missions"') &&
+      html.includes('MISSIONS') &&
+      html.includes('Loading missions') &&
+      html.includes('No missions yet') &&
+      html.includes('Untitled mission') &&
+      html.includes('Active mission'),
   },
   {
     name: 'Team agent cards show state and active count',

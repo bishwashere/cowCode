@@ -6,10 +6,40 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const htmlPath = path.join(__dirname, '../../dashboard/public/index.html');
-const html = fs.readFileSync(htmlPath, 'utf8');
+const publicDir = path.join(__dirname, '../../dashboard/public');
+const htmlPath = path.join(publicDir, 'index.html');
+const dashboardShell = fs.readFileSync(htmlPath, 'utf8');
+const pageFragments = fs.readdirSync(path.join(publicDir, 'pages'))
+  .filter((name) => name.endsWith('.html'))
+  .map((name) => fs.readFileSync(path.join(publicDir, 'pages', name), 'utf8'));
+const html = [dashboardShell, ...pageFragments].join('\n');
+
+function getInlineScripts(source) {
+  return Array.from(source.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi))
+    .map((match) => match[1]);
+}
 
 const checks = [
+  {
+    name: 'Dashboard inline scripts are syntactically valid',
+    ok: getInlineScripts(dashboardShell).every((script) => {
+      try {
+        new Function(script);
+        return true;
+      } catch (err) {
+        console.error(err.message);
+        return false;
+      }
+    }),
+  },
+  {
+    name: 'Dashboard page fragment loader inserts fetched pages',
+    ok: /id="page-fragments-root"/.test(dashboardShell) && /root\.outerHTML\s*=\s*pages\.map/.test(dashboardShell) && /pages\/'\s*\+\s*page\s*\+\s*'\.html'/.test(dashboardShell) && /\.join\('\\n'\)/.test(dashboardShell),
+  },
+  {
+    name: 'Dashboard fragment wrapper does not remain in layout',
+    ok: !/#page-fragments-root\s*\{[^}]*display:\s*contents/.test(dashboardShell) && /root\.outerHTML\s*=/.test(dashboardShell),
+  },
   {
     name: 'Test sidebar group heading CSS exists',
     ok: html.includes('.test-sidebar-group-title') && html.includes('.test-sidebar-group + .test-sidebar-group'),

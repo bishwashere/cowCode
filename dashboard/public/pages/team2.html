@@ -22,8 +22,8 @@
           <button type="button" class="mc-nav-item" data-mc-nav="activity" aria-label="Activity">
             <span class="mc-nav-icon">⌁</span><span class="mc-nav-label">Activity</span>
           </button>
-          <button type="button" class="mc-nav-item" data-mc-nav="goals" aria-label="Goals">
-            <span class="mc-nav-icon">◎</span><span class="mc-nav-label">Goals</span>
+          <button type="button" class="mc-nav-item" data-mc-nav="goals" aria-label="Missions">
+            <span class="mc-nav-icon">◎</span><span class="mc-nav-label">Missions</span>
           </button>
           <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Reports">
             <span class="mc-nav-icon">▥</span><span class="mc-nav-label">Reports</span>
@@ -49,7 +49,7 @@
           <h1 class="mc-header-title">MISSION CONTROL</h1>
           <span class="mc-header-pulse" aria-hidden="true">〜</span>
           <div class="mc-mission-select-wrap">
-            <select id="mc2-mission-select" class="mc-mission-select" aria-label="Active mission / goal">
+            <select id="mc2-mission-select" class="mc-mission-select" aria-label="Active mission">
               <option value="">No active mission</option>
             </select>
           </div>
@@ -159,11 +159,11 @@
           </div>
         </div>
 
-        <!-- Goals view -->
+        <!-- Missions view -->
         <div id="mc2-view-goals" class="mc-view" hidden>
-          <p class="mc-section-title">GOALS</p>
+          <p class="mc-section-title">MISSIONS</p>
           <div id="mc2-goals-list" style="display:flex;flex-direction:column;gap:0.45rem;">
-            <p style="color:var(--muted);font-size:0.66rem;">Loading goals…</p>
+            <p style="color:var(--muted);font-size:0.66rem;">Loading missions…</p>
           </div>
         </div>
 
