@@ -7584,18 +7584,20 @@
           var metrics = (teamAgentMetricsSnapshot.agents || {})[id] || {};
           var name = escapeHtml(agentCardShortName(a));
           var s = String(ctx.state || 'idle').toLowerCase();
-          var taskTitle = mc2KanbanTaskTitle(id, ctx);
+          var focus = String(ctx.currentGoal || ctx.currentStep || ctx.currentThought || '').trim();
+          if (!focus && s === 'idle') focus = 'Idle';
+          else if (!focus) focus = s.charAt(0).toUpperCase() + s.slice(1);
           var active = agentCardActiveCount(ctx, metrics);
           var done = Number(metrics.totalHandled || 0);
           var waitingCount = s === 'waiting' ? 1 : 0;
           var lastTs = Number(ctx.updatedAt) || 0;
           return '<div class="mc-agent-overview-card" data-mc-agent="' + escapeHtml(id) + '">' +
-            '<div class="mc-agent-overview-title">' + escapeHtml(taskTitle) + '</div>' +
-            '<div class="mc-kanban-card-meta mc-kanban-card-agent">' +
+            '<div class="mc-kanban-card-head">' +
               mc2AvatarHtml(a) +
-              '<span>' + name + '</span>' +
+              '<span class="mc-agent-role">' + name + '</span>' +
               '<span class="mc-agent-state-dot ' + escapeHtml(s) + '" aria-label="' + escapeHtml(s) + '"></span>' +
             '</div>' +
+            '<div class="mc-agent-overview-focus">Focus: ' + escapeHtml(focus.slice(0, 40)) + '</div>' +
             '<div class="mc-agent-overview-stats">' +
               '<span class="active">' + active + ' Active</span>' +
               '<span>' + done + ' Done</span>' +
