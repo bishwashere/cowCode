@@ -47,7 +47,7 @@ async function run() {
   assert(mainRank && Number(mainRank.confidence) > 0.5, `Expected main to lead fitness ranking, got ${mainRank?.confidencePct}`);
   assert(fitness.recommendation.offerUpgrade === true, 'Expected upgrade offer for unmatched domain');
 
-  const ctx = buildDelegationContext({
+  const ctx = await buildDelegationContext({
     agentId: 'main',
     userText: 'I want to get in shape this summer',
     availableSkillIds: ids,

@@ -980,7 +980,7 @@ async function main() {
     // Step 2: specialization-aware delegation check before planner.
     // This runs before tool schema loading and can pre-select agent-send.
     const delegationContext = !isGroupJid
-      ? buildDelegationContext({
+      ? await buildDelegationContext({
           agentId,
           userText: text,
           availableSkillIds: enabledSkillIds,
@@ -1014,7 +1014,9 @@ async function main() {
         status: delegationContext?.recommendation?.blocked ? 'blocked' : 'ok',
         depth: 0,
         jid,
-        message: `Delegation decision selected ${delegatedTarget}`,
+        message: delegationContext?.recommendation?.routingMethod === 'llm'
+          ? `Delegation decision (LLM router) selected ${delegatedTarget}`
+          : `Delegation decision selected ${delegatedTarget}`,
         details: delegationDecision,
       });
     } else if (delegationDecision && delegationContext?.teamCapability) {

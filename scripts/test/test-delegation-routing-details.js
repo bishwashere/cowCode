@@ -8,7 +8,7 @@ async function main() {
   const { buildDelegationContext } = await import('../../lib/agent-delegation-router.js');
   const { buildDelegationDecisionDetails } = await import('../../lib/delegation-routing-details.js');
 
-  const ctx = buildDelegationContext({
+  const ctx = await buildDelegationContext({
     agentId: 'main',
     userText: "What's our company tagline for marketing materials?",
     availableSkillIds: ['agent-send', 'evaluate-team-capability'],

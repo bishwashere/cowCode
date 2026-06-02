@@ -21,7 +21,7 @@ async function run() {
   const availableSkillIds = getEnabledSkillIds({ agentId: 'main' });
   assert(availableSkillIds.includes('agent-send'), 'Expected main to have agent-send enabled');
 
-  const marketing = buildDelegationContext({
+  const marketing = await buildDelegationContext({
     agentId: 'main',
     userText: 'I need a weekly content calendar and newsletter plan for our product launch.',
     availableSkillIds,
@@ -34,21 +34,21 @@ async function run() {
   );
   assert(Array.isArray(marketing?.candidates) && marketing.candidates.length >= 1, 'Expected ranked candidate list');
 
-  const engineering = buildDelegationContext({
+  const engineering = await buildDelegationContext({
     agentId: 'main',
     userText: 'Can you investigate why our GitHub CI check is failing and propose a fix?',
     availableSkillIds,
   });
   assert(engineering?.recommendation?.targetAgentId === 'alex', `Expected alex recommendation, got ${engineering?.recommendation?.targetAgentId || 'none'}`);
 
-  const greeting = buildDelegationContext({
+  const greeting = await buildDelegationContext({
     agentId: 'main',
     userText: 'Hi',
     availableSkillIds,
   });
   assert(greeting === null, 'Expected no delegation recommendation for greeting');
 
-  const marketingTypo = buildDelegationContext({
+  const marketingTypo = await buildDelegationContext({
     agentId: 'main',
     userText: 'what can be 3 blog ideas for marketting nextpostai.com',
     availableSkillIds,
@@ -59,7 +59,7 @@ async function run() {
   );
 
   await patchAgentConfig('marketer', { title: 'Chloe' });
-  const afterRename = buildDelegationContext({
+  const afterRename = await buildDelegationContext({
     agentId: 'main',
     userText: "What's our company tagline for marketing materials?",
     availableSkillIds,
@@ -70,7 +70,7 @@ async function run() {
   );
 
   await patchAgentConfig('main', { agentMessaging: { allow: ['marketer'] } });
-  const backendNotLinkedNatural = buildDelegationContext({
+  const backendNotLinkedNatural = await buildDelegationContext({
     agentId: 'main',
     userText: 'Can you investigate why our GitHub CI check is failing and propose a fix?',
     availableSkillIds,
@@ -81,7 +81,7 @@ async function run() {
   );
 
   // Unit contract only: explicit agent name when target exists but is not linked.
-  const alexNotLinkedExplicit = buildDelegationContext({
+  const alexNotLinkedExplicit = await buildDelegationContext({
     agentId: 'main',
     userText: "Can you check with Alex if he's around?",
     availableSkillIds,

@@ -55,6 +55,7 @@ Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Tho
 | [agent/](agent/inputs.md) | `test-agent.js` | `--test` |
 | [agent-team/](agent-team/inputs.md) | `test-agent-team-e2e.js` | `--test` + dashboard |
 | [evaluate-team-capability/](evaluate-team-capability/inputs.md) | `test-evaluate-team-capability.js` | direct (routing logic) |
+| - | `test-delegation-llm-router.js` | direct (LLM hybrid router; mock LLM) |
 | [agent-team/](agent-team/inputs.md) | `test-agent-config.js` | direct (config only; replaces deleted `test-agent-team-flow.js`) |
 | [basic/](basic/inputs.md) | `test-basic-e2e.js` | `--test` |
 | [casual-greetings/](casual-greetings/inputs.md) | `test-casual-greetings.js` | unit + `--test` |

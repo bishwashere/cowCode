@@ -6130,6 +6130,17 @@
         html += '<div class="team-agent-inbox-block"><strong>Why this agent:</strong><br>' +
           escapeHtml(routing.reason) + '</div>';
       }
+      if (routing.routingMethod === 'llm') {
+        var llmLine = 'Semantic router (LLM)';
+        if (routing.keywordAction) llmLine += ' — keyword was: ' + routing.keywordAction;
+        if (routing.llmReason) llmLine += '<br>' + escapeHtml(routing.llmReason);
+        if (routing.llmConfidence != null) {
+          llmLine += '<br>LLM confidence: ' + fmtMatchPct(routing.llmConfidence);
+        }
+        html += '<div class="team-agent-inbox-block"><strong>Routing:</strong><br>' + llmLine + '</div>';
+      } else if (routing.routingMethod === 'keyword') {
+        html += '<div class="team-agent-inbox-block"><strong>Routing:</strong> keyword match</div>';
+      }
       var selected = String(routing.selected || routing.selectedAgentId || '').trim();
       if (selected) {
         var selScore = Number(routing.selectedScore);

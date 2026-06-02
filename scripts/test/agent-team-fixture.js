@@ -66,6 +66,7 @@ export async function patchAgentConfig(agentId, patch) {
  */
 export async function setupAgentTeamFixture(stateDir, opts = {}) {
   process.env.COWCODE_STATE_DIR = stateDir;
+  process.env.COWCODE_LLM_DELEGATION_ROUTER = '0';
   const { ensureMainAgentInitialized, createAgent, loadAgentConfig, saveAgentConfig, syncAgentSendSkillInConfig } =
     await import('../../lib/agent-config.js');
   const { getAgentWorkspaceDir } = await import('../../lib/paths.js');

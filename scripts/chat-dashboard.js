@@ -138,7 +138,7 @@ async function main() {
   const enabledSkillIds = getEnabledSkillIds({ agentId });
   const enabledSkillSummaries = getEnabledSkillSummaries({ agentId });
   // Step 2: specialization-aware delegation check before planner (same as index.js private chat).
-  const delegationContext = buildDelegationContext({
+  const delegationContext = await buildDelegationContext({
     agentId,
     userText: message,
     availableSkillIds: enabledSkillIds,
@@ -171,7 +171,9 @@ async function main() {
       status: delegationContext?.recommendation?.blocked ? 'blocked' : 'ok',
       depth: 0,
       jid: dashboardJid,
-      message: `Delegation decision selected ${delegatedTarget}`,
+        message: delegationContext?.recommendation?.routingMethod === 'llm'
+          ? `Delegation decision (LLM router) selected ${delegatedTarget}`
+          : `Delegation decision selected ${delegatedTarget}`,
       details: delegationDecision,
     });
   } else if (delegationDecision && delegationContext?.teamCapability) {

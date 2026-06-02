@@ -27,6 +27,7 @@
     "test:agent-team-e2e": "node scripts/test/test-agent-team-e2e.js",
     "test:agent-config": "node scripts/test/test-agent-config.js",
     "test:agent-delegation-router": "node scripts/test/test-agent-delegation-router.js",
+    "test:delegation-llm-router": "node scripts/test/test-delegation-llm-router.js",
     "test:evaluate-team-capability": "node scripts/test/test-evaluate-team-capability.js",
     "test:agent-map-ui": "node scripts/test/test-agent-map-ui.js",
     "test:apply-patch-unit": "node scripts/test/test-apply-patch-unit.js",

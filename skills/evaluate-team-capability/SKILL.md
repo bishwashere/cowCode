@@ -8,6 +8,8 @@ description: Scan linked teammates and score who best fits a user request. Retur
 
 Use this when you are the **coordinator** (main/CEO) and need to decide whether to handle a request yourself, delegate to a linked specialist, adapt an existing teammate, or offer to create a dedicated agent/goal.
 
+**Automatic routing:** Before each turn, keyword scoring runs first. If no strong match, an **LLM semantic router** reads agent titles, aliases, SOUL excerpts, and skills to pick a specialist (when confidence ≥ 0.7). You usually do not need to call this skill manually — it is reflected in inbox routing logs.
+
 ## When to use
 
 - The user asks for something outside your obvious skill set (e.g. fitness, legal, design) and no teammate is an obvious fit.
