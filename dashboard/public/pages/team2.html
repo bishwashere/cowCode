@@ -10,6 +10,9 @@
           <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Agents">
             <span class="mc-nav-icon">♙</span><span class="mc-nav-label">Agents</span>
           </button>
+          <button type="button" class="mc-nav-item" data-mc-nav="context" aria-label="Context">
+            <span class="mc-nav-icon">◌</span><span class="mc-nav-label">Context</span>
+          </button>
           <button type="button" class="mc-nav-item" data-mc-nav="initiatives" aria-label="Initiatives">
             <span class="mc-nav-icon">ϟ</span><span class="mc-nav-label">Initiatives</span>
           </button>
@@ -25,7 +28,7 @@
           <button type="button" class="mc-nav-item" data-mc-nav="goals" aria-label="Missions">
             <span class="mc-nav-icon">◎</span><span class="mc-nav-label">Missions</span>
           </button>
-          <button type="button" class="mc-nav-item" data-mc-nav="agents" aria-label="Reports">
+          <button type="button" class="mc-nav-item" data-mc-nav="stats" aria-label="Reports">
             <span class="mc-nav-icon">▥</span><span class="mc-nav-label">Reports</span>
           </button>
           <div style="margin-top:auto;padding-top:0.5rem;border-top:1px solid var(--border);margin-bottom:0.35rem;"></div>
@@ -159,6 +162,22 @@
           </div>
         </div>
 
+        <!-- Context view -->
+        <div id="mc2-view-context" class="mc-view" hidden>
+          <div class="mc-activity-toolbar">
+            <p class="mc-section-title" id="mc2-context-title">ACTIVE CONTEXT</p>
+            <label class="mc-agent-filter" for="mc2-context-agent-filter">
+              <span>Agent</span>
+              <select id="mc2-context-agent-filter" class="mc2-agent-filter-select" aria-label="Filter context by agent">
+                <option value="">All agents</option>
+              </select>
+            </label>
+          </div>
+          <div id="mc2-context-list" style="display:flex;flex-direction:column;gap:0.6rem;">
+            <p style="color:var(--muted);font-size:0.66rem;">Loading context…</p>
+          </div>
+        </div>
+
         <!-- Missions view -->
         <div id="mc2-view-goals" class="mc-view" hidden>
           <p class="mc-section-title">MISSIONS</p>
@@ -181,13 +200,29 @@
             <p class="mc-section-title" id="mc2-activity-title">LIVE ACTIVITY</p>
             <label class="mc-agent-filter" for="mc2-inbox-agent-filter">
               <span>Agent</span>
-              <select id="mc2-inbox-agent-filter" aria-label="Filter inbox by agent">
+              <select id="mc2-inbox-agent-filter" class="mc2-agent-filter-select" aria-label="Filter inbox by agent">
                 <option value="">All agents</option>
               </select>
             </label>
           </div>
           <div id="mc2-activity-feed" style="display:flex;flex-direction:column;gap:0.2rem;">
             <p style="color:var(--muted);font-size:0.66rem;">No activity yet.</p>
+          </div>
+        </div>
+
+        <!-- Reports view -->
+        <div id="mc2-view-stats" class="mc-view" hidden>
+          <div class="mc-activity-toolbar">
+            <p class="mc-section-title" id="mc2-stats-title">REPORTS</p>
+            <label class="mc-agent-filter" for="mc2-stats-agent-filter">
+              <span>Agent</span>
+              <select id="mc2-stats-agent-filter" class="mc2-agent-filter-select" aria-label="Filter reports by agent">
+                <option value="">All agents</option>
+              </select>
+            </label>
+          </div>
+          <div id="mc2-stats-list" style="display:flex;flex-direction:column;gap:0.6rem;">
+            <p style="color:var(--muted);font-size:0.66rem;">Loading reports…</p>
           </div>
         </div>
       </div>

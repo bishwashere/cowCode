@@ -7119,7 +7119,7 @@
     function mc2SetView(view) {
       mc2ActiveView = view;
       var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view;
-      ['mission', 'agents', 'goals', 'initiatives', 'activity'].forEach(function (v) {
+      ['mission', 'agents', 'context', 'goals', 'initiatives', 'activity', 'stats'].forEach(function (v) {
         var el = mc2El('mc2-view-' + v);
         if (el) el.hidden = v !== visibleView;
       });
@@ -7130,6 +7130,8 @@
       if (visibleView === 'activity') mc2RenderActivity();
       if (view === 'goals') mc2RenderGoals();
       if (view === 'initiatives') mc2RenderInitiatives();
+      if (view === 'context') mc2RenderContext();
+      if (view === 'stats') mc2RenderStats();
       if (view === 'agents') mc2RenderAgentsDetail();
     }
 
@@ -7208,7 +7210,7 @@
         col.querySelectorAll('.mc-kanban-card[data-mc-agent]').forEach(function (card) {
           card.addEventListener('click', function () {
             var aid = card.getAttribute('data-mc-agent');
-            if (aid) openAgentEditModal(aid);
+            if (aid) mc2SetAgentFilter(aid, 'context');
           });
         });
       }
@@ -7254,7 +7256,7 @@
         el.querySelectorAll('.mc-agent-overview-card[data-mc-agent]').forEach(function (card) {
           card.addEventListener('click', function () {
             var aid = card.getAttribute('data-mc-agent');
-            if (aid) openAgentEditModal(aid);
+            if (aid) mc2SetAgentFilter(aid, 'context');
           });
         });
       }
@@ -7388,6 +7390,69 @@
       }).join('');
     }
 
+    function mc2SetAgentFilter(agentId, nextView) {
+      mc2InboxAgentFilter = String(agentId || '').trim();
+      mc2SyncAgentFilterControls();
+      if (nextView) {
+        mc2SetView(nextView);
+        return;
+      }
+      if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
+      if (mc2ActiveView === 'context') mc2RenderContext();
+      if (mc2ActiveView === 'stats') mc2RenderStats();
+    }
+
+    function mc2AgentIdsForFilter() {
+      var agents = agentMapData && agentMapData.length ? agentMapData : [{ id: 'main' }];
+      if (mc2InboxAgentFilter) return [mc2InboxAgentFilter];
+      return agents.map(function (a) { return String(a && a.id || ''); }).filter(Boolean);
+    }
+
+    function mc2RenderContext() {
+      var el = mc2El('mc2-context-list');
+      if (!el) return;
+      mc2SyncAgentFilterControls();
+      var ids = mc2AgentIdsForFilter();
+      if (!ids.length) {
+        el.innerHTML = '<p class="team-agent-inbox-empty">No agents available.</p>';
+        return;
+      }
+      if (teamAgentPanelRange !== 'today') {
+        el.innerHTML = ids.map(function (agentId) {
+          return '<div class="team-agent-context-card">' +
+            '<h4>' + escapeHtml(agentNameById(agentId)) + ' — Activity Context</h4>' +
+            renderAgentContextHistory(agentId, teamActivityEventsForRange(teamAgentPanelRange)) +
+          '</div>';
+        }).join('');
+        return;
+      }
+      el.innerHTML = ids.map(function (agentId) {
+        var ctx = (teamAgentContextSnapshot.agents || {})[agentId] || { state: 'idle' };
+        return renderAgentContextCard(agentId, ctx);
+      }).join('');
+    }
+
+    function mc2RenderStats() {
+      var el = mc2El('mc2-stats-list');
+      if (!el) return;
+      mc2SyncAgentFilterControls();
+      var ids = mc2AgentIdsForFilter();
+      if (!ids.length) {
+        el.innerHTML = '<p class="team-agent-inbox-empty">No agents available.</p>';
+        return;
+      }
+      el.innerHTML = ids.map(function (agentId) {
+        var metrics = (teamAgentMetricsSnapshot.agents || {})[agentId] || {
+          tasksHandled: 0,
+          delegatedOut: 0,
+          received: 0,
+          avgDurationMs: 0,
+          skills: {},
+        };
+        return renderAgentMetricsCard(agentId, metrics);
+      }).join('');
+    }
+
     function mc2EventMatchesAgent(event, agentId) {
       var id = String(agentId || '').trim();
       if (!id) return true;
@@ -7401,8 +7466,10 @@
     }
 
     function mc2SyncInboxAgentFilter() {
-      var select = mc2El('mc2-inbox-agent-filter');
-      if (!select) return;
+      mc2SyncAgentFilterControls();
+    }
+
+    function mc2SyncAgentFilterControls() {
       var agents = agentMapData && agentMapData.length ? agentMapData : [{ id: 'main' }];
       var hasCurrent = !mc2InboxAgentFilter || agents.some(function (a) {
         return String(a && a.id || '') === mc2InboxAgentFilter;
@@ -7414,8 +7481,10 @@
         var selected = id === mc2InboxAgentFilter ? ' selected' : '';
         return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(agentDisplayLabel(a)) + '</option>';
       }).join('');
-      if (select.innerHTML !== html) select.innerHTML = html;
-      if (select.value !== mc2InboxAgentFilter) select.value = mc2InboxAgentFilter;
+      document.querySelectorAll('#page-team2 .mc2-agent-filter-select').forEach(function (selectEl) {
+        if (selectEl.innerHTML !== html) selectEl.innerHTML = html;
+        if (selectEl.value !== mc2InboxAgentFilter) selectEl.value = mc2InboxAgentFilter;
+      });
     }
 
     function mc2RenderGoals() {
@@ -7498,6 +7567,8 @@
       if (mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') mc2RenderActivity();
       if (mc2ActiveView === 'goals') mc2RenderGoals();
       if (mc2ActiveView === 'initiatives') mc2RenderInitiatives();
+      if (mc2ActiveView === 'context') mc2RenderContext();
+      if (mc2ActiveView === 'stats') mc2RenderStats();
     }
 
     /* Wire MC sidebar nav */
@@ -7520,13 +7591,11 @@
         openAgentCreateModal({ fromAgentId: selectedChatAgentId });
       });
     }
-    var mc2InboxAgentFilterEl = document.getElementById('mc2-inbox-agent-filter');
-    if (mc2InboxAgentFilterEl) {
-      mc2InboxAgentFilterEl.addEventListener('change', function () {
-        mc2InboxAgentFilter = String(mc2InboxAgentFilterEl.value || '');
-        mc2RenderActivity();
+    document.querySelectorAll('#page-team2 .mc2-agent-filter-select').forEach(function (selectEl) {
+      selectEl.addEventListener('change', function () {
+        mc2SetAgentFilter(selectEl.value || '');
       });
-    }
+    });
     document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);
     document.getElementById('agent-create-modal-submit').addEventListener('click', function () {
       submitAgentCreateModal(true);

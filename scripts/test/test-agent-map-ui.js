@@ -240,7 +240,11 @@ const checks = [
     name: 'Team2 inbox outbox and activity render distinct content',
     ok: html.includes('data-mc-nav="inbox"') &&
       html.includes('data-mc-nav="outbox"') &&
+      html.includes('data-mc-nav="context"') &&
+      html.includes('data-mc-nav="stats"') &&
       html.includes('id="mc2-inbox-agent-filter"') &&
+      html.includes('id="mc2-context-agent-filter"') &&
+      html.includes('id="mc2-stats-agent-filter"') &&
       html.includes('Filter inbox by agent') &&
       html.includes('mc2InboxAgentFilter') &&
       html.includes("var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view") &&
@@ -248,7 +252,12 @@ const checks = [
       html.includes('mc2MailboxFlows') &&
       html.includes('filterFlowsForMailbox(buildAgentInboxFlows(agentId), direction)') &&
       html.includes('flow.entries.map(renderInboxEntry)') &&
-      html.includes('mc2SyncInboxAgentFilter') &&
+      html.includes('mc2RenderContext') &&
+      html.includes('renderAgentContextCard') &&
+      html.includes('renderAgentContextHistory') &&
+      html.includes('mc2RenderStats') &&
+      html.includes('renderAgentMetricsCard') &&
+      html.includes('mc2SyncAgentFilterControls') &&
       html.includes('mc2EventMatchesAgent'),
   },
   {
