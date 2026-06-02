@@ -269,6 +269,11 @@ const checks = [
       html.includes('mc2RenderStats') &&
       html.includes('renderAgentMetricsCard') &&
       html.includes('mc2SyncAgentFilterControls') &&
+      html.includes('mc2InferRangeFromTs') &&
+      html.includes('mc2SetTimelineHighlight') &&
+      html.includes('mc2SyncTimelineHighlightForScroll') &&
+      html.includes('mc2FirstVisibleTsInActivityView') &&
+      html.includes('data-ts=') &&
       html.includes('mc2EventMatchesAgent'),
   },
   {

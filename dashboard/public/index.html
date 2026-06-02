@@ -5201,6 +5201,7 @@
       renderAgentOutbox();
       renderAgentMetrics();
       renderMissionControl();
+      mc2SyncTimelineHighlightForScroll();
     }
 
     function selectTeamInboxAgent(agentId) {
@@ -6343,7 +6344,8 @@
 
     function renderInboxEntry(entry) {
       var time = formatInboxTime(entry.ts);
-      var html = '<div class="team-agent-inbox-entry"><div class="team-agent-inbox-time">' + escapeHtml(time) + '</div>';
+      var ts = Number(entry && entry.ts) || 0;
+      var html = '<div class="team-agent-inbox-entry" data-ts="' + escapeHtml(String(ts)) + '"><div class="team-agent-inbox-time">' + escapeHtml(time) + '</div>';
       if (entry.type === 'delegation_decision') {
         html += '<div class="team-agent-inbox-label">' + escapeHtml(entry.label || ('Delegated to ' + agentNameById(entry.target))) + '</div>';
         html += renderRoutingFactors(entry.routing || {
@@ -7061,6 +7063,7 @@
 
     var mc2ActiveView = 'mission';
     var mc2InboxAgentFilter = '';
+    var mc2TimelineScrollRaf = 0;
 
     function mc2El(id) { return document.getElementById(id); }
 
@@ -7134,6 +7137,55 @@
       if (view === 'context') mc2RenderContext();
       if (view === 'stats') mc2RenderStats();
       if (view === 'agents') mc2RenderAgentsDetail();
+      mc2SyncTimelineHighlightForScroll();
+    }
+
+    function mc2InferRangeFromTs(ts) {
+      var n = Number(ts) || 0;
+      if (!n) return 'all';
+      if (eventTsInTeamAgentRange(n, 'today')) return 'today';
+      if (eventTsInTeamAgentRange(n, 'yesterday')) return 'yesterday';
+      if (eventTsInTeamAgentRange(n, 'last7')) return 'last7';
+      if (eventTsInTeamAgentRange(n, 'last30')) return 'last30';
+      return 'all';
+    }
+
+    function mc2SetTimelineHighlight(rangeKey) {
+      var key = TEAM_AGENT_RANGE_LABELS[String(rangeKey || '').trim()] ? String(rangeKey) : 'today';
+      document.querySelectorAll('#page-team2 .mc2-range-controls .team-agent-panel-range').forEach(function (btn) {
+        var active = btn.getAttribute('data-range') === key;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
+
+    function mc2FirstVisibleTsInActivityView() {
+      var view = mc2El('mc2-view-activity');
+      if (!view || view.hidden) return 0;
+      var markers = view.querySelectorAll('#mc2-activity-feed [data-ts]');
+      if (!markers.length) return 0;
+      var viewRect = view.getBoundingClientRect();
+      var threshold = viewRect.top + 84;
+      for (var i = 0; i < markers.length; i++) {
+        var markerRect = markers[i].getBoundingClientRect();
+        if (markerRect.bottom > threshold) {
+          return Number(markers[i].getAttribute('data-ts')) || 0;
+        }
+      }
+      return Number(markers[markers.length - 1].getAttribute('data-ts')) || 0;
+    }
+
+    function mc2SyncTimelineHighlightForScroll() {
+      if (teamAgentPanelRange !== 'all') {
+        mc2SetTimelineHighlight(teamAgentPanelRange);
+        return;
+      }
+      if (!(mc2ActiveView === 'activity' || mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox')) {
+        mc2SetTimelineHighlight('all');
+        return;
+      }
+      var ts = mc2FirstVisibleTsInActivityView();
+      mc2SetTimelineHighlight(mc2InferRangeFromTs(ts));
     }
 
     function mc2RenderMissionProgress() {
@@ -7281,12 +7333,13 @@
         var text = formatTeamActivityText ? formatTeamActivityText(ev) : escapeHtml(String(ev.type || ''));
         var agentId = String(ev.agentId || '');
         var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
-        return '<div class="mc-movement-item">' +
+        return '<div class="mc-movement-item" data-ts="' + escapeHtml(String(ts)) + '">' +
           '<span class="mc-movement-time">' + mc2RelTime(ts) + '</span>' +
           mc2AvatarHtml(a) +
           '<span>' + text + '</span>' +
         '</div>';
       }).join('');
+      mc2SyncTimelineHighlightForScroll();
     }
 
     function mc2RenderAttention() {
@@ -7414,7 +7467,8 @@
       }
       var showAgent = !mc2InboxAgentFilter;
       var rows = flows.map(function (flow) {
-        return '<div class="team-agent-inbox-flow">' +
+        var flowTs = Number(flow && flow.ts) || 0;
+        return '<div class="team-agent-inbox-flow" data-ts="' + escapeHtml(String(flowTs)) + '">' +
           (showAgent ? '<div class="team-agent-inbox-label">' + escapeHtml(agentNameById(flow.agentId)) + '</div>' : '') +
           flow.entries.map(renderInboxEntry).join('') +
         '</div>';
@@ -7422,9 +7476,11 @@
       if (usedAllTimeFallback) {
         var rangeLabel = teamAgentRangeLabel(teamAgentPanelRange).toLowerCase();
         el.innerHTML = '<p class="mc-kanban-empty">No ' + escapeHtml(direction) + ' activity for ' + escapeHtml(label) + ' in ' + escapeHtml(rangeLabel) + '; showing all time.</p>' + rows;
+        mc2SyncTimelineHighlightForScroll();
         return;
       }
       el.innerHTML = rows;
+      mc2SyncTimelineHighlightForScroll();
     }
 
     function mc2SetAgentFilter(agentId, nextView) {
@@ -7633,6 +7689,16 @@
         mc2SetAgentFilter(selectEl.value || '');
       });
     });
+    var mc2ActivityViewEl = document.getElementById('mc2-view-activity');
+    if (mc2ActivityViewEl) {
+      mc2ActivityViewEl.addEventListener('scroll', function () {
+        if (mc2TimelineScrollRaf) return;
+        mc2TimelineScrollRaf = requestAnimationFrame(function () {
+          mc2TimelineScrollRaf = 0;
+          mc2SyncTimelineHighlightForScroll();
+        });
+      }, { passive: true });
+    }
     document.getElementById('agent-create-modal-cancel').addEventListener('click', closeAgentCreateModal);
     document.getElementById('agent-create-modal-submit').addEventListener('click', function () {
       submitAgentCreateModal(true);
