@@ -1080,7 +1080,27 @@
     }
     .team-activity-text {
       color: var(--text);
+      flex: 1 1 auto;
+      min-width: 0;
       word-break: break-word;
+    }
+    .mc-activity-agent {
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-bottom: 0.15rem;
+    }
+    .mc-activity-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 0.12rem;
+    }
+    .mc-activity-line {
+      color: var(--muted);
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+    .mc-activity-line:last-child {
+      color: var(--text);
     }
     .team-activity-text .accent {
       color: var(--accent);
@@ -6722,6 +6742,15 @@
         if (type === 'skill_start') {
           var next = events[i + 1];
           if (next && String(next.type || '') === 'skill_done' && String(next.skillId || '') === String(ev.skillId || '')) {
+            out.push({
+              type: 'skill_done',
+              agentId: next.agentId || ev.agentId,
+              skillId: next.skillId || ev.skillId,
+              action: ev.action || next.action || '',
+              ts: next.ts || ev.ts,
+              message: next.message || ev.message || '',
+            });
+            i++;
             continue;
           }
         }
@@ -6876,16 +6905,22 @@
       flushSkillBuffer(skillBuffer);
 
       groups.forEach(function (group) {
-        if (group.events.length > 1) {
-          var compressed = compressTurnSkillEvents(group.events);
-          if (compressed.length !== group.events.length) {
-            group.lines = [];
-            group._keys = {};
-            compressed.forEach(function (ev) {
-              pushUniqueActivityLine(group, formatTeamActivitySubline(ev));
-            });
-          }
+        if (!group.events || group.events.length <= 1) {
+          delete group._keys;
+          delete group.events;
+          return;
         }
+        var compressed = compressTurnSkillEvents(group.events);
+        group.lines = [];
+        group._keys = {};
+        compressed.forEach(function (ev) {
+          var evType = String(ev.type || '');
+          if (evType.indexOf('skill_') === 0 || evType === 'turn_start' || evType === 'turn_done') {
+            pushUniqueActivityLine(group, formatTeamActivitySubline(ev));
+          } else {
+            pushUniqueActivityLine(group, formatTeamActivityText(ev));
+          }
+        });
         delete group._keys;
         delete group.events;
       });
@@ -7946,18 +7981,10 @@
     function mc2RenderMovement() {
       var el = mc2El('mc2-recent-movement');
       if (!el) return;
-      var events = (teamActivityEvents || []).slice().reverse().slice(0, 8);
-      if (!events.length) { el.innerHTML = '<p class="mc-kanban-empty">No activity yet.</p>'; return; }
-      el.innerHTML = events.map(function (ev) {
-        var ts = Number(ev.ts) || 0;
-        var text = formatTeamActivityText ? formatTeamActivityText(ev) : escapeHtml(String(ev.type || ''));
-        var agentId = String(ev.agentId || '');
-        var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
-        return '<div class="mc-movement-item" data-ts="' + escapeHtml(String(ts)) + '">' +
-          '<span class="mc-movement-time">' + mc2RelTime(ts) + '</span>' +
-          mc2AvatarHtml(a) +
-          '<span>' + text + '</span>' +
-        '</div>';
+      var groups = groupTeamActivityEvents((teamActivityEvents || []).slice(-80)).slice(0, 8);
+      if (!groups.length) { el.innerHTML = '<p class="mc-kanban-empty">No activity yet.</p>'; return; }
+      el.innerHTML = groups.map(function (group) {
+        return renderTeamActivityGroupRow(group, { timeHtml: mc2RelTime(group.ts) });
       }).join('');
       mc2SyncTimelineHighlightForScroll();
     }
@@ -8011,26 +8038,19 @@
       var titleEl = mc2El('mc2-activity-title');
       if (titleEl) titleEl.textContent = 'LIVE ACTIVITY';
       mc2SyncInboxAgentFilter();
-      var events = (teamActivityEvents || []).filter(function (ev) {
+      var filtered = (teamActivityEvents || []).filter(function (ev) {
         return mc2EventMatchesAgent(ev, mc2InboxAgentFilter);
-      }).slice().reverse().slice(0, 60);
-      if (!events.length) {
+      });
+      var groups = groupTeamActivityEvents(filtered.slice(-200)).slice(0, 60);
+      if (!groups.length) {
         mc2TimelineSpyEnabled = false;
         var emptyLabel = mc2InboxAgentFilter ? (' for ' + agentNameById(mc2InboxAgentFilter)) : '';
         el.innerHTML = '<p class="mc-kanban-empty">No activity' + escapeHtml(emptyLabel) + ' yet.</p>';
         return;
       }
       mc2TimelineSpyEnabled = true;
-      el.innerHTML = events.map(function (ev) {
-        var ts = Number(ev.ts) || 0;
-        var text = formatTeamActivityText ? formatTeamActivityText(ev) : escapeHtml(String(ev.type || ''));
-        var agentId = String(ev.agentId || '');
-        var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
-        return '<div class="mc-movement-item" data-ts="' + escapeHtml(String(ts)) + '">' +
-          '<span class="mc-movement-time">' + mc2RelTime(ts) + '</span>' +
-          mc2AvatarHtml(a) +
-          '<span>' + text + '</span>' +
-        '</div>';
+      el.innerHTML = groups.map(function (group) {
+        return renderTeamActivityGroupRow(group, { timeHtml: mc2RelTime(group.ts) });
       }).join('');
       mc2SyncTimelineHighlightForScroll();
     }

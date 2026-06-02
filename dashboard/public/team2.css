@@ -728,6 +728,37 @@ button.mc-stat-card-action:focus-visible {
   font-size: 0.58rem;
 }
 
+.mc-activity-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mc-activity-agent {
+  font-size: 0.62rem;
+  font-weight: 600;
+  margin-bottom: 0.12rem;
+}
+
+.mc-activity-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mc-activity-line {
+  color: var(--text);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.mc-activity-group .mc-activity-line {
+  color: var(--muted);
+}
+
+.mc-activity-group .mc-activity-line:last-child {
+  color: var(--text);
+}
+
 .mc-attention-icon { flex-shrink: 0; width: 1.1rem; text-align: center; }
 
 .mc-attention-item.error   .mc-attention-text { color: #fca5a5; }
