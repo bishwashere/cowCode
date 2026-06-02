@@ -2573,8 +2573,7 @@
           throw new Error('Failed to load page fragment: ' + page + ' (' + xhr.status + ')');
         }
         return xhr.responseText;
-      }).join('
-');
+      }).join('\n');
     })();
   </script>
 
@@ -7154,8 +7153,10 @@
       if (fill) fill.style.width = pct + '%';
       var pl = mc2El('mc2-progress-label');
       if (pl) pl.textContent = progressLabel;
+      var pp = mc2El('mc2-progress-percent');
+      if (pp) pp.textContent = pct + '%';
       var eta = mc2El('mc2-eta-label');
-      if (eta) eta.textContent = etaLabel;
+      if (eta) eta.textContent = etaLabel || (activeGoal ? 'ETA: tracking live work' : 'ETA: no active mission');
       var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = summary.active;
       var statWaiting = mc2El('mc2-stat-waiting'); if (statWaiting) statWaiting.textContent = summary.waiting;
       var statBlocked = mc2El('mc2-stat-blocked'); if (statBlocked) statBlocked.textContent = summary.blocked;
@@ -7236,7 +7237,7 @@
             '<div class="mc-kanban-card-head">' +
               mc2AvatarHtml(a) +
               '<span class="mc-agent-role">' + name + '</span>' +
-              '<span style="margin-left:auto;font-size:0.55rem;color:var(--muted);">' + (s === 'working' ? '🟢' : s === 'waiting' ? '🟡' : s === 'error' ? '🔴' : '⚪') + '</span>' +
+              '<span class="mc-agent-state-dot ' + escapeHtml(s) + '" aria-label="' + escapeHtml(s) + '"></span>' +
             '</div>' +
             '<div class="mc-agent-overview-focus">Focus: ' + escapeHtml(focus.slice(0, 40)) + '</div>' +
             '<div class="mc-agent-overview-stats">' +

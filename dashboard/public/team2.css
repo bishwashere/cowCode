@@ -949,3 +949,344 @@ body.dashboard-team2-active {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ── Mission Control reference polish ─────────────────────────────────── */
+
+body.dashboard-team2-active {
+  background:
+    radial-gradient(circle at 20% -12%, rgba(124, 58, 237, 0.22), transparent 25rem),
+    radial-gradient(circle at 82% 4%, rgba(59, 130, 246, 0.14), transparent 22rem),
+    #030712;
+}
+
+.mc-shell {
+  min-height: 100dvh;
+  background:
+    linear-gradient(135deg, rgba(8, 13, 29, 0.96), rgba(5, 9, 22, 0.98)),
+    #050816;
+}
+
+.mc-main {
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at 55% 0%, rgba(124, 58, 237, 0.12), transparent 23rem);
+  background-size: 42px 42px, 42px 42px, auto;
+}
+
+.mc-header {
+  height: 3.75rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.12);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.mc-header-title {
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+.mc-header-pulse {
+  font-size: 1.15rem;
+}
+
+.mc-mission-select-wrap {
+  justify-content: center;
+}
+
+.mc-mission-select {
+  max-width: 18.7rem;
+  height: 2rem;
+  padding-left: 2rem;
+  border-radius: 0.55rem;
+  background:
+    linear-gradient(90deg, rgba(124, 58, 237, 0.16), rgba(15, 23, 42, 0.86)),
+    rgba(8, 13, 29, 0.88);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(167, 139, 250, 0.06);
+}
+
+.mc-mission-select-wrap::before {
+  content: "◈";
+  position: relative;
+  z-index: 1;
+  left: 1.55rem;
+  align-self: center;
+  margin-left: -1rem;
+  color: #a78bfa;
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+.mc-view {
+  padding: 0.75rem 0.95rem 0.85rem;
+  gap: 0.7rem;
+}
+
+.mc-progress-card {
+  display: grid;
+  grid-template-columns: minmax(18rem, 1.35fr) minmax(30rem, 2fr);
+  gap: 0.75rem;
+  align-items: stretch;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.75rem;
+}
+
+.mc-progress-summary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.mc-progress-score {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.85rem;
+  margin: 0.24rem 0 0.36rem;
+}
+
+.mc-progress-current {
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.mc-progress-current::first-letter {
+  color: #8b5cf6;
+}
+
+.mc-progress-percent {
+  color: #dbeafe;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.mc-progress-bar {
+  max-width: none;
+  height: 0.54rem;
+  margin: 0 0 0.45rem;
+}
+
+.mc-progress-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mc-progress-meta::before {
+  content: "◎";
+  color: #94a3b8;
+  font-size: 0.62rem;
+}
+
+.mc-stat-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0;
+}
+
+.mc-stat-card {
+  min-height: 5.3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 0.65rem;
+  text-align: center;
+}
+
+.mc-stat-card::after {
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.34rem;
+  overflow: hidden;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.mc-stat-label {
+  color: #dbeafe;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.mc-stat-value {
+  margin-bottom: 0.62rem;
+  font-size: 1.72rem;
+}
+
+.mc-kanban {
+  gap: 0.6rem;
+}
+
+.mc-kanban-col {
+  min-height: 14.9rem;
+  padding: 0.55rem;
+  border-color: rgba(99, 102, 241, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.mc-kanban-col-head::after {
+  content: "•••";
+  margin-left: auto;
+  color: #6b7280;
+  letter-spacing: 0.08em;
+}
+
+.mc-kanban-col-count {
+  margin-left: 0.2rem;
+}
+
+.mc-kanban-card {
+  position: relative;
+  min-height: 5.85rem;
+  border-color: rgba(129, 140, 248, 0.12);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(99, 102, 241, 0.12), transparent 5rem),
+    linear-gradient(180deg, rgba(19, 29, 56, 0.96), rgba(13, 20, 39, 0.96));
+}
+
+.mc-kanban-card::after {
+  content: "⋮";
+  position: absolute;
+  top: 0.48rem;
+  right: 0.48rem;
+  color: #7f8eaa;
+  font-size: 0.8rem;
+}
+
+.mc-kanban-card-title {
+  padding-right: 0.45rem;
+}
+
+.mc-kanban-card-meta {
+  margin-top: 0.18rem;
+}
+
+.mc-agent-avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.82),
+    0 0 15px rgba(124, 58, 237, 0.28);
+}
+
+.mc-agents-overview {
+  grid-template-columns: repeat(4, minmax(10rem, 1fr));
+}
+
+.mc-agent-overview-card {
+  position: relative;
+  min-height: 6.1rem;
+  padding: 0.6rem 0.65rem;
+  overflow: hidden;
+}
+
+.mc-agent-overview-card::after {
+  content: "⌁⌁⌁⌁⌁";
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.36rem;
+  color: #60a5fa;
+  opacity: 0.35;
+  letter-spacing: -0.12em;
+}
+
+.mc-agent-state-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-left: auto;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  box-shadow: 0 0 10px rgba(148, 163, 184, 0.25);
+}
+
+.mc-agent-state-dot.working {
+  background: #22c55e;
+  border-color: rgba(34, 197, 94, 0.7);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.65);
+}
+
+.mc-agent-state-dot.waiting {
+  background: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.72);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.55);
+}
+
+.mc-agent-state-dot.error {
+  background: #fb4769;
+  border-color: rgba(251, 71, 105, 0.7);
+  box-shadow: 0 0 12px rgba(251, 71, 105, 0.58);
+}
+
+.mc-agent-overview-stats {
+  justify-content: space-between;
+  max-width: 8.5rem;
+}
+
+.mc-panel {
+  border-radius: 0.72rem;
+}
+
+.mc-movement-item,
+.mc-attention-item {
+  align-items: center;
+}
+
+.mc-attention-item .mc-attention-text {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 1260px) {
+  .mc-progress-card {
+    grid-template-columns: 1fr;
+  }
+
+  .mc-stat-grid {
+    grid-template-columns: repeat(5, minmax(6.4rem, 1fr));
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  body.dashboard-team2-active {
+    overflow: auto;
+  }
+
+  .mc-shell {
+    min-height: auto;
+  }
+
+  .mc-sidebar {
+    flex-basis: 4.25rem;
+    width: 4.25rem;
+  }
+
+  .mc-nav-label,
+  .mc-nav-badge,
+  .mc-sidebar-footer {
+    display: none;
+  }
+
+  .mc-nav-item {
+    justify-content: center;
+  }
+
+  .mc-header {
+    height: auto;
+    flex-wrap: wrap;
+  }
+
+  .mc-mission-select-wrap {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .mc-kanban,
+  .mc-agents-overview {
+    grid-template-columns: 1fr;
+  }
+}

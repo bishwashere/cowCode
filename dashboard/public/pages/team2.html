@@ -68,12 +68,17 @@
           <!-- Progress row -->
           <div class="mc-progress-row">
             <div class="mc-progress-card">
-              <div class="mc-progress-head">
-                <h3>MISSION PROGRESS</h3>
-                <span class="mc-progress-meta" id="mc2-progress-label">— / — tasks completed</span>
-                <span class="mc-progress-meta" id="mc2-eta-label"></span>
+              <div class="mc-progress-summary">
+                <div class="mc-progress-head">
+                  <h3>MISSION PROGRESS</h3>
+                </div>
+                <div class="mc-progress-score">
+                  <span class="mc-progress-current" id="mc2-progress-label">— / — tasks completed</span>
+                  <span class="mc-progress-percent" id="mc2-progress-percent">0%</span>
+                </div>
+                <div class="mc-progress-bar"><span id="mc2-progress-bar-fill" style="width:0%"></span></div>
+                <span class="mc-progress-meta" id="mc2-eta-label">ETA: live</span>
               </div>
-              <div class="mc-progress-bar"><span id="mc2-progress-bar-fill" style="width:0%"></span></div>
               <div class="mc-stat-grid">
                 <div class="mc-stat-card">
                   <div class="mc-stat-label">Active</div>
