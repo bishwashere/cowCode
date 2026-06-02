@@ -230,13 +230,17 @@ const checks = [
       html.includes('Active mission'),
   },
   {
-    name: 'Team2 inbox can filter activity by agent',
+    name: 'Team2 inbox outbox and activity render distinct content',
     ok: html.includes('data-mc-nav="inbox"') &&
       html.includes('data-mc-nav="outbox"') &&
       html.includes('id="mc2-inbox-agent-filter"') &&
       html.includes('Filter inbox by agent') &&
       html.includes('mc2InboxAgentFilter') &&
       html.includes("var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view") &&
+      html.includes("mc2RenderMailbox(mc2ActiveView)") &&
+      html.includes('mc2MailboxFlows') &&
+      html.includes('filterFlowsForMailbox(buildAgentInboxFlows(agentId), direction)') &&
+      html.includes('flow.entries.map(renderInboxEntry)') &&
       html.includes('mc2SyncInboxAgentFilter') &&
       html.includes('mc2EventMatchesAgent'),
   },

@@ -7320,14 +7320,12 @@
     function mc2RenderActivity() {
       var el = mc2El('mc2-activity-feed');
       if (!el) return;
-      var titleEl = mc2El('mc2-activity-title');
-      if (titleEl) {
-        titleEl.textContent = mc2ActiveView === 'inbox'
-          ? 'INBOX'
-          : mc2ActiveView === 'outbox'
-            ? 'OUTBOX'
-            : 'LIVE ACTIVITY';
+      if (mc2ActiveView === 'inbox' || mc2ActiveView === 'outbox') {
+        mc2RenderMailbox(mc2ActiveView);
+        return;
       }
+      var titleEl = mc2El('mc2-activity-title');
+      if (titleEl) titleEl.textContent = 'LIVE ACTIVITY';
       mc2SyncInboxAgentFilter();
       var events = (teamActivityEvents || []).filter(function (ev) {
         return mc2EventMatchesAgent(ev, mc2InboxAgentFilter);
@@ -7346,6 +7344,45 @@
           '<span class="mc-movement-time">' + mc2RelTime(ts) + '</span>' +
           mc2AvatarHtml(a) +
           '<span>' + text + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    function mc2MailboxAgentIds() {
+      var agents = agentMapData && agentMapData.length ? agentMapData : [{ id: 'main' }];
+      if (mc2InboxAgentFilter) return [mc2InboxAgentFilter];
+      return agents.map(function (a) { return String(a && a.id || ''); }).filter(Boolean);
+    }
+
+    function mc2MailboxFlows(direction) {
+      var flows = [];
+      mc2MailboxAgentIds().forEach(function (agentId) {
+        filterFlowsForMailbox(buildAgentInboxFlows(agentId), direction).forEach(function (flow) {
+          flows.push({ ts: flow.ts, agentId: agentId, entries: flow.entries || [] });
+        });
+      });
+      flows = filterFlowsByTeamAgentRange(flows, teamAgentPanelRange);
+      flows.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
+      return flows;
+    }
+
+    function mc2RenderMailbox(direction) {
+      var el = mc2El('mc2-activity-feed');
+      if (!el) return;
+      var titleEl = mc2El('mc2-activity-title');
+      if (titleEl) titleEl.textContent = direction === 'outbox' ? 'OUTBOX' : 'INBOX';
+      mc2SyncInboxAgentFilter();
+      var flows = mc2MailboxFlows(direction).slice(0, 60);
+      var label = mc2InboxAgentFilter ? agentNameById(mc2InboxAgentFilter) : 'all agents';
+      if (!flows.length) {
+        el.innerHTML = '<p class="mc-kanban-empty">No ' + escapeHtml(direction) + ' activity for ' + escapeHtml(label) + ' yet.</p>';
+        return;
+      }
+      var showAgent = !mc2InboxAgentFilter;
+      el.innerHTML = flows.map(function (flow) {
+        return '<div class="team-agent-inbox-flow">' +
+          (showAgent ? '<div class="team-agent-inbox-label">' + escapeHtml(agentNameById(flow.agentId)) + '</div>' : '') +
+          flow.entries.map(renderInboxEntry).join('') +
         '</div>';
       }).join('');
     }
