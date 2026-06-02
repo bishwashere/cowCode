@@ -271,7 +271,11 @@ const checks = [
       html.includes('mc2SetTimelineHighlight') &&
       html.includes('mc2SyncTimelineHighlightForScroll') &&
       html.includes('mc2ScrollToRange') &&
-      html.includes('mc2FirstVisibleTsInActivityView') &&
+      html.includes('mc2ScrollViewAndFeed') &&
+      html.includes('mc2FirstVisibleTsInScrollView') &&
+      html.includes('mc2ContextSections') &&
+      html.includes('mc2BindTimelineScrollSpy') &&
+      html.includes("mc2ActiveView === 'context'") &&
       html.includes('data-ts=') &&
       html.includes('mc2EventMatchesAgent'),
   },
