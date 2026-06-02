@@ -250,7 +250,10 @@ const checks = [
       html.includes("var visibleView = (view === 'inbox' || view === 'outbox') ? 'activity' : view") &&
       html.includes("mc2RenderMailbox(mc2ActiveView)") &&
       html.includes('mc2MailboxFlows') &&
+      html.includes('mc2MailboxFlows(direction, range)') &&
       html.includes('filterFlowsForMailbox(buildAgentInboxFlows(agentId), direction)') &&
+      html.includes('var allTimeFlows = mc2MailboxFlows(direction, \'all\').slice(0, 60);') &&
+      html.includes('No ' + "' + escapeHtml(direction) + '" + ' activity for ' + "' + escapeHtml(label) + '" + ' in ' + "' + escapeHtml(rangeLabel) + '" + '; showing all time.') &&
       html.includes('flow.entries.map(renderInboxEntry)') &&
       html.includes('mc2RenderContext') &&
       html.includes('renderAgentContextCard') &&

@@ -7191,14 +7191,20 @@
       var agents = agentMapData || [];
       var ctxMap = teamAgentContextSnapshot.agents || {};
       var working = [], waiting = [], blocked = [], nextQueue = [];
+      var NEXT_QUEUE_MAX_IDLE_MS = 6 * 60 * 60 * 1000;
+      var NEXT_QUEUE_STANDBY_RE = /\b(standing by|idle|standby|next task|no active task)\b/i;
       agents.forEach(function (a) {
         var id = String(a.id || '');
         var ctx = ctxMap[id] || { state: 'idle' };
         var s = String(ctx.state || 'idle').toLowerCase();
+        var queuedText = String(ctx.currentGoal || ctx.currentStep || '').trim();
+        var lastTs = Number(ctx.updatedAt) || 0;
+        var isRecent = !!lastTs && (Date.now() - lastTs) <= NEXT_QUEUE_MAX_IDLE_MS;
+        var isStandby = NEXT_QUEUE_STANDBY_RE.test(queuedText);
         if (s === 'working') working.push({ a: a, ctx: ctx });
         else if (s === 'waiting') waiting.push({ a: a, ctx: ctx });
         else if (s === 'error') blocked.push({ a: a, ctx: ctx });
-        else if (String(ctx.currentGoal || ctx.currentStep || '').trim()) nextQueue.push({ a: a, ctx: ctx });
+        else if (queuedText && isRecent && !isStandby) nextQueue.push({ a: a, ctx: ctx });
       });
       function renderCol(colId, countId, items, emptyMsg) {
         var col = mc2El(colId);
@@ -7352,19 +7358,35 @@
     }
 
     function mc2MailboxAgentIds() {
-      var agents = agentMapData && agentMapData.length ? agentMapData : [{ id: 'main' }];
       if (mc2InboxAgentFilter) return [mc2InboxAgentFilter];
-      return agents.map(function (a) { return String(a && a.id || ''); }).filter(Boolean);
+      var ids = {};
+      (agentMapData || []).forEach(function (a) {
+        var id = String(a && a.id || '').trim();
+        if (id) ids[id] = true;
+      });
+      (teamActivityEvents || []).forEach(function (event) {
+        var agentId = String(event && event.agentId || '').trim();
+        var targetAgentId = String(event && event.targetAgentId || '').trim();
+        if (agentId) ids[agentId] = true;
+        if (targetAgentId) ids[targetAgentId] = true;
+        var details = event && typeof event.details === 'object' ? event.details : null;
+        var selectedId = String(details && details.selected || '').trim();
+        if (selectedId) ids[selectedId] = true;
+      });
+      var agentIds = Object.keys(ids);
+      if (!agentIds.length) agentIds.push('main');
+      return agentIds;
     }
 
-    function mc2MailboxFlows(direction) {
+    function mc2MailboxFlows(direction, range) {
       var flows = [];
+      var activeRange = String(range || teamAgentPanelRange || 'today').trim();
       mc2MailboxAgentIds().forEach(function (agentId) {
         filterFlowsForMailbox(buildAgentInboxFlows(agentId), direction).forEach(function (flow) {
           flows.push({ ts: flow.ts, agentId: agentId, entries: flow.entries || [] });
         });
       });
-      flows = filterFlowsByTeamAgentRange(flows, teamAgentPanelRange);
+      flows = filterFlowsByTeamAgentRange(flows, activeRange);
       flows.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
       return flows;
     }
@@ -7377,17 +7399,31 @@
       mc2SyncInboxAgentFilter();
       var flows = mc2MailboxFlows(direction).slice(0, 60);
       var label = mc2InboxAgentFilter ? agentNameById(mc2InboxAgentFilter) : 'all agents';
+      var usedAllTimeFallback = false;
+      if (!flows.length && teamAgentPanelRange !== 'all') {
+        var allTimeFlows = mc2MailboxFlows(direction, 'all').slice(0, 60);
+        if (allTimeFlows.length) {
+          flows = allTimeFlows;
+          usedAllTimeFallback = true;
+        }
+      }
       if (!flows.length) {
         el.innerHTML = '<p class="mc-kanban-empty">No ' + escapeHtml(direction) + ' activity for ' + escapeHtml(label) + ' yet.</p>';
         return;
       }
       var showAgent = !mc2InboxAgentFilter;
-      el.innerHTML = flows.map(function (flow) {
+      var rows = flows.map(function (flow) {
         return '<div class="team-agent-inbox-flow">' +
           (showAgent ? '<div class="team-agent-inbox-label">' + escapeHtml(agentNameById(flow.agentId)) + '</div>' : '') +
           flow.entries.map(renderInboxEntry).join('') +
         '</div>';
       }).join('');
+      if (usedAllTimeFallback) {
+        var rangeLabel = teamAgentRangeLabel(teamAgentPanelRange).toLowerCase();
+        el.innerHTML = '<p class="mc-kanban-empty">No ' + escapeHtml(direction) + ' activity for ' + escapeHtml(label) + ' in ' + escapeHtml(rangeLabel) + '; showing all time.</p>' + rows;
+        return;
+      }
+      el.innerHTML = rows;
     }
 
     function mc2SetAgentFilter(agentId, nextView) {
