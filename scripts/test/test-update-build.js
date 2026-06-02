@@ -1,9 +1,10 @@
 /**
  * Build label helpers for cowcode update (version + git short SHA).
  */
-import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
 import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 import { formatVersionLabel, readBuild, fetchRemoteBuildSync, BUILD_FILE } from '../../lib/build-info.js';
 
 let failed = 0;
@@ -21,6 +22,7 @@ const dir = mkdtempSync(join(tmpdir(), 'cowcode-build-test-'));
 const root = join(dir, 'install');
 mkdirSync(root, { recursive: true });
 writeFileSync(join(root, BUILD_FILE), 'abc1234\n', 'utf8');
+const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
 assert(readBuild(root) === 'abc1234', 'readBuild from BUILD file');
 assert(formatVersionLabel('2.0.0', 'abc1234') === 'v2.0.0 (abc1234)', 'format with version and build');
@@ -33,6 +35,12 @@ if (remote) {
 } else {
   console.log('SKIP: fetchRemoteBuildSync (no network or git)');
 }
+
+const dashboardShell = readFileSync(join(projectRoot, 'dashboard/public/index.html'), 'utf8');
+assert(
+  dashboardShell.includes('root.outerHTML = pages.map') && dashboardShell.includes("}).join('\\n');"),
+  'dashboard fragment loader replaces install/update placeholder'
+);
 
 if (failed > 0) {
   console.error(`\n${failed} assertion(s) failed`);
