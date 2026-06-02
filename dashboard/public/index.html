@@ -2622,6 +2622,7 @@
     </div>
   </div>
 
+  <script src="completed-tasks-display.js"></script>
   <script type="module" src="test-output-parse.js"></script>
   <script>
     const API = '';
@@ -5607,7 +5608,9 @@
           skillCount: extractTurnDoneSkills(summary),
         });
       });
-      out.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
+      if (window.cowCodeCompletedTasks && typeof window.cowCodeCompletedTasks.consolidateCompletedTasks === 'function') {
+        out = window.cowCodeCompletedTasks.consolidateCompletedTasks(out);
+      }
       return out;
     }
 
