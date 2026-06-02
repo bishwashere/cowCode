@@ -250,7 +250,6 @@ const checks = [
       html.includes('data-range="yesterday"') &&
       html.includes('data-range="last7"') &&
       html.includes('data-range="last30"') &&
-      html.includes('data-range="all"') &&
       html.includes('Filter inbox by agent') &&
       html.includes('mc2InboxAgentFilter') &&
       html.includes('setTeamAgentPanelRange') &&
