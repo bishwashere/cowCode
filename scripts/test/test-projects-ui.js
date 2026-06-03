@@ -4,26 +4,45 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const publicDir = join(__dirname, '../../dashboard/public');
 const html = readFileSync(join(__dirname, '../../dashboard/public/index.html'), 'utf8');
+const team2 = readFileSync(join(publicDir, 'pages/team2.html'), 'utf8');
+const projectsJs = readFileSync(join(publicDir, 'assets/js/06-projects.js'), 'utf8');
+const serverJs = readFileSync(join(__dirname, '../../dashboard/server.js'), 'utf8');
+
+const projectModal = readFileSync(join(publicDir, 'assets/partials/project-edit-modal.html'), 'utf8');
 
 const checks = [
   {
     name: 'Project edit modal exists',
-    ok: html.includes('id="project-edit-modal"') &&
-      html.includes('id="project-edit-name"') &&
-      html.includes('id="project-edit-url"') &&
-      html.includes('id="project-edit-desc"'),
+    ok: projectModal.includes('id="project-edit-modal"') &&
+      projectModal.includes('id="project-edit-name"') &&
+      projectModal.includes('id="project-edit-url"') &&
+      projectModal.includes('id="project-edit-desc"'),
   },
   {
     name: 'Project root has pencil edit control',
-    ok: html.includes('proj-root-edit') &&
-      html.includes('openProjectEditModal') &&
-      html.includes('submitProjectEditModal'),
+    ok: projectsJs.includes('proj-root-edit') &&
+      projectsJs.includes('openProjectEditModal') &&
+      projectsJs.includes('submitProjectEditModal'),
   },
   {
     name: 'Project edit uses PATCH API',
-    ok: html.includes("projFetch('/projects/' + projectEditModalId") &&
-      html.includes("method: 'PATCH'"),
+    ok: projectsJs.includes("projFetch('/projects/' + projectEditModalId") &&
+      projectsJs.includes("method: 'PATCH'"),
+  },
+  {
+    name: 'Team projects view has Connector section',
+    ok: team2.includes('id="mc2-proj-connectors"') &&
+      team2.includes('CONNECTOR') &&
+      projectsJs.includes('renderMc2Connectors') &&
+      projectsJs.includes("'github'") &&
+      projectsJs.includes("'mongodb'"),
+  },
+  {
+    name: 'Connectors API and project patch support',
+    ok: serverJs.includes('/api/connectors/status') &&
+      serverJs.includes('connectors: connectors !== undefined'),
   },
 ];
 

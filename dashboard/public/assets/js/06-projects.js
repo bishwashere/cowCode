@@ -456,6 +456,134 @@
         }
       });
 
+      var CONNECTOR_DEFS = [
+        {
+          id: 'github',
+          label: 'GitHub',
+          desc: 'Link this project to a repo. API token comes from Skills / secrets.json.',
+          field: 'repo',
+          placeholder: 'owner/repo',
+          globalKey: 'github',
+        },
+        {
+          id: 'mongodb',
+          label: 'MongoDB',
+          desc: 'Connection string for this project database.',
+          field: 'uri',
+          placeholder: 'mongodb://localhost:27017/myapp',
+          secret: true,
+        },
+        {
+          id: 'postgres',
+          label: 'PostgreSQL',
+          desc: 'Postgres connection URI for this project.',
+          field: 'uri',
+          placeholder: 'postgresql://user:pass@localhost:5432/myapp',
+          secret: true,
+        },
+      ];
+
+      var connectorStatusCache = null;
+
+      async function fetchConnectorStatus() {
+        if (connectorStatusCache) return connectorStatusCache;
+        var r = await projFetch('/connectors/status');
+        if (!r || !r.ok) return {};
+        connectorStatusCache = await r.json().catch(function () { return {}; });
+        return connectorStatusCache;
+      }
+
+      function connectorBadgeHtml(def, value, globalStatus) {
+        if (def.globalKey === 'github') {
+          var tokenOk = globalStatus && globalStatus.github && (globalStatus.github.status === 'ok' || globalStatus.github.status === 'ok-legacy');
+          if (!tokenOk) return '<span class="mc2-connector-badge missing">Token not set</span>';
+          if (value) return '<span class="mc2-connector-badge connected">Connected</span>';
+          return '<span class="mc2-connector-badge">Token ready</span>';
+        }
+        if (value) return '<span class="mc2-connector-badge connected">Connected</span>';
+        return '<span class="mc2-connector-badge">Not configured</span>';
+      }
+
+      async function saveProjectConnector(projectId, connectorId, field, value) {
+        var patch = {};
+        patch[connectorId] = {};
+        patch[connectorId][field] = String(value || '').trim();
+        var r = await projFetch('/projects/' + projectId, {
+          method: 'PATCH',
+          body: JSON.stringify({ connectors: patch }),
+        });
+        return r && r.ok;
+      }
+
+      async function renderMc2Connectors(projectId) {
+        var grid = document.getElementById('mc2-proj-connectors-grid');
+        var hint = document.getElementById('mc2-proj-connectors-hint');
+        if (!grid) return;
+        var pid = String(projectId || '').trim();
+        if (!pid) {
+          if (hint) hint.textContent = 'Add a project below, then configure connectors here.';
+          grid.innerHTML = '<p class="mc2-proj-connectors-empty">No project selected.</p>';
+          return;
+        }
+        var projects = await (window.cowCodeProjectsApi && window.cowCodeProjectsApi.listProjects
+          ? window.cowCodeProjectsApi.listProjects()
+          : Promise.resolve([]));
+        var project = (projects || []).find(function (p) { return String(p.id) === pid; });
+        if (!project) {
+          if (hint) hint.textContent = 'Project not found.';
+          grid.innerHTML = '<p class="mc2-proj-connectors-empty">Project not found.</p>';
+          return;
+        }
+        if (hint) hint.textContent = 'Connections for “' + project.name + '”.';
+        var globalStatus = await fetchConnectorStatus();
+        var connectors = project.connectors || {};
+        grid.innerHTML = '';
+        CONNECTOR_DEFS.forEach(function (def) {
+          var stored = connectors[def.id] || {};
+          var value = String(stored[def.field] || '');
+          if (!value && def.globalKey === 'github' && globalStatus.github && globalStatus.github.defaultRepo) {
+            value = globalStatus.github.defaultRepo;
+          }
+          var card = document.createElement('article');
+          card.className = 'mc2-connector-card';
+          card.innerHTML =
+            '<div class="mc2-connector-card-head">' +
+              '<span class="mc2-connector-title">' + esc(def.label) + '</span>' +
+              connectorBadgeHtml(def, value, globalStatus) +
+            '</div>' +
+            '<p class="mc2-connector-desc">' + esc(def.desc) + '</p>' +
+            '<div class="mc2-connector-field">' +
+              '<label for="mc2-conn-' + esc(def.id) + '">' + esc(def.label) + '</label>' +
+              '<input id="mc2-conn-' + esc(def.id) + '" type="' + (def.secret ? 'password' : 'text') + '" placeholder="' + esc(def.placeholder) + '" autocomplete="off">' +
+            '</div>' +
+            '<div class="mc2-connector-actions">' +
+              '<button type="button" class="mc2-connector-save" data-connector-id="' + esc(def.id) + '" data-connector-field="' + esc(def.field) + '">Save</button>' +
+              '<span class="mc2-connector-saved" hidden>Saved</span>' +
+            '</div>';
+          var input = card.querySelector('input');
+          if (input) input.value = value;
+          var saveBtn = card.querySelector('.mc2-connector-save');
+          var savedEl = card.querySelector('.mc2-connector-saved');
+          if (saveBtn) {
+            saveBtn.addEventListener('click', async function () {
+              var nextVal = input ? input.value : '';
+              saveBtn.disabled = true;
+              var ok = await saveProjectConnector(pid, def.id, def.field, nextVal);
+              saveBtn.disabled = false;
+              if (!ok) return;
+              if (savedEl) {
+                savedEl.hidden = false;
+                setTimeout(function () { savedEl.hidden = true; }, 1800);
+              }
+              var badge = card.querySelector('.mc2-connector-badge');
+              if (badge) badge.outerHTML = connectorBadgeHtml(def, nextVal, globalStatus);
+              if (typeof mc2RenderSidebarProjects === 'function') mc2RenderSidebarProjects();
+            });
+          }
+          grid.appendChild(card);
+        });
+      }
+
       // ── Add project ──
       async function addProjectFromForm(nameInputId, urlInputId, descInputId, canvasId) {
         var nameEl = document.getElementById(nameInputId);
@@ -480,6 +608,10 @@
         if (empty) empty.remove();
         await loadAndRenderProject(proj.id, canvas);
         if (typeof mc2RenderSidebarProjects === 'function') mc2RenderSidebarProjects();
+        if (typeof mc2SelectedProjectId !== 'undefined') {
+          mc2SelectedProjectId = String(proj.id);
+        }
+        if (typeof renderMc2Connectors === 'function') renderMc2Connectors(String(proj.id));
       }
 
       document.getElementById('proj-add-btn').addEventListener('click', function () {
@@ -502,6 +634,7 @@
         },
         activeCanvas: activeProjectsCanvas,
         addProjectFromForm: addProjectFromForm,
+        renderConnectors: renderMc2Connectors,
       };
 
       function esc(s) {

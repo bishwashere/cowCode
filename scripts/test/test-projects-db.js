@@ -49,6 +49,7 @@ async function main() {
     const cols = db.prepare('PRAGMA table_info(projects)').all().map((c) => c.name);
     assert(cols.includes('url'), 'projects table has url column');
     assert(cols.includes('setup_notes'), 'projects table has setup_notes column');
+    assert(cols.includes('connectors_json'), 'projects table has connectors_json column');
 
     const withSetup = createProject({
       name: 'WithSetup',
@@ -56,6 +57,15 @@ async function main() {
       setup_notes: 'mongodb://localhost/test',
     });
     assert(withSetup.setup_notes.includes('mongodb'), `setup notes: ${withSetup.setup_notes}`);
+
+    const withConnectors = updateProject(p1.id, {
+      connectors: {
+        github: { repo: 'owner/repo' },
+        mongodb: { uri: 'mongodb://localhost:27017/app' },
+      },
+    });
+    assert(withConnectors.connectors.github.repo === 'owner/repo', 'github connector saved');
+    assert(withConnectors.connectors.mongodb.uri.includes('mongodb'), 'mongodb connector saved');
 
     const reloaded = getProject(p2.id);
     assert(reloaded.name === 'Site' && reloaded.url === 'https://nextpostai.com', 'reload ok');

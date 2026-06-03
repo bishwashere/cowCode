@@ -197,6 +197,12 @@
       workspaceEl.style.display = 'flex';
       var canvas = mc2El('mc2-proj-canvas');
       if (canvas) await api.loadProjects(canvas);
+      var projects = await api.listProjects();
+      if (projects) mc2ProjectsSnapshot = projects;
+      if (!mc2SelectedProjectId && mc2ProjectsSnapshot.length) {
+        mc2SelectedProjectId = String(mc2ProjectsSnapshot[0].id || '');
+      }
+      if (api.renderConnectors) await api.renderConnectors(mc2SelectedProjectId);
       if (mc2SelectedProjectId) mc2ScrollToProject(mc2SelectedProjectId);
       mc2RenderSidebarProjects();
     }
@@ -233,6 +239,7 @@
           mc2SelectedProjectId = btn.getAttribute('data-project-id') || '';
           mc2SetView('projects');
           mc2ScrollToProject(mc2SelectedProjectId);
+          if (api.renderConnectors) api.renderConnectors(mc2SelectedProjectId);
         });
       });
     }

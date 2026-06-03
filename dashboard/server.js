@@ -1692,7 +1692,7 @@ app.post('/api/projects', (req, res) => {
 });
 
 app.patch('/api/projects/:id', (req, res) => {
-  const { name, description, url, setup_notes } = req.body || {};
+  const { name, description, url, setup_notes, connectors } = req.body || {};
   const id = Number(req.params.id);
   const existing = getProject(id);
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
@@ -1704,9 +1704,22 @@ app.patch('/api/projects/:id', (req, res) => {
       description: description !== undefined ? String(description || '').trim() : existing.description,
       url: url !== undefined ? String(url || '').trim() : undefined,
       setup_notes: setup_notes !== undefined ? String(setup_notes || '').trim() : undefined,
+      connectors: connectors !== undefined && typeof connectors === 'object' ? connectors : undefined,
     });
     if (!p) { res.status(404).json({ error: 'Not found' }); return; }
     res.json(p);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/connectors/status', (_req, res) => {
+  try {
+    const config = loadConfig();
+    res.json({
+      github: {
+        status: getSkillConfigStatus('github'),
+        defaultRepo: String(config?.skills?.github?.defaultRepo || '').trim(),
+      },
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
