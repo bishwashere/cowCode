@@ -921,6 +921,14 @@ button.mc-mission-task-card {
   color: var(--muted);
   font-size: 0.62rem;
 }
+.mc-task-card-initiative {
+  color: #93c5fd;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+.mc2-initiatives-main.team-initiatives-main {
+  margin-top: 0;
+}
 .mc-task-card-actions {
   display: flex;
   flex-wrap: wrap;

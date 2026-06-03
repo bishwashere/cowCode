@@ -910,13 +910,15 @@
             var title = String(sg.title || '').trim() || 'Untitled subgoal';
             var parts = pathParts.concat(title);
             var status = effectiveSubgoalStatus(sg, g);
+            var subgoalId = String(sg.id || '').trim();
             items.push({
               kind: 'subgoal',
               status: status,
               title: title,
               missionTitle: missionTitle,
               goalId: goalId,
-              subgoalId: String(sg.id || '').trim(),
+              subgoalId: subgoalId,
+              fromInitiative: /^init-/.test(subgoalId),
               path: parts.join(' → '),
               assignee: String(sg.assignee || g.ownerAgentId || '').trim(),
               progress: normalizeSubgoalProgress(sg.progress),
@@ -1565,8 +1567,137 @@
       });
     }
 
-    function renderInitiativeDetail(initiative) {
-      var detail = document.getElementById('team-initiative-detail');
+    function initiativeSubgoalId(initiative) {
+      var id = String(initiative && initiative.id || '').trim();
+      return id ? 'init-' + id : '';
+    }
+
+    function initiativeActivityLines(initiative) {
+      var raw = initiative && initiative.activity;
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw.map(function (line) { return String(line || ''); });
+      return [String(raw)];
+    }
+
+    function initiativeWasAutoPromoted(initiative) {
+      return initiativeActivityLines(initiative).some(function (line) {
+        return line.indexOf('Auto-promoted to subgoal in ') >= 0;
+      });
+    }
+
+    function goalTreeHasSubgoalId(subgoals, subgoalId) {
+      var sid = String(subgoalId || '').trim();
+      if (!sid) return false;
+      var stack = Array.isArray(subgoals) ? subgoals.slice() : [];
+      while (stack.length) {
+        var sg = stack.pop();
+        if (!sg || typeof sg !== 'object') continue;
+        if (String(sg.id || '') === sid) return true;
+        if (Array.isArray(sg.subgoals) && sg.subgoals.length) stack.push.apply(stack, sg.subgoals);
+      }
+      return false;
+    }
+
+    function initiativePromotedGoalId(initiative) {
+      if (!initiative || typeof initiative !== 'object') return '';
+      var lines = initiativeActivityLines(initiative);
+      var i;
+      for (i = 0; i < lines.length; i++) {
+        var m = lines[i].match(/(?:Auto-)?[Pp]romoted to subgoal in (goal-[a-z0-9-]+)/i);
+        if (m) return m[1];
+      }
+      var subId = initiativeSubgoalId(initiative);
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+      for (i = 0; i < goals.length; i++) {
+        if (goalTreeHasSubgoalId(goals[i].subgoals, subId)) return String(goals[i].id || '');
+      }
+      var related = Array.isArray(initiative.relatedGoalIds) ? initiative.relatedGoalIds : [];
+      return String(related[0] || '').trim();
+    }
+
+    function initiativeIsOnMission(initiative) {
+      var subId = initiativeSubgoalId(initiative);
+      if (!subId) return false;
+      return (teamGoalsSnapshot.goals || []).some(function (g) {
+        return goalTreeHasSubgoalId(g.subgoals, subId);
+      });
+    }
+
+    function activeGoalsForInitiativePicker() {
+      return (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).filter(function (g) {
+        return String(g.status || '').toLowerCase() === 'active';
+      });
+    }
+
+    function removeSubgoalFromTree(subgoals, subgoalId) {
+      var sid = String(subgoalId || '').trim();
+      var out = [];
+      (subgoals || []).forEach(function (sg) {
+        if (!sg || typeof sg !== 'object') return;
+        if (String(sg.id || '') === sid) return;
+        var next = Object.assign({}, sg);
+        if (Array.isArray(next.subgoals) && next.subgoals.length) {
+          next.subgoals = removeSubgoalFromTree(next.subgoals, sid);
+        }
+        out.push(next);
+      });
+      return out;
+    }
+
+    async function undoInitiativePromotion(initiative) {
+      if (!initiative || !initiative.id) return false;
+      var goalId = initiativePromotedGoalId(initiative);
+      var subId = initiativeSubgoalId(initiative);
+      if (!goalId || !subId) return false;
+      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+        return String(g.id || '') === goalId;
+      });
+      if (!goal) return false;
+      try {
+        var gr = await fetch(API + '/api/goals/' + encodeURIComponent(goalId), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subgoals: removeSubgoalFromTree(goal.subgoals, subId) }),
+        });
+        if (!gr.ok) return false;
+        await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'open',
+            activity: ['Promotion removed by user — review again before promoting'],
+          }),
+        }).catch(function () {});
+        await fetchGoalsSnapshot();
+        await fetchInitiativesSnapshot();
+        if (typeof renderMissionControl === 'function') renderMissionControl();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function viewInitiativeOnMission(initiative) {
+      var goalId = initiativePromotedGoalId(initiative);
+      var subId = initiativeSubgoalId(initiative);
+      if (!goalId) return;
+      selectedTeamGoalId = goalId;
+      if (typeof mc2SetView === 'function') mc2SetView('goals');
+      Promise.resolve(typeof mc2RenderGoals === 'function' ? mc2RenderGoals() : null).then(function () {
+        if (typeof scheduleScrollToBlockedTarget === 'function') {
+          scheduleScrollToBlockedTarget({
+            kind: subId ? 'subgoal' : 'goal',
+            goalId: goalId,
+            subgoalId: subId,
+            title: initiative.title || '',
+          }, 0);
+        }
+      });
+      renderGoalsList();
+    }
+
+    function renderInitiativeDetail(initiative, detailEl) {
+      var detail = detailEl || document.getElementById('team-initiative-detail');
       if (!detail) return;
       if (!initiative || typeof initiative !== 'object') {
         detail.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select an initiative to review and promote.</p>';
@@ -1577,82 +1708,125 @@
         var goal = (teamGoalsSnapshot.goals || []).find(function (g) { return String(g.id || '') === String(gid); });
         return goal ? goal.title : gid;
       }).join(', ') : '—';
+      var status = String(initiative.status || 'open').toLowerCase();
+      var autoPromoted = initiativeWasAutoPromoted(initiative);
+      var onMission = initiativeIsOnMission(initiative);
+      var activeGoals = activeGoalsForInitiativePicker();
+      var defaultGoalId = initiativePromotedGoalId(initiative) ||
+        relatedGoals[0] ||
+        (activeGoals[0] && activeGoals[0].id) ||
+        '';
+      var goalPickerHtml = activeGoals.length
+        ? '<div class="team-initiative-row"><label><strong>Target mission:</strong> ' +
+            '<select class="team-init-goal-picker" data-init-goal-picker="1">' +
+            activeGoals.map(function (g) {
+              var gid = String(g.id || '');
+              var selected = gid === String(defaultGoalId) ? ' selected' : '';
+              return '<option value="' + escapeHtml(gid) + '"' + selected + '>' +
+                escapeHtml(String(g.title || g.objective || gid)) + '</option>';
+            }).join('') +
+            '</select></label></div>'
+        : '<div class="team-initiative-row"><strong>Target mission:</strong> No active missions</div>';
+      var badgeHtml = autoPromoted
+        ? '<span class="team-initiative-auto-badge">Auto-promoted</span> '
+        : (onMission ? '<span class="team-initiative-auto-badge">On mission</span> ' : '');
+      var reviseHtml = onMission
+        ? '<button type="button" class="secondary" data-init-action="view-mission">View on mission</button>' +
+          '<button type="button" class="secondary" data-init-action="undo-promotion">Undo promotion</button>'
+        : '';
+      var reviewHtml = status !== 'rejected'
+        ? '<button type="button" class="secondary" data-init-action="accept">Accept</button>' +
+          '<button type="button" class="secondary" data-init-action="reject">Reject</button>' +
+          (onMission ? '' : (
+            '<button type="button" class="secondary" data-init-action="promote-goal">Promote to Goal</button>' +
+            '<button type="button" class="secondary" data-init-action="promote-subgoal">Promote to Subgoal</button>'
+          ))
+        : '';
       detail.innerHTML = '' +
-        '<h4>' + escapeHtml(initiative.title || 'Untitled initiative') + '</h4>' +
+        '<h4>' + badgeHtml + escapeHtml(initiative.title || 'Untitled initiative') + '</h4>' +
         '<div class="team-initiative-row"><strong>Type:</strong> <span class="team-initiative-type">' + escapeHtml(initiative.type || 'observation') + '</span></div>' +
-        '<div class="team-initiative-row"><strong>Status:</strong> <span class="team-initiative-status ' + escapeHtml(String(initiative.status || 'open').toLowerCase()) + '">' + escapeHtml(initiative.status || 'open') + '</span></div>' +
+        '<div class="team-initiative-row"><strong>Status:</strong> <span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(initiative.status || 'open') + '</span></div>' +
         '<div class="team-initiative-row"><strong>Confidence:</strong> ' + escapeHtml(String(Math.round((Number(initiative.confidence) || 0) * 100))) + '%</div>' +
         '<div class="team-initiative-row"><strong>Description:</strong> ' + escapeHtml(initiative.description || '') + '</div>' +
         '<div class="team-initiative-row"><strong>Source:</strong> ' + escapeHtml(initiative.source || '') + '</div>' +
         '<div class="team-initiative-row"><strong>Created by:</strong> ' + escapeHtml(agentNameById(initiative.createdBy || 'main')) + '</div>' +
         '<div class="team-initiative-row"><strong>Related goals:</strong> ' + escapeHtml(relatedLabel) + '</div>' +
-        '<div class="team-initiative-row"><strong>Activity:</strong> ' + escapeHtml((initiative.activity || []).join(' | ') || '—') + '</div>' +
+        goalPickerHtml +
+        '<div class="team-initiative-row"><strong>Activity:</strong> ' + escapeHtml(initiativeActivityLines(initiative).join(' | ') || '—') + '</div>' +
         '<div class="team-initiative-row"><strong>Specialist reviews:</strong> ' + escapeHtml((initiative.specialistReviews || []).join(' | ') || '—') + '</div>' +
-        '<div class="team-initiative-actions">' +
-          '<button type="button" class="secondary" id="team-init-accept">Accept</button>' +
-          '<button type="button" class="secondary" id="team-init-reject">Reject</button>' +
-          '<button type="button" class="secondary" id="team-init-promote-goal">Promote to Goal</button>' +
-          '<button type="button" class="secondary" id="team-init-promote-subgoal">Promote to Subgoal</button>' +
-        '</div>';
-      var acceptBtn = document.getElementById('team-init-accept');
-      var rejectBtn = document.getElementById('team-init-reject');
-      var promoteGoalBtn = document.getElementById('team-init-promote-goal');
-      var promoteSubgoalBtn = document.getElementById('team-init-promote-subgoal');
-      if (acceptBtn) {
-        acceptBtn.addEventListener('click', async function () {
-          await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'accepted' }),
-          }).catch(function () {});
-          fetchInitiativesSnapshot();
-        });
-      }
-      if (rejectBtn) {
-        rejectBtn.addEventListener('click', async function () {
-          await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'rejected' }),
-          }).catch(function () {});
-          fetchInitiativesSnapshot();
-        });
-      }
-      if (promoteGoalBtn) {
-        promoteGoalBtn.addEventListener('click', async function () {
-          await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: 'goal' }),
-          }).catch(function () {});
-          fetchGoalsSnapshot();
-          fetchInitiativesSnapshot();
-        });
-      }
-      if (promoteSubgoalBtn) {
-        promoteSubgoalBtn.addEventListener('click', async function () {
-          var goalId = relatedGoals[0] || ((teamGoalsSnapshot.goals || [])[0] && (teamGoalsSnapshot.goals || [])[0].id);
-          if (!goalId) return;
-          await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: 'subgoal', goalId: goalId }),
-          }).catch(function () {});
-          fetchGoalsSnapshot();
-          fetchInitiativesSnapshot();
-        });
-      }
+        '<div class="team-initiative-actions">' + reviseHtml + reviewHtml + '</div>';
+      wireInitiativeDetailActions(detail, initiative);
     }
 
-    function renderInitiativesList() {
-      var wrap = document.getElementById('team-initiatives-list');
+    function wireInitiativeDetailActions(detailEl, initiative) {
+      if (!detailEl || !initiative || !initiative.id) return;
+      function goalIdFromPicker() {
+        var picker = detailEl.querySelector('[data-init-goal-picker]');
+        if (picker && picker.value) return String(picker.value).trim();
+        return initiativePromotedGoalId(initiative) ||
+          ((Array.isArray(initiative.relatedGoalIds) ? initiative.relatedGoalIds : [])[0] || '');
+      }
+      detailEl.querySelectorAll('[data-init-action]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          var action = btn.getAttribute('data-init-action') || '';
+          btn.disabled = true;
+          try {
+            if (action === 'accept') {
+              await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'accepted' }),
+              }).catch(function () {});
+              await fetchInitiativesSnapshot();
+            } else if (action === 'reject') {
+              await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'rejected' }),
+              }).catch(function () {});
+              await fetchInitiativesSnapshot();
+            } else if (action === 'promote-goal') {
+              await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'goal' }),
+              }).catch(function () {});
+              await fetchGoalsSnapshot();
+              await fetchInitiativesSnapshot();
+            } else if (action === 'promote-subgoal') {
+              var goalId = goalIdFromPicker();
+              if (!goalId) return;
+              await fetch(API + '/api/initiatives/' + encodeURIComponent(initiative.id) + '/promote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'subgoal', goalId: goalId }),
+              }).catch(function () {});
+              await fetchGoalsSnapshot();
+              await fetchInitiativesSnapshot();
+            } else if (action === 'view-mission') {
+              viewInitiativeOnMission(initiative);
+            } else if (action === 'undo-promotion') {
+              if (!window.confirm('Remove this initiative from the mission and reopen it for review?')) return;
+              await undoInitiativePromotion(initiative);
+            }
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    function renderInitiativesPanel(opts) {
+      opts = opts || {};
+      var wrap = document.getElementById(opts.listId || 'team-initiatives-list');
+      var detailEl = document.getElementById(opts.detailId || 'team-initiative-detail');
       if (!wrap) return;
       var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives.slice() : [];
       initiatives.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
       if (!initiatives.length) {
-        selectedTeamInitiativeId = '';
+        if (!selectedTeamInitiativeId) selectedTeamInitiativeId = '';
         wrap.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0.5rem 0;">No initiatives yet.</p>';
-        renderInitiativeDetail(null);
+        if (detailEl) renderInitiativeDetail(null, detailEl);
         return;
       }
       if (!selectedTeamInitiativeId || !initiatives.some(function (i) { return String(i.id || '') === selectedTeamInitiativeId; })) {
@@ -1663,9 +1837,12 @@
         var selected = id === selectedTeamInitiativeId ? ' selected' : '';
         var confidence = Math.round((Number(it.confidence) || 0) * 100);
         var status = String(it.status || 'open').toLowerCase();
+        var badge = initiativeWasAutoPromoted(it)
+          ? '<span class="team-initiative-auto-badge">Auto-promoted</span> '
+          : (initiativeIsOnMission(it) ? '<span class="team-initiative-auto-badge">On mission</span> ' : '');
         return '<div class="team-initiative-card' + selected + '" data-initiative-id="' + escapeHtml(id) + '">' +
           '<div class="team-goal-card-head">' +
-            '<h4 class="team-goal-card-title">' + escapeHtml(it.title || 'Untitled initiative') + '</h4>' +
+            '<h4 class="team-goal-card-title">' + badge + escapeHtml(it.title || 'Untitled initiative') + '</h4>' +
             '<span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '</div>' +
           '<div class="team-goal-meta"><span class="team-initiative-type">' + escapeHtml(it.type || 'observation') + '</span></div>' +
@@ -1674,15 +1851,25 @@
           '<div class="team-goal-meta">' + escapeHtml(String(it.description || '').slice(0, 180)) + '</div>' +
         '</div>';
       }).join('');
-      renderInitiativeDetail(initiatives.find(function (i) { return String(i.id || '') === selectedTeamInitiativeId; }) || initiatives[0]);
+      var selectedInitiative = initiatives.find(function (i) { return String(i.id || '') === selectedTeamInitiativeId; }) || initiatives[0];
+      if (detailEl) renderInitiativeDetail(selectedInitiative, detailEl);
       wrap.querySelectorAll('.team-initiative-card').forEach(function (card) {
         card.addEventListener('click', function () {
           var id = String(card.getAttribute('data-initiative-id') || '').trim();
           if (!id) return;
           selectedTeamInitiativeId = id;
-          renderInitiativesList();
+          renderInitiativesPanels();
         });
       });
+    }
+
+    function renderInitiativesPanels() {
+      renderInitiativesPanel({ listId: 'team-initiatives-list', detailId: 'team-initiative-detail' });
+      renderInitiativesPanel({ listId: 'mc2-initiatives-list', detailId: 'mc2-initiative-detail' });
+    }
+
+    function renderInitiativesList() {
+      renderInitiativesPanels();
     }
 
     function renderTeamAgentCards() {
@@ -3217,6 +3404,10 @@
     var teamInitiativesRefreshEl = document.getElementById('team-initiatives-refresh');
     if (teamInitiativesRefreshEl) {
       teamInitiativesRefreshEl.addEventListener('click', function () { fetchInitiativesSnapshot(); });
+    }
+    var mc2InitiativesRefreshEl = document.getElementById('mc2-initiatives-refresh');
+    if (mc2InitiativesRefreshEl) {
+      mc2InitiativesRefreshEl.addEventListener('click', function () { fetchInitiativesSnapshot(); });
     }
     var teamGoalCreateEl = document.getElementById('team-goal-create');
     if (teamGoalCreateEl) {

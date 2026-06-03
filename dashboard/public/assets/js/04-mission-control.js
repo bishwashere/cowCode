@@ -531,6 +531,9 @@
       var missionLine = item.missionTitle && item.kind !== 'goal'
         ? '<span class="mc-task-card-mission">' + escapeHtml(item.missionTitle) + '</span>'
         : '';
+      var initiativeLine = item.fromInitiative
+        ? '<span class="mc-task-card-initiative">From initiative</span>'
+        : '';
       var pathLine = item.path && item.kind === 'subgoal'
         ? '<div class="mc-task-card-path">' + escapeHtml(item.path) + '</div>'
         : '';
@@ -569,6 +572,7 @@
           '<span class="team-goal-subgoal-status ' + escapeHtml(status) + '">' + escapeHtml(mc2MissionTaskStatusLabel(status)) + '</span>' +
           agentHtml +
           missionLine +
+          initiativeLine +
           (progressLabel ? '<span>' + escapeHtml(progressLabel) + '</span>' : '') +
         '</div>' +
         actionsHtml +
@@ -1236,34 +1240,7 @@
     }
 
     function mc2RenderInitiatives() {
-      var el = mc2El('mc2-initiatives-list');
-      if (!el) return;
-      var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives.slice() : [];
-      initiatives.sort(function (a, b) { return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0); });
-      if (!initiatives.length) {
-        el.innerHTML = '<p style="color:var(--muted);font-size:0.66rem;">No initiatives yet. They appear here when reflection or team activity suggests follow-up work.</p>';
-        return;
-      }
-      el.innerHTML = initiatives.map(function (it) {
-        var status = String(it.status || 'open').toLowerCase();
-        var confidence = Math.round((Number(it.confidence) || 0) * 100);
-        var relatedGoals = Array.isArray(it.relatedGoalIds) ? it.relatedGoalIds : [];
-        var relatedLabel = relatedGoals.length ? relatedGoals.map(function (gid) {
-          var goal = (teamGoalsSnapshot.goals || []).find(function (g) { return String(g.id || '') === String(gid); });
-          return goal ? String(goal.title || goal.objective || gid) : String(gid);
-        }).join(', ') : 'None';
-        return '<div class="mc-progress-card" style="cursor:default;">' +
-          '<div class="mc-progress-head">' +
-            '<h3>' + escapeHtml(String(it.title || 'Untitled initiative')) + '</h3>' +
-            '<span class="team-initiative-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
-          '</div>' +
-          '<div class="team-goal-meta"><span class="team-initiative-type">' + escapeHtml(String(it.type || 'observation')) + '</span></div>' +
-          '<div class="team-goal-meta"><strong>Confidence:</strong> ' + escapeHtml(String(confidence)) + '%</div>' +
-          '<div class="team-goal-meta"><strong>Source:</strong> ' + escapeHtml(String(it.source || '')) + '</div>' +
-          '<div class="team-goal-meta"><strong>Related goals:</strong> ' + escapeHtml(relatedLabel) + '</div>' +
-          '<div class="team-goal-meta">' + escapeHtml(String(it.description || '').slice(0, 220)) + '</div>' +
-        '</div>';
-      }).join('');
+      if (typeof renderInitiativesPanels === 'function') renderInitiativesPanels();
     }
 
     function mc2RenderAgentsDetail() {

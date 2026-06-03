@@ -141,7 +141,9 @@ const checks = [
       html.includes('id="team-initiative-detail"') &&
       html.includes('/api/initiatives') &&
       html.includes('fetchInitiativesSnapshot') &&
-      html.includes('renderInitiativesList'),
+      html.includes('renderInitiativesList') &&
+      html.includes('data-init-action="promote-goal"') &&
+      html.includes('undoInitiativePromotion'),
   },
   {
     name: 'Team page includes live activity panel',
@@ -263,7 +265,10 @@ const checks = [
       html.includes('data-mc-nav="initiatives"') &&
       html.includes('id="mc2-view-initiatives"') &&
       html.includes('id="mc2-initiatives-list"') &&
-      html.includes('renderInitiatives') &&
+      html.includes('id="mc2-initiative-detail"') &&
+      html.includes('data-init-action="promote-subgoal"') &&
+      html.includes('data-init-action="undo-promotion"') &&
+      html.includes('renderInitiativesPanels') &&
       html.includes('mc2RenderInitiatives') &&
       html.includes('aria-label="Active mission"') &&
       html.includes('aria-label="Missions"') &&
