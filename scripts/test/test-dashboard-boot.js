@@ -165,18 +165,26 @@ const checks = [
     ok: fullHtml.includes('id="mc2-task-drawer"') &&
       missionControlJs.includes('function mc2BuildTaskDetailHtml') &&
       missionControlJs.includes('function mc2OpenTaskDrawer') &&
+      missionControlJs.includes('Source Chain') &&
       missionControlJs.includes('Assigned To') &&
-      missionControlJs.includes('Created By') &&
       missionControlJs.includes('Skills Used') &&
       chat.includes('function enrichMissionTaskItem') &&
+      chat.includes('function buildMissionTaskSourceChain') &&
+      chat.includes('function buildMissionTaskInactionImpact') &&
+      chat.includes('Auto archive in') &&
+      missionControlJs.includes('If you do nothing') &&
+      missionControlJs.includes('mc-task-inaction') &&
+      chat.includes('Initiative Auto Promotion') &&
       chat.includes('function buildStructuredMissionTaskTimeline'),
   },
   {
-    name: 'Tasks is default mission control view and navigation hub',
-    ok: missionControlJs.includes("var mc2ActiveView = 'tasks'") &&
-      fullHtml.includes('id="mc2-view-tasks" class="mc-view"') &&
-      fullHtml.includes('id="mc2-view-mission" class="mc-view" role="main" hidden') &&
-      /class="mc-nav-item active"[\s\S]{0,80}data-mc-nav="tasks"/.test(fullHtml) &&
+    name: 'Home (mission) is default mission control landing view',
+    ok: missionControlJs.includes("var mc2ActiveView = 'mission'") &&
+      fullHtml.includes('id="mc2-view-tasks" class="mc-view" hidden') &&
+      fullHtml.includes('id="mc2-view-mission" class="mc-view" role="main"') &&
+      !/id="mc2-view-mission" class="mc-view" role="main" hidden/.test(fullHtml) &&
+      /class="mc-nav-item active"[\s\S]{0,80}data-mc-nav="mission"/.test(fullHtml) &&
+      fullHtml.includes('mc-nav-label">Home</span>') &&
       missionControlJs.includes('window.mc2OpenTaskDetail = mc2OpenTaskDetail') &&
       missionControlJs.includes('mc2OpenTaskForInitiative') &&
       !fullHtml.includes('data-mc-nav="agents">View all blockers'),
