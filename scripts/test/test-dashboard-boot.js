@@ -40,6 +40,7 @@ const core = fs.readFileSync(path.join(assetsJs, '01-core-router-status.js'), 'u
 const chat = fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8');
 const missionControlJs = fs.readFileSync(path.join(assetsJs, '04-mission-control.js'), 'utf8');
 const bind = fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8');
+const team2Css = fs.readFileSync(path.join(publicDir, 'assets/css/team2.css'), 'utf8');
 
 const checks = [
   {
@@ -143,6 +144,20 @@ const checks = [
       chat.includes('function buildAgentLastTaskSummary') &&
       chat.includes('window.buildAgentLastTaskSummary = buildAgentLastTaskSummary') &&
       !missionControlJs.includes('Focus:'),
+  },
+  {
+    name: 'mission view scrolls when kanban content is long',
+    ok: /#mc2-view-mission[\s\S]{0,180}overflow:\s*auto/.test(team2Css) &&
+      /#mc2-view-mission > \.mc-bottom-row[\s\S]{0,120}flex-shrink:\s*0/.test(team2Css) &&
+      !/\.mc-kanban-col-body[\s\S]{0,120}overflow-y:\s*auto/.test(team2Css),
+  },
+  {
+    name: 'action required banner renders structured attention items',
+    ok: fullHtml.includes('id="mc2-action-banner"') &&
+      fullHtml.includes('ACTION REQUIRED') &&
+      missionControlJs.includes('function mc2CollectActionRequiredItems') &&
+      missionControlJs.includes('function mc2RenderActionBanner') &&
+      missionControlJs.includes("action: 'initiative-review'"),
   },
   {
     name: 'Tasks is default mission control view and navigation hub',

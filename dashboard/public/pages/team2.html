@@ -81,6 +81,14 @@
 
         <div id="mc2-pending-approvals" class="mc-pending-approvals" hidden aria-live="polite"></div>
 
+        <div id="mc2-action-banner" class="mc-action-banner" hidden aria-live="polite" aria-label="Actions required">
+          <div class="mc-action-banner-head">
+            <span class="mc-action-banner-label">ACTION REQUIRED</span>
+            <span class="mc-action-banner-count" id="mc2-action-banner-count">0</span>
+          </div>
+          <div class="mc-action-banner-items" id="mc2-action-banner-items"></div>
+        </div>
+
         <!-- Mission view -->
         <div id="mc2-view-mission" class="mc-view" role="main" hidden>
           <!-- Progress row -->
@@ -160,7 +168,7 @@
               <button type="button" class="mc-panel-link" data-mc-nav="tasks" data-mc-tasks-filter="all">View all tasks →</button>
             </div>
             <div class="mc-panel">
-              <p class="mc-section-title">ATTENTION NEEDED</p>
+              <p class="mc-section-title">ACTION QUEUE</p>
               <div class="mc-panel-body" id="mc2-attention">
                 <p class="mc-kanban-empty">All clear.</p>
               </div>
