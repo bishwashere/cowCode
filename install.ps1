@@ -596,12 +596,18 @@ node "$InstallDir\cli.js" %*
         $hasDotenv = Test-Path (Join-Path $InstallDir "node_modules\dotenv")
         if ($hasDotenv) {
             Write-Host "  [OK] Dependencies already installed."
-        } elseif ($hasPnpm) {
+        } else {
+            if (Test-Path (Join-Path $InstallDir "node_modules")) {
+                Write-Host "  > Removing incomplete node_modules..."
+                Remove-Item -Path (Join-Path $InstallDir "node_modules") -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            if ($hasPnpm) {
             Invoke-Native "pnpm install" { & $pnpmCmd install }
             Write-Host "  [OK] Dependencies installed."
-        } else {
+            } else {
             Invoke-Native "npm install" { & $npmCmd install }
             Write-Host "  [OK] Dependencies installed."
+            }
         }
         if (-not (Test-Path (Join-Path $InstallDir "node_modules\dotenv"))) {
             Write-Host "  [X] Dependencies missing after install (node_modules/dotenv)."
