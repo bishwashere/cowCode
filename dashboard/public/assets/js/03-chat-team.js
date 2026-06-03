@@ -1441,6 +1441,7 @@
       }
       parts.push(btn('remove', 'Remove', false));
       if (fromInit) parts.push(btn('review-initiative', 'Review initiative', false));
+      if (!opts.inDetailPanel) parts.push(btn('in-mission', 'Mission tree', false));
       var wrapClass = opts.compact ? 'team-goal-task-actions' : 'mc-task-card-actions';
       return '<div class="' + wrapClass + '">' + parts.join('') + '</div>';
     }
@@ -3537,8 +3538,142 @@
       }
     }
 
+    function findMissionTaskItem(opts) {
+      opts = opts || {};
+      var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var goalId = String(opts.goalId || '').trim();
+      var subgoalId = String(opts.subgoalId || '').trim();
+      var agentId = String(opts.agentId || '').trim();
+      var title = String(opts.title || '').trim().toLowerCase();
+      var i;
+      if (subgoalId) {
+        for (i = 0; i < items.length; i++) {
+          if (String(items[i].subgoalId || '') === subgoalId) {
+            if (!goalId || String(items[i].goalId || '') === goalId) return items[i];
+          }
+        }
+      }
+      if (agentId) {
+        var agentItems = items.filter(function (it) {
+          return it.kind === 'subgoal' &&
+            String(it.assignee || it.agentId || '') === agentId &&
+            String(it.status || '') !== 'done';
+        });
+        if (title) {
+          for (i = 0; i < agentItems.length; i++) {
+            if (String(agentItems[i].title || '').toLowerCase().indexOf(title.slice(0, 40)) >= 0) return agentItems[i];
+          }
+        }
+        if (agentItems.length) return agentItems[0];
+      }
+      if (title && goalId) {
+        for (i = 0; i < items.length; i++) {
+          if (String(items[i].goalId || '') === goalId &&
+            String(items[i].title || '').toLowerCase().indexOf(title.slice(0, 40)) >= 0) {
+            return items[i];
+          }
+        }
+      }
+      return null;
+    }
+
+    function findMissionTaskForAgent(agentId, ctx) {
+      var aid = String(agentId || '').trim();
+      if (!aid) return null;
+      var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var active = items.filter(function (it) {
+        return it.kind === 'subgoal' &&
+          String(it.assignee || it.agentId || '') === aid &&
+          (it.status === 'blocked' || it.status === 'doing' || it.status === 'todo');
+      });
+      if (active.length === 1) return active[0];
+      ctx = ctx || (teamAgentContextSnapshot.agents || {})[aid] || {};
+      var needle = String(ctx.currentStep || ctx.currentGoal || ctx.currentThought || ctx.lastAction || '').trim().toLowerCase();
+      if (needle) {
+        for (var i = 0; i < active.length; i++) {
+          var t = String(active[i].title || '').toLowerCase();
+          if (t && (t.indexOf(needle.slice(0, 32)) >= 0 || needle.indexOf(t.slice(0, 32)) >= 0)) return active[i];
+        }
+      }
+      return active[0] || null;
+    }
+
+    function buildMissionTaskTimeline(item, limit) {
+      limit = Math.max(4, Number(limit) || 14);
+      if (!item) return [];
+      var goalId = String(item.goalId || '');
+      var subgoalId = String(item.subgoalId || '');
+      var assignee = String(item.assignee || item.agentId || '');
+      var titleNeedle = String(item.title || '').trim().toLowerCase().slice(0, 48);
+      var matched = [];
+      (teamActivityEvents || []).forEach(function (ev) {
+        if (!ev) return;
+        var details = ev.details && typeof ev.details === 'object' ? ev.details : {};
+        var evGoalId = String(details.goalId || ev.goalId || '');
+        var evSubId = String(details.subgoalId || '');
+        var hit = false;
+        if (subgoalId && evSubId === subgoalId) hit = true;
+        if (!hit && subgoalId && String(ev.type || '') === 'initiative_auto_promoted' &&
+          String(ev.title || details.title || '').toLowerCase().indexOf(titleNeedle.slice(0, 24)) >= 0) {
+          hit = true;
+        }
+        if (!hit && goalId && evGoalId === goalId) {
+          if (!subgoalId || !titleNeedle) hit = true;
+          else {
+            var blob = (String(ev.message || '') + ' ' + String(ev.title || details.title || '')).toLowerCase();
+            if (blob.indexOf(titleNeedle.slice(0, 24)) >= 0) hit = true;
+          }
+        }
+        if (!hit && assignee && (String(ev.agentId || '') === assignee || String(ev.targetAgentId || '') === assignee)) {
+          if (!titleNeedle) hit = true;
+          else {
+            var msg = (String(ev.message || '') + ' ' + String(ev.title || '')).toLowerCase();
+            if (msg.indexOf(titleNeedle.slice(0, 24)) >= 0) hit = true;
+          }
+        }
+        if (hit) matched.push(ev);
+      });
+      matched.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
+      return matched.slice(0, limit);
+    }
+
+    function formatMissionTaskTimelineLine(ev) {
+      if (!ev) return '';
+      var ts = Number(ev.ts) || Date.now();
+      var time = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      var agent = agentNameById(String(ev.agentId || ''));
+      var target = agentNameById(String(ev.targetAgentId || ''));
+      var type = String(ev.type || '');
+      var msg = String(ev.message || '');
+      var line = '';
+      if (type === 'delegation_start') {
+        line = agent + ' handed off to ' + target;
+        if (msg) line += ' — ' + msg;
+      } else if (type === 'delegation_done') {
+        line = target + ' replied to ' + agent;
+      } else if (type === 'initiative_auto_promoted') {
+        line = 'Added to mission' + (msg ? ': ' + humanizeTeamActivityMessage(msg).replace(/^Added initiative to mission:\s*/i, '') : '');
+      } else if (type === 'skill_start' || type === 'skill_done') {
+        line = agent + ' ' + (type === 'skill_done' ? 'finished' : 'started') + ' ' + String(ev.skillId || 'work');
+      } else if (type === 'turn_start') {
+        line = agent + ' picked up: ' + (msg || 'task');
+      } else if (type === 'turn_done') {
+        line = agent + ' finished turn';
+      } else if (msg) {
+        line = humanizeTeamActivityMessage(msg);
+      } else {
+        line = type || 'activity';
+      }
+      return '<li class="mc-task-timeline-item"><span class="mc-task-timeline-time">' + escapeHtml(time) + '</span>' +
+        '<span class="mc-task-timeline-text">' + escapeHtml(line) + '</span></li>';
+    }
+
     window.openMissionWorkInputModal = openMissionWorkInputModal;
     window.patchMissionSubgoalStatus = patchMissionSubgoalStatus;
+    window.findMissionTaskItem = findMissionTaskItem;
+    window.findMissionTaskForAgent = findMissionTaskForAgent;
+    window.buildMissionTaskTimeline = buildMissionTaskTimeline;
+    window.formatMissionTaskTimelineLine = formatMissionTaskTimelineLine;
     window.wireMissionTaskActions = wireMissionTaskActions;
     window.missionTaskActionButtonsHtml = missionTaskActionButtonsHtml;
     window.runMissionGoalAction = runMissionGoalAction;

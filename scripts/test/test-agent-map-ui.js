@@ -277,6 +277,10 @@ const checks = [
       html.includes('wireMissionTaskActions') &&
       html.includes('data-mc-goal-action') &&
       html.includes('review-initiative') &&
+      html.includes('id="mc2-task-detail"') &&
+      html.includes('mc2OpenTaskDetail') &&
+      html.includes('buildMissionTaskTimeline') &&
+      html.includes('mc-task-timeline') &&
       html.includes('renderInitiativesPanels') &&
       html.includes('mc2RenderInitiatives') &&
       html.includes('aria-label="Active mission"') &&

@@ -963,6 +963,67 @@ button.mc-mission-task-card {
   padding: 0.2rem 0.45rem !important;
   margin: 0 !important;
 }
+.mc-task-detail-panel {
+  margin-bottom: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(26, 26, 31, 0.85);
+}
+.mc-task-detail-panel[hidden] {
+  display: none !important;
+}
+.mc-task-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+.mc-task-detail-title {
+  margin: 0;
+  font-size: 0.82rem;
+}
+.mc-task-detail-meta {
+  margin: 0.15rem 0;
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+.mc-task-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.mc-task-timeline-item {
+  display: flex;
+  gap: 0.45rem;
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+.mc-task-timeline-time {
+  flex: 0 0 auto;
+  color: var(--muted);
+  min-width: 3.2rem;
+}
+.mc-task-timeline-text {
+  flex: 1 1 auto;
+}
+.mc-task-card-selected {
+  outline: 1px solid rgba(167, 139, 250, 0.65);
+  background: rgba(167, 139, 250, 0.08);
+}
+.mc-kanban-context-link {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.58rem !important;
+  text-align: left;
+  padding: 0 !important;
+}
 .mc-task-card-actions {
   display: flex;
   flex-wrap: wrap;

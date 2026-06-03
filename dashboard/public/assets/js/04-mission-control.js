@@ -11,6 +11,7 @@
     var mc2TimelineSpyEnabled = false;
     var mc2PendingActionBusy = false;
     var mc2TasksFilter = 'all';
+    var mc2SelectedTask = null;
 
     function mc2El(id) { return document.getElementById(id); }
 
@@ -31,6 +32,115 @@
       mc2SetTasksFilter(filter || 'all');
       mc2SetView('tasks');
       mc2RenderTasks();
+      mc2RenderTaskDetail();
+    }
+
+    function mc2ScrollToMissionTaskCard(item) {
+      if (!item) return;
+      var subgoalId = String(item.subgoalId || '');
+      if (!subgoalId) return;
+      var safeId = String(subgoalId).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      var card = document.querySelector(
+        '#page-team2 .mc-mission-task-card[data-subgoal-id="' + safeId + '"]'
+      );
+      if (card) {
+        document.querySelectorAll('#page-team2 .mc-mission-task-card').forEach(function (c) {
+          c.classList.remove('mc-task-card-selected');
+        });
+        card.classList.add('mc-task-card-selected');
+        try { card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+        if (typeof highlightBlockedTarget === 'function') highlightBlockedTarget(card);
+      }
+    }
+
+    function mc2RenderTaskDetail() {
+      var panel = mc2El('mc2-task-detail');
+      if (!panel) return;
+      var item = mc2SelectedTask;
+      if (!item || !String(item.goalId || item.subgoalId || item.title || '').trim()) {
+        panel.hidden = true;
+        panel.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;">Select a task from the board, list, or recent movement.</p>';
+        return;
+      }
+      panel.hidden = false;
+      var title = String(item.title || 'Untitled task');
+      var status = String(item.status || 'todo');
+      var mission = String(item.missionTitle || '').trim();
+      var assignee = String(item.assignee || item.agentId || '');
+      var path = String(item.path || '').trim();
+      var actionsHtml = typeof missionTaskActionButtonsHtml === 'function'
+        ? missionTaskActionButtonsHtml(item.goalId, item.subgoalId, status, {
+          fromInitiative: !!item.fromInitiative,
+          inDetailPanel: true,
+        })
+        : '';
+      var events = typeof buildMissionTaskTimeline === 'function' ? buildMissionTaskTimeline(item, 14) : [];
+      var timelineHtml = events.length
+        ? '<ul class="mc-task-timeline">' + events.map(function (ev) {
+          return typeof formatMissionTaskTimelineLine === 'function'
+            ? formatMissionTaskTimelineLine(ev)
+            : '';
+        }).join('') + '</ul>'
+        : '<p class="mc-kanban-empty" style="margin:0.35rem 0 0;">No timeline entries yet for this task.</p>';
+      var agentLink = assignee
+        ? '<button type="button" class="mc-panel-link" data-mc-task-agent-context="' + escapeHtml(assignee) + '">Agent context (' + escapeHtml(agentNameById(assignee)) + ') →</button>'
+        : '';
+      panel.innerHTML = '' +
+        '<div class="mc-task-detail-head">' +
+          '<h3 class="mc-task-detail-title">' + escapeHtml(title) + '</h3>' +
+          '<span class="team-goal-subgoal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+        '</div>' +
+        (mission ? '<p class="mc-task-detail-meta"><strong>Mission:</strong> ' + escapeHtml(mission) + '</p>' : '') +
+        (path ? '<p class="mc-task-detail-meta"><strong>Path:</strong> ' + escapeHtml(path) + '</p>' : '') +
+        (assignee ? '<p class="mc-task-detail-meta"><strong>Assignee:</strong> ' + escapeHtml(agentNameById(assignee)) + '</p>' : '') +
+        (item.fromInitiative ? '<p class="mc-task-detail-meta"><span class="mc-task-card-initiative">From initiative</span></p>' : '') +
+        actionsHtml +
+        '<p class="mc-section-title" style="margin:0.65rem 0 0.35rem;">TASK TIMELINE</p>' +
+        timelineHtml +
+        '<div class="mc-task-detail-links">' + agentLink + '</div>';
+      if (typeof wireMissionTaskActions === 'function') wireMissionTaskActions(panel);
+      panel.querySelectorAll('[data-mc-task-agent-context]').forEach(function (btn) {
+        if (btn._wiredCtx) return;
+        btn._wiredCtx = true;
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          mc2SetAgentFilter(btn.getAttribute('data-mc-task-agent-context') || '', 'context');
+        });
+      });
+    }
+
+    function mc2OpenTaskDetail(item, opts) {
+      opts = opts || {};
+      if (!item && opts.agentId && typeof findMissionTaskForAgent === 'function') {
+        var ctx = (teamAgentContextSnapshot.agents || {})[opts.agentId] || {};
+        item = findMissionTaskForAgent(opts.agentId, ctx);
+      }
+      if (!item && opts.goalId && typeof findMissionTaskItem === 'function') {
+        item = findMissionTaskItem({
+          goalId: opts.goalId,
+          subgoalId: opts.subgoalId,
+          title: opts.title,
+          agentId: opts.agentId,
+        });
+      }
+      mc2SelectedTask = item || null;
+      if (opts.filter) mc2SetTasksFilter(opts.filter);
+      else if (item && item.status === 'blocked') mc2SetTasksFilter('blocked');
+      else mc2SetTasksFilter('all');
+      if (opts.agentId) mc2TasksAgentFilter = String(opts.agentId);
+      mc2SetView('tasks');
+      mc2RenderTasks();
+      mc2RenderTaskDetail();
+      setTimeout(function () { mc2ScrollToMissionTaskCard(item); }, 80);
+    }
+
+    function mc2OpenTaskDetailForAgent(agentId) {
+      var aid = String(agentId || '').trim();
+      if (!aid) return;
+      var ctx = (teamAgentContextSnapshot.agents || {})[aid] || {};
+      var item = typeof findMissionTaskForAgent === 'function' ? findMissionTaskForAgent(aid, ctx) : null;
+      mc2OpenTaskDetail(item, { agentId: aid, filter: item && item.status === 'blocked' ? 'blocked' : 'all' });
     }
 
     window.mc2OpenTasksView = mc2OpenTasksView;
@@ -175,6 +285,7 @@
           : '') +
         (lastTs ? '<div class="mc-kanban-card-meta">Last action: ' + mc2RelTime(lastTs) + '</div>' : '') +
         tagHtml +
+        '<button type="button" class="mc-panel-link mc-kanban-context-link" data-mc-open-context="1" data-mc-agent="' + escapeHtml(id) + '">Agent context →</button>' +
       '</div>';
     }
 
@@ -427,9 +538,16 @@
         if (!items.length) { col.innerHTML = '<p class="mc-kanban-empty">' + emptyMsg + '</p>'; return; }
         col.innerHTML = items.map(function (item) { return mc2KanbanCard(item.a, item.ctx); }).join('');
         col.querySelectorAll('.mc-kanban-card[data-mc-agent]').forEach(function (card) {
-          card.addEventListener('click', function () {
+          card.addEventListener('click', function (e) {
+            var ctxLink = e.target && e.target.closest ? e.target.closest('[data-mc-open-context]') : null;
+            if (ctxLink) {
+              e.preventDefault();
+              e.stopPropagation();
+              mc2SetAgentFilter(ctxLink.getAttribute('data-mc-agent') || card.getAttribute('data-mc-agent') || '', 'context');
+              return;
+            }
             var aid = card.getAttribute('data-mc-agent');
-            if (aid) mc2SetAgentFilter(aid, 'context');
+            if (aid) mc2OpenTaskDetailForAgent(aid);
           });
         });
       }
@@ -476,7 +594,7 @@
         el.querySelectorAll('.mc-agent-overview-card[data-mc-agent]').forEach(function (card) {
           card.addEventListener('click', function () {
             var aid = card.getAttribute('data-mc-agent');
-            if (aid) mc2SetAgentFilter(aid, 'context');
+            if (aid) mc2OpenTaskDetailForAgent(aid);
           });
         });
       }
@@ -603,21 +721,26 @@
     }
 
     function mc2ShowMissionTaskDetails(card) {
+      if (!card) return;
+      var item = typeof mc2MissionTaskItemFromEl === 'function' ? mc2MissionTaskItemFromEl(card) : null;
+      if (item && item.goalId) {
+        var full = typeof findMissionTaskItem === 'function'
+          ? findMissionTaskItem({
+            goalId: item.goalId,
+            subgoalId: item.subgoalId,
+            title: item.title,
+            agentId: item.agentId,
+          })
+          : null;
+        mc2OpenTaskDetail(full || item, { filter: item.status === 'blocked' ? 'blocked' : 'all' });
+        return;
+      }
       var goalId = card.getAttribute('data-goal-id');
-      var subgoalId = card.getAttribute('data-subgoal-id');
-      if (!goalId) return;
-      selectedTeamGoalId = goalId;
-      mc2SetView('goals');
-      Promise.resolve(mc2RenderGoals()).then(function () {
-        if (typeof scheduleScrollToBlockedTarget === 'function') {
-          scheduleScrollToBlockedTarget({
-            kind: subgoalId ? 'subgoal' : 'goal',
-            goalId: goalId,
-            subgoalId: subgoalId,
-            title: card.getAttribute('data-title') || '',
-          }, 0);
-        }
-      });
+      if (goalId) {
+        selectedTeamGoalId = goalId;
+        mc2SetView('goals');
+        mc2RenderGoals();
+      }
     }
 
     function mc2WireMissionTaskCards(root) {
@@ -630,17 +753,11 @@
           if (e.target && e.target.closest && e.target.closest('[data-mc-task-action]')) return;
           var agentId = card.getAttribute('data-agent-id');
           var goalId = card.getAttribute('data-goal-id');
-          if (agentId && card.getAttribute('data-status') === 'blocked' && !goalId) {
-            mc2SetAgentFilter(agentId, 'context');
+          if (goalId || (agentId && card.getAttribute('data-mc-mission-task'))) {
+            mc2ShowMissionTaskDetails(card);
             return;
           }
-          if (card.getAttribute('data-status') === 'blocked' && goalId) {
-            if (typeof openMissionWorkInputModal === 'function') {
-              openMissionWorkInputModal(mc2MissionTaskItemFromEl(card));
-            }
-            return;
-          }
-          if (goalId) mc2ShowMissionTaskDetails(card);
+          if (agentId) mc2OpenTaskDetailForAgent(agentId);
         });
       });
     }
@@ -713,7 +830,7 @@
         card._wiredTurn = true;
         card.addEventListener('click', function () {
           var aid = card.getAttribute('data-mc-task-agent');
-          if (aid) mc2SetAgentFilter(aid, 'context');
+          if (aid) mc2OpenTaskDetailForAgent(aid);
         });
       });
       if (filter === 'blocked' && groups.blocked.length) {
@@ -845,15 +962,37 @@
       if (!btn) return;
       var action = String(btn.getAttribute('data-attention-action') || '').trim();
       if (action === 'goal-input') {
-        var goal = mc2GoalById(btn.getAttribute('data-goal-id'));
+        var goalId = btn.getAttribute('data-goal-id') || '';
+        var blocked = typeof findBlockedWorkRefs === 'function' ? findBlockedWorkRefs() : [];
+        var ref = null;
+        var i;
+        for (i = 0; i < blocked.length; i++) {
+          if (blocked[i].goalId === goalId && blocked[i].kind === 'subgoal') {
+            ref = blocked[i];
+            break;
+          }
+        }
+        if (ref && typeof findMissionTaskItem === 'function') {
+          var taskItem = findMissionTaskItem({
+            goalId: ref.goalId,
+            subgoalId: ref.subgoalId,
+            title: ref.title,
+          });
+          if (taskItem) {
+            mc2OpenTaskDetail(taskItem, { filter: 'blocked' });
+            return;
+          }
+        }
+        var goal = mc2GoalById(goalId);
         if (goal && typeof openTeamUserInputModal === 'function') {
           openTeamUserInputModal(goal);
           return;
         }
-        action = 'goal';
+        mc2OpenTasksView('blocked');
+        return;
       }
       if (action === 'goal') {
-        mc2SetView('goals');
+        mc2OpenTasksView('all');
         return;
       }
       if (action === 'blocked-tasks') {
@@ -861,7 +1000,7 @@
         return;
       }
       if (action === 'agent') {
-        mc2SetAgentFilter(btn.getAttribute('data-agent-id') || '', 'context');
+        mc2OpenTaskDetailForAgent(btn.getAttribute('data-agent-id') || '');
         return;
       }
       if (action === 'pending') {
@@ -1407,7 +1546,10 @@
         }
         if (mc2ActiveView === 'projects') mc2RenderProjects();
         if (mc2ActiveView === 'goals') mc2RenderGoals();
-        if (mc2ActiveView === 'tasks') mc2RenderTasks();
+        if (mc2ActiveView === 'tasks') {
+          mc2RenderTasks();
+          mc2RenderTaskDetail();
+        }
         renderMissionControl();
       } catch (err) {
         alert(err && err.message ? err.message : String(err));
@@ -1437,7 +1579,10 @@
         if (mc2ActiveView === 'projects') mc2RenderProjects();
         if (mc2ActiveView === 'context') mc2RenderContext();
         if (mc2ActiveView === 'stats') mc2RenderStats();
-        if (mc2ActiveView === 'tasks') mc2RenderTasks();
+        if (mc2ActiveView === 'tasks') {
+          mc2RenderTasks();
+          mc2RenderTaskDetail();
+        }
       } catch (err) {
         console.error('[mission-control] render failed:', err);
       }
@@ -1486,35 +1631,35 @@
         if (typeof renderInitiativesPanels === 'function') renderInitiativesPanels();
         return;
       }
-      if (goalId) selectedTeamGoalId = goalId;
-      if (nav === 'goals') {
-        mc2SetView('goals');
-        Promise.resolve(mc2RenderGoals()).then(function () {
-          if (subgoalId && typeof scheduleScrollToBlockedTarget === 'function') {
-            scheduleScrollToBlockedTarget({
-              kind: 'subgoal',
-              goalId: goalId,
-              subgoalId: subgoalId,
-              title: '',
-            }, 0);
-          }
-        });
+      var item = typeof findMissionTaskItem === 'function'
+        ? findMissionTaskItem({ goalId: goalId, subgoalId: subgoalId })
+        : null;
+      if (!item && initiativeId && subgoalId) {
+        item = typeof findMissionTaskItem === 'function'
+          ? findMissionTaskItem({ subgoalId: 'init-' + initiativeId, goalId: goalId })
+          : null;
+      }
+      if (item) {
+        mc2OpenTaskDetail(item, { filter: 'all' });
+        return;
+      }
+      if (goalId) {
+        mc2OpenTaskDetail(null, { goalId: goalId, subgoalId: subgoalId, filter: 'all' });
         return;
       }
       mc2OpenTasksView('all');
-      Promise.resolve(mc2RenderTasks()).then(function () {
-        if (!subgoalId) return;
-        var safeId = String(subgoalId).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        var card = document.querySelector(
-          '#page-team2 .mc-mission-task-card[data-subgoal-id="' + safeId + '"]'
-        );
-        if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      });
     }
 
     var mc2PendingRoot = document.getElementById('page-team2');
     if (mc2PendingRoot) {
       mc2PendingRoot.addEventListener('click', function (e) {
+        var contextLink = e.target && e.target.closest ? e.target.closest('[data-mc-open-context]') : null;
+        if (contextLink) {
+          e.preventDefault();
+          e.stopPropagation();
+          mc2SetAgentFilter(contextLink.getAttribute('data-mc-agent') || '', 'context');
+          return;
+        }
         var movementRow = e.target && e.target.closest ? e.target.closest('[data-mc-movement-nav]') : null;
         if (movementRow) {
           e.preventDefault();
@@ -1551,7 +1696,10 @@
       selectEl.addEventListener('change', function () {
         if (selectEl.id === 'mc2-tasks-agent-filter') {
           mc2TasksAgentFilter = selectEl.value || '';
-          if (mc2ActiveView === 'tasks') mc2RenderTasks();
+          if (mc2ActiveView === 'tasks') {
+          mc2RenderTasks();
+          mc2RenderTaskDetail();
+        }
           return;
         }
         mc2SetAgentFilter(selectEl.value || '');
