@@ -65,6 +65,29 @@
       return '💡';
     }
 
+    function mc2AutoPromotedTagHtml(extraClass) {
+      var cls = 'mc-kanban-card-tag discovery' + (extraClass ? ' ' + extraClass : '');
+      return '<span class="' + cls + '">Auto-promoted</span>';
+    }
+
+    function mc2TaskTitleForInitiative(initiative) {
+      var initiativeId = String(initiative && initiative.id || '');
+      var subgoalId = initiativeId ? 'init-' + initiativeId : '';
+      var fallback = String(initiative && initiative.title || 'Untitled task').trim();
+      if (!subgoalId || typeof findMissionTaskItem !== 'function') return fallback;
+      var taskItem = findMissionTaskItem({ subgoalId: subgoalId, title: initiative.title });
+      return String((taskItem && taskItem.title) || fallback).trim();
+    }
+
+    function mc2AutoPromotedInitiativeSubtitle(initiative) {
+      var confidence = Math.round((Number(initiative && initiative.confidence) || 0) * 100);
+      var ts = Number(initiative && initiative.updatedAt) || 0;
+      var parts = ['Needs review'];
+      if (confidence > 0) parts.unshift('Confidence ' + confidence + '%');
+      if (ts) parts.push('waiting ' + mc2ShortWaitTime(ts));
+      return parts.join(' · ');
+    }
+
     function mc2KanbanCompletedCard(item) {
       var title = escapeHtml(String(item.title || 'Completed task'));
       var rawTitle = String(item.title || 'Completed task');
@@ -104,6 +127,9 @@
       if (item.initiativeId) attrs += ' data-initiative-id="' + escapeHtml(item.initiativeId) + '"';
       return '<div' + attrs + ' role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + escapeHtml(item.title) + '</div>' +
+        (item.tag
+          ? '<div class="mc-kanban-card-meta">' + mc2AutoPromotedTagHtml() + '</div>'
+          : '') +
         (item.subtitle || item.text
           ? '<div class="mc-kanban-card-meta">' + escapeHtml(item.subtitle || String(item.text || '').replace(/^[^—]+—\s*/, '')) + '</div>'
           : '') +
@@ -118,7 +144,7 @@
       var confidence = Math.round((Number(initiative.confidence) || 0) * 100);
       return '<div class="mc-kanban-card mc-kanban-card-discovery" data-mc-kanban-kind="discovery" data-initiative-id="' + escapeHtml(id) + '" role="button" tabindex="0">' +
         '<div class="mc-kanban-card-title">' + icon + ' ' + title + '</div>' +
-        '<div class="mc-kanban-card-meta"><span class="mc-kanban-card-tag discovery">Auto-promoted</span></div>' +
+        '<div class="mc-kanban-card-meta">' + mc2AutoPromotedTagHtml() + '</div>' +
         '<div class="mc-kanban-card-meta">Confidence ' + escapeHtml(String(confidence)) + '%</div>' +
       '</div>';
     }
@@ -252,13 +278,21 @@
       var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : [];
       initiatives.forEach(function (it) {
         if (!mc2InitiativeWasAutoPromoted(it)) return;
+        var initiativeId = String(it.id || '');
+        var subgoalId = initiativeId ? 'init-' + initiativeId : '';
         var ts = Number(it.updatedAt) || 0;
+        var taskItem = (subgoalId && typeof findMissionTaskItem === 'function')
+          ? findMissionTaskItem({ subgoalId: subgoalId, title: it.title })
+          : null;
         mc2PushActionRequiredItem(items, {
           kind: 'warning',
           action: 'initiative-review',
-          initiativeId: String(it.id || ''),
-          title: 'Review auto-promoted initiative',
-          subtitle: String(it.title || 'Untitled initiative').trim().slice(0, 96),
+          initiativeId: initiativeId,
+          subgoalId: subgoalId,
+          goalId: taskItem ? String(taskItem.goalId || '') : '',
+          title: mc2TaskTitleForInitiative(it),
+          tag: 'Auto-promoted',
+          subtitle: mc2AutoPromotedInitiativeSubtitle(it),
           ts: ts,
         });
       });
@@ -327,7 +361,10 @@
       itemsEl.innerHTML = items.slice(0, 6).map(function (item) {
         return '<button type="button" class="mc-action-banner-item ' + escapeHtml(item.kind || 'warning') + '"' +
           mc2ActionRequiredItemAttrs(item) + '>' +
-          '<span class="mc-action-banner-item-title">' + escapeHtml(item.title) + '</span>' +
+          '<span class="mc-action-banner-item-title">' +
+            escapeHtml(item.title) +
+            (item.tag ? ' ' + mc2AutoPromotedTagHtml('mc-action-banner-item-tag') : '') +
+          '</span>' +
           '<span class="mc-action-banner-item-sub">' + escapeHtml(item.subtitle || '') + '</span>' +
         '</button>';
       }).join('');
@@ -345,6 +382,7 @@
           initiativeId: item.initiativeId,
           title: item.title,
           subtitle: item.subtitle,
+          tag: item.tag,
           text: escapeHtml(item.title) + (item.subtitle ? ' — ' + escapeHtml(item.subtitle) : ''),
           ts: item.ts,
         };
