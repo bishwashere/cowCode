@@ -98,6 +98,16 @@ const checks = [
       fullHtml.includes('id="chat-overview-uptime"') &&
       fullHtml.includes('id="home-identity-tiles"'),
   },
+  {
+    name: 'chat bundle guards mission-control forward refs before script 04 loads',
+    ok: fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8').includes("typeof renderMissionControl === 'function'") &&
+      fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8').includes("typeof mc2SyncTimelineHighlightForScroll === 'function'"),
+  },
+  {
+    name: 'home chat toolbar buttons are wired in chat bundle',
+    ok: fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8').includes("wireEl('chat-send', 'click'") &&
+      fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8').includes("wireClick('chat-agent-create-btn'"),
+  },
 ];
 
 let failed = 0;

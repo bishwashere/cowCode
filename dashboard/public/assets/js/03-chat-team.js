@@ -526,8 +526,8 @@
       renderAgentInbox();
       renderAgentOutbox();
       renderAgentMetrics();
-      renderMissionControl();
-      mc2SyncTimelineHighlightForScroll();
+      if (typeof renderMissionControl === 'function') renderMissionControl();
+      if (typeof mc2SyncTimelineHighlightForScroll === 'function') mc2SyncTimelineHighlightForScroll();
     }
 
     function selectTeamInboxAgent(agentId) {
@@ -2371,7 +2371,7 @@
       renderAgentOutbox();
       renderAgentContext();
       renderTeamTaskSummary();
-      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active')) renderMissionControl();
+      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active') && typeof renderMissionControl === 'function') renderMissionControl();
     }
 
     async function fetchTeamContextFeed() {
@@ -2389,7 +2389,7 @@
       renderCurrentMission();
       renderTeamTaskSummary();
       renderAgentMapForPrefix({ prefix: 'team-map', mode: 'edit-page' });
-      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active')) renderMissionControl();
+      if (document.getElementById('page-team2') && document.getElementById('page-team2').classList.contains('active') && typeof renderMissionControl === 'function') renderMissionControl();
     }
 
     async function fetchTeamMetricsFeed() {
@@ -2447,14 +2447,14 @@
       fetchTeamMetricsFeed();
       fetchGoalsSnapshot();
       fetchInitiativesSnapshot();
-      fetchMc2PendingApprovals();
+      if (typeof fetchMc2PendingApprovals === 'function') fetchMc2PendingApprovals();
       teamActivityPollTimer = setInterval(function () {
         fetchTeamActivityFeed();
         fetchTeamContextFeed();
         fetchTeamMetricsFeed();
         fetchGoalsSnapshot();
         fetchInitiativesSnapshot();
-        fetchMc2PendingApprovals();
+        if (typeof fetchMc2PendingApprovals === 'function') fetchMc2PendingApprovals();
       }, TEAM_ACTIVITY_POLL_MS);
     }
 
@@ -2750,31 +2750,4 @@
       }
     }
 
-    wireEl('chat-send', 'click', function () {
-      if (chatLoading && chatAbortController) {
-        chatAbortController.abort();
-        return;
-      }
-      sendChatMessage();
-    });
-    wireEl('chat-input', 'keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
-    });
-    wireEl('chat-agent-select', 'change', function (e) {
-      setChatAgent((e.target && e.target.value) || 'main');
-    });
-    wireClick('chat-agent-create-btn', function () {
-      openAgentCreateModal({ fromAgentId: selectedChatAgentId });
-    });
-    wireClick('agent-team-ext-btn', function () {
-      openTeamPage();
-    });
-    wireClick('agent-team-create-btn', function () {
-      openAgentCreateModal({ fromAgentId: selectedChatAgentId });
-    });
-    wireClick('team-page-create-btn', function () {
-      openAgentCreateModal({ fromAgentId: selectedChatAgentId });
-    });
-    wireClick('team-page-fullscreen-btn', function () {
-      toggleTeamPageFullscreen();
-    });
+    // Chat toolbar bindings also live in 05-bind-init.js (loads after mission-control).

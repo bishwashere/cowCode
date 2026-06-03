@@ -85,6 +85,34 @@ function mc2BindTimelineScrollSpy(viewEl) {
         e.stopPropagation();
         toggleChatHistory();
       });
+      wireEl('chat-send', 'click', function () {
+        if (chatLoading && chatAbortController) {
+          chatAbortController.abort();
+          return;
+        }
+        sendChatMessage();
+      });
+      wireEl('chat-input', 'keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+      });
+      wireEl('chat-agent-select', 'change', function (e) {
+        setChatAgent((e.target && e.target.value) || 'main');
+      });
+      wireClick('chat-agent-create-btn', function () {
+        openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+      });
+      wireClick('agent-team-ext-btn', function () {
+        openTeamPage();
+      });
+      wireClick('agent-team-create-btn', function () {
+        openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+      });
+      wireClick('team-page-create-btn', function () {
+        openAgentCreateModal({ fromAgentId: selectedChatAgentId });
+      });
+      wireClick('team-page-fullscreen-btn', function () {
+        toggleTeamPageFullscreen();
+      });
       document.addEventListener('click', function (e) {
         var panel = document.getElementById('chat-history-panel');
         var btn = document.getElementById('chat-history-btn');
@@ -97,6 +125,9 @@ function mc2BindTimelineScrollSpy(viewEl) {
     }
 
     if (typeof fetchChatAgents === 'function') fetchChatAgents();
+    if (typeof setTeamAgentPanelRange === 'function' && typeof renderMissionControl === 'function') {
+      setTeamAgentPanelRange(typeof teamAgentPanelRange === 'string' ? teamAgentPanelRange : 'today');
+    }
     (function () {
       AGENT_MAP_PREFIXES.forEach(function (mapConfig) {
         var canvas = document.getElementById(mapConfig.prefix + '-canvas');
