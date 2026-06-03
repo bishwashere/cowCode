@@ -147,9 +147,9 @@
         await fetchMc2PendingApprovals();
         await fetchGoalsSnapshot();
         await fetchInitiativesSnapshot();
-        if (window.cowCodeProjectsApi && typeof window.cowCodeProjectsApi.listProjects === 'function') {
+        if (window.pastureProjectsApi && typeof window.pastureProjectsApi.listProjects === 'function') {
           try {
-            mc2ProjectsSnapshot = await window.cowCodeProjectsApi.listProjects();
+            mc2ProjectsSnapshot = await window.pastureProjectsApi.listProjects();
           } catch (_) {}
         }
         if (mc2ActiveView === 'projects') mc2RenderProjects();

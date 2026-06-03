@@ -1,7 +1,10 @@
 {
-  "name": "cowcode",
+  "name": "pastureprotocol",
   "version": "2.0.0",
-  "description": "WhatsApp + configurable local/cloud LLM. No tools, just reply.",
+  "description": "Pasture Protocol — private local AI agent crew with missions, dashboard, and WhatsApp/Telegram.",
+  "bin": {
+    "pasture": "./cli.js"
+  },
   "type": "module",
   "main": "index.js",
   "packageManager": "pnpm@9.15.0",

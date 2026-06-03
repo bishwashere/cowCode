@@ -290,7 +290,7 @@ async function waitForDashboard(url, timeoutMs = 15000) {
 async function testDashboardServerStarts() {
   const port = pickPort();
   const url = `http://127.0.0.1:${port}/`;
-  const stateDir = mkdtempSync(path.join(tmpdir(), 'cowcode-dashboard-boot-'));
+  const stateDir = mkdtempSync(path.join(tmpdir(), 'pasture-dashboard-boot-'));
   let child = null;
   let stderr = '';
   try {
@@ -298,9 +298,9 @@ async function testDashboardServerStarts() {
       cwd: ROOT,
       env: {
         ...process.env,
-        COWCODE_STATE_DIR: stateDir,
-        COWCODE_DASHBOARD_PORT: String(port),
-        COWCODE_DASHBOARD_HOST: '127.0.0.1',
+        PASTURE_STATE_DIR: stateDir,
+        PASTURE_DASHBOARD_PORT: String(port),
+        PASTURE_DASHBOARD_HOST: '127.0.0.1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
