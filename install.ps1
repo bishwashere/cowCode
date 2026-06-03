@@ -529,6 +529,11 @@ try {
     }
     $Src = $SrcDir.FullName
     Write-Host "  [OK] Done."
+    Write-Host ""
+
+    # --- install code ---
+    Write-Host "  > Installing to $InstallDir ..."
+    Copy-CowcodeTree -SourceDir $Src -DestDir $InstallDir
 
     $pkgPath = Join-Path $InstallDir "package.json"
     if (-not (Test-Path -LiteralPath $pkgPath) -or -not (Test-Path -LiteralPath (Join-Path $InstallDir "index.js"))) {
