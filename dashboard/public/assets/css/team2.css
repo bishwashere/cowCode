@@ -754,6 +754,36 @@ button.mc-stat-card-action:focus-visible {
   padding: 0.35rem 0.1rem;
 }
 
+.mc-kanban-expand {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.38rem 0.45rem;
+  border: 1px dashed rgba(129, 140, 248, 0.28);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.35);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.6rem;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.mc-kanban-expand:hover {
+  border-color: rgba(129, 140, 248, 0.5);
+  color: var(--text);
+  background: rgba(30, 41, 59, 0.55);
+}
+
+.mc-kanban-expand.mc-kanban-collapse {
+  border-style: solid;
+  border-color: rgba(129, 140, 248, 0.18);
+}
+
 /* ── Section title ────────────────────────────────────────────────────── */
 
 .mc-section-title {

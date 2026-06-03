@@ -370,23 +370,25 @@
       }).join('');
     }
 
+    function mc2MapKanbanAttentionItem(item) {
+      return {
+        kind: item.kind,
+        action: item.action,
+        goalId: item.goalId,
+        subgoalId: item.subgoalId,
+        agentId: item.agentId,
+        pendingId: item.pendingId,
+        initiativeId: item.initiativeId,
+        title: item.title,
+        subtitle: item.subtitle,
+        tag: item.tag,
+        text: escapeHtml(item.title) + (item.subtitle ? ' — ' + escapeHtml(item.subtitle) : ''),
+        ts: item.ts,
+      };
+    }
+
     function mc2CollectKanbanAttentionItems() {
-      return mc2CollectActionRequiredItems().slice(0, 8).map(function (item) {
-        return {
-          kind: item.kind,
-          action: item.action,
-          goalId: item.goalId,
-          subgoalId: item.subgoalId,
-          agentId: item.agentId,
-          pendingId: item.pendingId,
-          initiativeId: item.initiativeId,
-          title: item.title,
-          subtitle: item.subtitle,
-          tag: item.tag,
-          text: escapeHtml(item.title) + (item.subtitle ? ' — ' + escapeHtml(item.subtitle) : ''),
-          ts: item.ts,
-        };
-      });
+      return mc2CollectActionRequiredItems().map(mc2MapKanbanAttentionItem);
     }
 
     function mc2CollectKanbanCompletedItems() {
@@ -405,7 +407,7 @@
         });
       });
       if (typeof listCompletedTasks === 'function') {
-        listCompletedTasks({ range: 'today' }).slice(0, 8).forEach(function (task) {
+        listCompletedTasks({ range: 'today' }).forEach(function (task) {
           items.push({
             kind: 'turn',
             title: typeof mc2TaskDisplayTitle === 'function' ? mc2TaskDisplayTitle(task) : String(task.prompt || task.summary || 'Completed task'),
@@ -421,7 +423,7 @@
         if (seen[key]) return false;
         seen[key] = true;
         return true;
-      }).slice(0, 8);
+      });
     }
 
     function mc2CollectKanbanProgressItems() {
@@ -448,7 +450,7 @@
         return mc2InitiativeWasAutoPromoted(it);
       }).sort(function (a, b) {
         return (Number(b.confidence) || 0) - (Number(a.confidence) || 0);
-      }).slice(0, 8);
+      });
     }
 
     function mc2WireKanbanCol(col) {
@@ -494,52 +496,107 @@
       });
     }
 
-    function mc2RenderKanbanCol(colId, countId, html, emptyMsg) {
+    var MC2_KANBAN_DISPLAY_LIMIT = 5;
+    var mc2KanbanColExpanded = {
+      attention: false,
+      completed: false,
+      progress: false,
+      discoveries: false,
+    };
+
+    function mc2KanbanExpandHtml(key, hiddenCount, expanded, totalCount) {
+      if (!expanded && hiddenCount > 0) {
+        return '<button type="button" class="mc-kanban-expand" data-mc-kanban-expand="' + escapeHtml(key) + '">' +
+          'Click to expand below for ' + hiddenCount + ' more</button>';
+      }
+      if (expanded && totalCount > MC2_KANBAN_DISPLAY_LIMIT) {
+        return '<button type="button" class="mc-kanban-expand mc-kanban-collapse" data-mc-kanban-collapse="' + escapeHtml(key) + '">' +
+          'Show less</button>';
+      }
+      return '';
+    }
+
+    function mc2WireKanbanExpand(col) {
+      if (!col) return;
+      col.querySelectorAll('[data-mc-kanban-expand]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var key = btn.getAttribute('data-mc-kanban-expand') || '';
+          if (key && Object.prototype.hasOwnProperty.call(mc2KanbanColExpanded, key)) {
+            mc2KanbanColExpanded[key] = true;
+            mc2RenderKanban();
+          }
+        });
+      });
+      col.querySelectorAll('[data-mc-kanban-collapse]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var key = btn.getAttribute('data-mc-kanban-collapse') || '';
+          if (key && Object.prototype.hasOwnProperty.call(mc2KanbanColExpanded, key)) {
+            mc2KanbanColExpanded[key] = false;
+            mc2RenderKanban();
+          }
+        });
+      });
+    }
+
+    function mc2RenderKanbanCol(colId, countId, items, renderCard, emptyMsg, expandKey) {
       var col = mc2El(colId);
       var count = mc2El(countId);
       if (!col) return;
-      var itemCount = html ? (html.match(/mc-kanban-card/g) || []).length : 0;
-      if (count) count.textContent = itemCount;
-      if (!itemCount) {
+      var totalCount = Array.isArray(items) ? items.length : 0;
+      if (count) count.textContent = String(totalCount);
+      if (!totalCount) {
         col.innerHTML = '<p class="mc-kanban-empty">' + emptyMsg + '</p>';
         return;
       }
+      var expanded = expandKey ? !!mc2KanbanColExpanded[expandKey] : false;
+      var visibleCount = expanded ? totalCount : Math.min(MC2_KANBAN_DISPLAY_LIMIT, totalCount);
+      var hiddenCount = totalCount - visibleCount;
+      var html = items.slice(0, visibleCount).map(renderCard).join('') +
+        mc2KanbanExpandHtml(expandKey || '', hiddenCount, expanded, totalCount);
       col.innerHTML = html;
       mc2WireKanbanCol(col);
+      mc2WireKanbanExpand(col);
     }
 
     function mc2RenderKanban() {
-      var attention = mc2CollectKanbanAttentionItems();
-      var completed = mc2CollectKanbanCompletedItems();
-      var progress = mc2CollectKanbanProgressItems();
-      var discoveries = mc2CollectKanbanDiscoveryItems();
-
       mc2RenderKanbanCol(
         'mc2-col-attention',
         'mc2-col-count-attention',
-        attention.map(mc2KanbanAttentionCard).join(''),
-        'All clear'
+        mc2CollectKanbanAttentionItems(),
+        mc2KanbanAttentionCard,
+        'All clear',
+        'attention'
       );
       mc2RenderKanbanCol(
         'mc2-col-completed',
         'mc2-col-count-completed',
-        completed.map(mc2KanbanCompletedCard).join(''),
-        'Nothing completed yet'
+        mc2CollectKanbanCompletedItems(),
+        mc2KanbanCompletedCard,
+        'Nothing completed yet',
+        'completed'
       );
       mc2RenderKanbanCol(
         'mc2-col-progress',
         'mc2-col-count-progress',
-        progress.map(function (entry) {
+        mc2CollectKanbanProgressItems(),
+        function (entry) {
           if (entry.kind === 'agent') return mc2KanbanCard(entry.a, entry.ctx);
           return mc2KanbanProgressSubgoalCard(entry.item);
-        }).join(''),
-        'No active work'
+        },
+        'No active work',
+        'progress'
       );
       mc2RenderKanbanCol(
         'mc2-col-discoveries',
         'mc2-col-count-discoveries',
-        discoveries.map(mc2KanbanDiscoveryCard).join(''),
-        'No discoveries yet'
+        mc2CollectKanbanDiscoveryItems(),
+        mc2KanbanDiscoveryCard,
+        'No discoveries yet',
+        'discoveries'
       );
     }
 

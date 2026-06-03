@@ -177,6 +177,11 @@ const checks = [
       fullHtml.includes('id="mc2-col-discoveries"') &&
       missionControlJs.includes('mc2CollectKanbanCompletedItems') &&
       missionControlJs.includes('mc2CollectKanbanDiscoveryItems') &&
+      missionControlJs.includes('MC2_KANBAN_DISPLAY_LIMIT = 5') &&
+      missionControlJs.includes('Click to expand below for') &&
+      missionControlJs.includes('data-mc-kanban-expand') &&
+      missionControlJs.includes('mc2KanbanColExpanded') &&
+      /function mc2RenderKanbanCol\([\s\S]*expandKey/.test(missionControlJs) &&
       !fullHtml.includes('>NOW <'),
   },
   {
