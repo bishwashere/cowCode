@@ -136,6 +136,7 @@ const checks = [
     ok: fs.existsSync(path.join(mc2PagesDir, 'view-home.html')) &&
       fs.existsSync(path.join(mc2PagesDir, 'view-tasks.html')) &&
       fullHtml.includes('id="mc2-views-root"') &&
+      fullHtml.includes('id="mc2-views-root"') &&
       fullHtml.includes('id="mc2-view-mission"') &&
       !fullHtml.includes('<!-- MC2_VIEWS -->'),
   },
@@ -194,7 +195,8 @@ const checks = [
   },
   {
     name: 'mission view scrolls when kanban content is long',
-    ok: /#mc2-view-mission[\s\S]{0,260}overflow-y:\s*auto/.test(team2Css) &&
+    ok: /#mc2-views-root[\s\S]{0,220}flex:\s*1 1 0[\s\S]{0,120}min-height:\s*0/.test(team2Css) &&
+      /#mc2-view-mission[\s\S]{0,260}overflow-y:\s*auto/.test(team2Css) &&
       /#mc2-view-mission > \*[\s\S]{0,80}flex:\s*0 0 auto/.test(team2Css) &&
       /#mc2-view-mission \.mc-bottom-row \.mc-panel-body[\s\S]{0,80}flex:\s*none/.test(team2Css) &&
       !/\.mc-kanban-col-body[\s\S]{0,120}overflow-y:\s*auto/.test(team2Css),
