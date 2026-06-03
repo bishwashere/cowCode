@@ -258,8 +258,8 @@ if (-not (Test-CowcodeBranchName $Branch)) {
 }
 
 $BranchPath = Encode-GitHubBranchPath $Branch
-$Tarball = "https://github.com/bishwashere/cowCode/archive/refs/heads/$BranchPath.tar.gz"
-$Extracted = "cowCode-$Branch"
+$Tarball = "https://github.com/bishwashere/pastureprotocol/archive/refs/heads/$BranchPath.tar.gz"
+$Extracted = "pastureprotocol-$Branch"
 
 $Root = if ($env:PASTURE_ROOT) { $env:PASTURE_ROOT } elseif ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { $PSScriptRoot }
 $StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
@@ -284,7 +284,7 @@ try {
         $localVer = Read-PackageJsonVersion (Join-Path $Root "package.json")
         $remoteJson = Join-Path $Work "remote_package.json"
         $ts = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-        $pkgUri = "https://raw.githubusercontent.com/bishwashere/cowCode/$BranchPath/package.json?t=$ts"
+        $pkgUri = "https://raw.githubusercontent.com/bishwashere/pastureprotocol/$BranchPath/package.json?t=$ts"
         if (Save-CowcodeDownload -Uri $pkgUri -OutFile $remoteJson -Label "Fetch remote package.json" `
             -MinBytes 16 -TimeoutSec 120 -AllowFail) {
             $remoteVer = Read-PackageJsonVersion $remoteJson

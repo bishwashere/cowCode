@@ -1,7 +1,7 @@
 # Pasture Protocol Windows installer
 # Download -> install -> deps -> setup -> start (pm2)
 # Code: %USERPROFILE%\.local\share\pastureprotocol   State: %USERPROFILE%\.pasture
-# Install: iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
+# Install: iwr -useb https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.ps1 | iex
 
 param(
     [switch]$SkipSetup
@@ -501,8 +501,8 @@ if (-not (Test-CowcodeBranchName $Branch)) {
 }
 
 $BranchPath = Encode-GitHubBranchPath $Branch
-$Tarball = "https://github.com/bishwashere/cowCode/archive/refs/heads/$BranchPath.tar.gz"
-$Extracted = "cowCode-$Branch"
+$Tarball = "https://github.com/bishwashere/pastureprotocol/archive/refs/heads/$BranchPath.tar.gz"
+$Extracted = "pastureprotocol-$Branch"
 
 $InstallDir = if ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".local\share\pastureprotocol" }
 $BinDir = Join-Path $env:USERPROFILE ".local\bin"
@@ -531,7 +531,7 @@ try {
     $Src = Join-Path $Work $Extracted
     if (-not (Test-Path -LiteralPath $Src)) {
         Write-Host "  [X] Extracted folder not found: $Src"
-        Write-Host "  [X] Check PASTURE_BRANCH (archive root must be cowCode-<branch>)."
+        Write-Host "  [X] Check PASTURE_BRANCH (archive root must be pastureprotocol-<branch>)."
         Exit-Install 1
     }
 
@@ -565,7 +565,6 @@ try {
 set PASTURE_INSTALL_DIR=$InstallDir
 set PASTURE_NODE_DIR=$CowcodeNodeDir
 if exist "%PASTURE_NODE_DIR%\node.exe" set PATH=%PASTURE_NODE_DIR%;%APPDATA%\npm;%PATH%
-if exist "%COWCODE_NODE_DIR%\node.exe" set PATH=%COWCODE_NODE_DIR%;%APPDATA%\npm;%PATH%
 node "$InstallDir\cli.js" %*
 "@
         Set-Content -Path $Launcher -Value $cmdContent -Encoding ASCII -ErrorAction Stop
