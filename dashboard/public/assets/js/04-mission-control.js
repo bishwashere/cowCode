@@ -542,42 +542,121 @@
         var lastTs = Number(ctx.updatedAt) || 0;
         if (s === 'error') {
           var reason = String(ctx.currentThought || ctx.lastAction || '').trim() || 'blocked';
-          items.push({ kind: 'error', text: escapeHtml(agentCardShortName(a)) + ' blocked — ' + escapeHtml(reason.slice(0, 60)), ts: lastTs });
+          items.push({
+            kind: 'error',
+            action: 'agent',
+            agentId: id,
+            text: escapeHtml(agentCardShortName(a)) + ' blocked — ' + escapeHtml(reason.slice(0, 60)),
+            ts: lastTs,
+          });
         } else if (s === 'waiting') {
           var waitFor = String(ctx.waitingFor || '').trim();
           var desc = waitFor ? 'waiting for ' + escapeHtml(agentNameById(waitFor)) : 'waiting for response';
-          items.push({ kind: 'warning', text: escapeHtml(agentCardShortName(a)) + ' ' + desc, ts: lastTs });
+          items.push({
+            kind: 'warning',
+            action: 'agent',
+            agentId: id,
+            text: escapeHtml(agentCardShortName(a)) + ' ' + desc,
+            ts: lastTs,
+          });
         }
       });
       var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
       goals.forEach(function (g) {
         var status = String(g.status || '').toLowerCase();
+        var goalId = String(g.id || '');
         if (status === 'blocked') {
-          items.push({ kind: 'error', text: 'Mission blocked: ' + escapeHtml(String(g.title || g.objective || '').slice(0, 60)), ts: Number(g.updatedAt) || 0 });
+          items.push({
+            kind: 'error',
+            action: String(g.needsUserInput || '').trim() ? 'goal-input' : 'goal',
+            goalId: goalId,
+            text: 'Mission blocked: ' + escapeHtml(String(g.title || g.objective || '').slice(0, 60)),
+            ts: Number(g.updatedAt) || 0,
+          });
           return;
         }
         if (isGoalPartialWait(g) || String(g.needsUserInput || '').trim()) {
           items.push({
             kind: 'warning',
+            action: String(g.needsUserInput || '').trim() ? 'goal-input' : 'goal',
+            goalId: goalId,
             text: formatGoalImplementationAttention(g),
             ts: Number(g.updatedAt) || 0,
           });
         }
       });
       mc2PendingItems().forEach(function (p) {
+        var pendingId = String(p.id || '');
         var label = mc2PendingKindLabel(p.kind) + ': ' + mc2PendingTitle(p);
-        items.push({ kind: 'warning', text: 'Awaiting approval — ' + escapeHtml(label.slice(0, 72)), ts: Number(p.createdAt) || 0 });
+        items.push({
+          kind: 'warning',
+          action: 'pending',
+          pendingId: pendingId,
+          text: 'Awaiting approval — ' + escapeHtml(label.slice(0, 72)),
+          ts: Number(p.createdAt) || 0,
+        });
       });
       items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
       if (!items.length) { el.innerHTML = '<p class="mc-kanban-empty">All clear.</p>'; return; }
       el.innerHTML = items.slice(0, 6).map(function (item) {
         var icon = item.kind === 'error' ? '🔴' : '⚠️';
-        return '<div class="mc-attention-item ' + item.kind + '">' +
+        var attrs = ' type="button" class="mc-attention-item ' + item.kind + '" data-attention-action="' + escapeHtml(item.action || '') + '"';
+        if (item.goalId) attrs += ' data-goal-id="' + escapeHtml(item.goalId) + '"';
+        if (item.agentId) attrs += ' data-agent-id="' + escapeHtml(item.agentId) + '"';
+        if (item.pendingId) attrs += ' data-pending-id="' + escapeHtml(item.pendingId) + '"';
+        return '<button' + attrs + '>' +
           '<span class="mc-attention-icon">' + icon + '</span>' +
           '<span class="mc-attention-text">' + item.text + '</span>' +
-          (item.ts ? '<span style="margin-left:auto;flex-shrink:0;font-size:0.58rem;color:var(--muted);">' + mc2RelTime(item.ts) + '</span>' : '') +
-        '</div>';
+          (item.ts ? '<span class="mc-attention-time">' + mc2RelTime(item.ts) + '</span>' : '') +
+        '</button>';
       }).join('');
+    }
+
+    function mc2GoalById(goalId) {
+      var id = String(goalId || '').trim();
+      if (!id) return null;
+      return (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+        return String(g.id || '') === id;
+      }) || null;
+    }
+
+    function mc2HandleAttentionClick(btn) {
+      if (!btn) return;
+      var action = String(btn.getAttribute('data-attention-action') || '').trim();
+      if (action === 'goal-input') {
+        var goal = mc2GoalById(btn.getAttribute('data-goal-id'));
+        if (goal && typeof openTeamUserInputModal === 'function') {
+          openTeamUserInputModal(goal);
+          return;
+        }
+        action = 'goal';
+      }
+      if (action === 'goal') {
+        mc2SetView('goals');
+        return;
+      }
+      if (action === 'agent') {
+        mc2SetAgentFilter(btn.getAttribute('data-agent-id') || '', 'context');
+        return;
+      }
+      if (action === 'pending') {
+        var pendingId = String(btn.getAttribute('data-pending-id') || '').trim();
+        mc2SetView('tasks');
+        if (!pendingId) return;
+        setTimeout(function () {
+          var cards = document.querySelectorAll('.mc-pending-card[data-pending-id]');
+          var card = null;
+          for (var i = 0; i < cards.length; i++) {
+            if (String(cards[i].getAttribute('data-pending-id') || '') === pendingId) {
+              card = cards[i];
+              break;
+            }
+          }
+          if (card) {
+            try { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+          }
+        }, 120);
+      }
     }
 
     function mc2RenderActivity() {
@@ -1146,6 +1225,12 @@
     var mc2PendingRoot = document.getElementById('page-team2');
     if (mc2PendingRoot) {
       mc2PendingRoot.addEventListener('click', function (e) {
+        var attentionBtn = e.target && e.target.closest ? e.target.closest('[data-attention-action]') : null;
+        if (attentionBtn) {
+          e.preventDefault();
+          mc2HandleAttentionClick(attentionBtn);
+          return;
+        }
         var btn = e.target && e.target.closest ? e.target.closest('[data-pending-action]') : null;
         if (!btn) return;
         e.preventDefault();

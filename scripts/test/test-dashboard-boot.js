@@ -38,6 +38,7 @@ const serverJs = fs.readFileSync(serverPath, 'utf8');
 const script = appScripts;
 const core = fs.readFileSync(path.join(assetsJs, '01-core-router-status.js'), 'utf8');
 const chat = fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8');
+const missionControlJs = fs.readFileSync(path.join(assetsJs, '04-mission-control.js'), 'utf8');
 const bind = fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8');
 
 const checks = [
@@ -113,6 +114,13 @@ const checks = [
   {
     name: 'initiative promote route is async (await promoteInitiativeToSubgoal)',
     ok: /app\.post\('\/api\/initiatives\/:id\/promote',\s*async\s*\(req,\s*res\)\s*=>\s*\{[\s\S]*await promoteInitiativeToSubgoal\(/.test(serverJs),
+  },
+  {
+    name: 'attention needed items are clickable buttons with actions',
+    ok: missionControlJs.includes('data-attention-action') &&
+      missionControlJs.includes('mc2HandleAttentionClick') &&
+      missionControlJs.includes("return '<button'") &&
+      missionControlJs.includes('goal-input'),
   },
   {
     name: 'home page has status overview element ids',

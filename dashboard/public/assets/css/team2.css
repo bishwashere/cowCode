@@ -877,6 +877,30 @@ button.mc-stat-card-action:focus-visible {
   font-size: 0.64rem;
   line-height: 1.35;
 }
+button.mc-attention-item {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+button.mc-attention-item:hover {
+  background: rgba(255,255,255,0.04);
+}
+button.mc-attention-item:focus-visible {
+  outline: 1px solid rgba(253,224,71,0.45);
+  outline-offset: 1px;
+}
+.mc-attention-time {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.58rem;
+  color: var(--muted);
+}
 .mc-movement-item:last-child,
 .mc-attention-item:last-child { border-bottom: none; }
 
