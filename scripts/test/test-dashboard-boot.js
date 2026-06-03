@@ -33,6 +33,7 @@ const fullHtml = html + '\n' + pageFragments;
 const serverJs = fs.readFileSync(serverPath, 'utf8');
 const script = appScripts;
 const core = fs.readFileSync(path.join(assetsJs, '01-core-router-status.js'), 'utf8');
+const chat = fs.readFileSync(path.join(assetsJs, '03-chat-team.js'), 'utf8');
 const bind = fs.readFileSync(path.join(assetsJs, '05-bind-init.js'), 'utf8');
 
 const checks = [
@@ -65,8 +66,19 @@ const checks = [
     ok: /var teamGoalsSnapshot[\s\S]{0,200}var mc2PendingSnapshot = \{ pending: \[\]/.test(core),
   },
   {
-    name: 'dashboardBoot runs soon after fetchStatus in core bundle',
-    ok: /async function fetchStatus\(\)[\s\S]*function dashboardBoot\(\)[\s\S]*dashboardBoot\(\)/.test(core),
+    name: 'dashboardBoot runs soon after fetchStatus in core bundle (home data load regression)',
+    ok: /async function fetchStatus\(\)[\s\S]*function dashboardBoot\(\)[\s\S]*dashboardBoot\(\)/.test(core) &&
+      core.indexOf('dashboardBoot()') < core.length * 0.95,
+  },
+  {
+    name: 'index.html loads core router before chat and mission-control bundles',
+    ok: (() => {
+      const scripts = [...html.matchAll(/assets\/js\/(\d{2}-[^"]+\.js)/g)].map((m) => m[1]);
+      const coreIdx = scripts.indexOf('01-core-router-status.js');
+      const chatIdx = scripts.indexOf('03-chat-team.js');
+      const mcIdx = scripts.indexOf('04-mission-control.js');
+      return coreIdx >= 0 && chatIdx > coreIdx && mcIdx > chatIdx;
+    })(),
   },
   {
     name: 'home setPage refreshes status and identity tiles',
