@@ -200,7 +200,10 @@ const checks = [
       fullHtml.includes('ACTION REQUIRED') &&
       missionControlJs.includes('function mc2CollectActionRequiredItems') &&
       missionControlJs.includes('function mc2RenderActionBanner') &&
-      missionControlJs.includes("action: 'initiative-review'"),
+      missionControlJs.includes("action: 'initiative-review'") &&
+      missionControlJs.includes("tag: 'Auto-promoted'") &&
+      missionControlJs.includes('function mc2TaskTitleForInitiative') &&
+      !missionControlJs.includes("'Review auto-promoted initiative'"),
   },
   {
     name: 'task detail drawer renders structured mission task fields',

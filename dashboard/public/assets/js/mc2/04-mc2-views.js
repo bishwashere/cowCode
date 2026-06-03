@@ -28,7 +28,9 @@
         return '<button' + attrs + '>' +
           '<span class="mc-attention-icon">' + icon + '</span>' +
           '<span class="mc-attention-copy">' +
-            '<span class="mc-attention-title">' + escapeHtml(item.title) + '</span>' +
+            '<span class="mc-attention-title">' + escapeHtml(item.title) +
+              (item.tag ? ' ' + mc2AutoPromotedTagHtml('mc-attention-tag') : '') +
+            '</span>' +
             (item.subtitle ? '<span class="mc-attention-sub">' + escapeHtml(item.subtitle) + '</span>' : '') +
           '</span>' +
         '</button>';
