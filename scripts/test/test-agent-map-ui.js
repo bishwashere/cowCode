@@ -348,7 +348,18 @@ const checks = [
       html.includes('flattenMissionWorkItems') &&
       html.includes('groupMissionWorkItems') &&
       html.includes('mc-mission-task-card') &&
+      html.includes('data-mc-task-action="respond"') &&
+      html.includes('openMissionWorkInputModal') &&
+      html.includes('goalNeedsAttention') &&
+      html.includes('countBlockedSubgoalsForGoal') &&
       html.includes('View blocked tasks and subtasks'),
+  },
+  {
+    name: 'Team2 attention lists blocked subgoals needing input',
+    ok: html.includes('countBlockedSubgoalsForGoal') &&
+      html.includes('goalNeedsAttention') &&
+      html.includes('goalAttentionPrompt') &&
+      html.includes('tap to respond'),
   },
   {
     name: 'Team page blocked badge is clickable',

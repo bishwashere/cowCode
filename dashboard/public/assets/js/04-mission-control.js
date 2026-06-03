@@ -538,11 +538,30 @@
       var descHtml = desc ? '<p class="mc-task-card-desc">' + escapeHtml(desc.slice(0, 220)) + '</p>' : '';
       var progress = Number(item.progress);
       var progressLabel = isFinite(progress) && progress > 0 ? (progress + '%') : '';
-      return '<button type="button" class="mc-task-card mc-mission-task-card" data-mc-mission-task="1"' +
-        ' data-goal-id="' + escapeHtml(String(item.goalId || '')) + '"' +
-        ' data-subgoal-id="' + escapeHtml(String(item.subgoalId || '')) + '"' +
+      var goalId = String(item.goalId || '');
+      var subgoalId = String(item.subgoalId || '');
+      var actionsHtml = '';
+      if (status === 'blocked' && goalId) {
+        actionsHtml = '<div class="mc-task-card-actions">' +
+          '<button type="button" class="mc-task-card-btn primary" data-mc-task-action="respond"' +
+            ' data-goal-id="' + escapeHtml(goalId) + '"' +
+            ' data-subgoal-id="' + escapeHtml(subgoalId) + '">Respond</button>' +
+          (subgoalId
+            ? '<button type="button" class="mc-task-card-btn" data-mc-task-action="unblock"' +
+                ' data-goal-id="' + escapeHtml(goalId) + '"' +
+                ' data-subgoal-id="' + escapeHtml(subgoalId) + '">Mark open</button>'
+            : '') +
+          '<button type="button" class="mc-task-card-btn" data-mc-task-action="details"' +
+            ' data-goal-id="' + escapeHtml(goalId) + '"' +
+            ' data-subgoal-id="' + escapeHtml(subgoalId) + '">Details</button>' +
+        '</div>';
+      }
+      return '<div class="mc-task-card mc-mission-task-card" data-mc-mission-task="1"' +
+        ' data-goal-id="' + escapeHtml(goalId) + '"' +
+        ' data-subgoal-id="' + escapeHtml(subgoalId) + '"' +
         ' data-agent-id="' + escapeHtml(String(item.agentId || assigneeId || '')) + '"' +
-        ' data-status="' + escapeHtml(status) + '">' +
+        ' data-status="' + escapeHtml(status) + '"' +
+        ' data-title="' + escapeHtml(String(item.title || '')) + '">' +
         '<div class="mc-task-card-title">' + escapeHtml(item.title || 'Untitled') + '</div>' +
         pathLine +
         descHtml +
@@ -552,7 +571,8 @@
           missionLine +
           (progressLabel ? '<span>' + escapeHtml(progressLabel) + '</span>' : '') +
         '</div>' +
-      '</button>';
+        actionsHtml +
+      '</div>';
     }
 
     function mc2MissionTasksSection(title, items) {
@@ -571,35 +591,83 @@
       });
     }
 
+    function mc2MissionTaskItemFromEl(el) {
+      if (!el) return null;
+      return {
+        kind: 'subgoal',
+        goalId: String(el.getAttribute('data-goal-id') || ''),
+        subgoalId: String(el.getAttribute('data-subgoal-id') || ''),
+        title: String(el.getAttribute('data-title') || '').trim(),
+        agentId: String(el.getAttribute('data-agent-id') || ''),
+        status: String(el.getAttribute('data-status') || 'blocked'),
+      };
+    }
+
+    function mc2ShowMissionTaskDetails(card) {
+      var goalId = card.getAttribute('data-goal-id');
+      var subgoalId = card.getAttribute('data-subgoal-id');
+      if (!goalId) return;
+      selectedTeamGoalId = goalId;
+      mc2SetView('goals');
+      Promise.resolve(mc2RenderGoals()).then(function () {
+        if (typeof scheduleScrollToBlockedTarget === 'function') {
+          scheduleScrollToBlockedTarget({
+            kind: subgoalId ? 'subgoal' : 'goal',
+            goalId: goalId,
+            subgoalId: subgoalId,
+            title: card.getAttribute('data-title') || '',
+          }, 0);
+        }
+      });
+    }
+
     function mc2WireMissionTaskCards(root) {
       if (!root) return;
+      root.querySelectorAll('[data-mc-task-action]').forEach(function (btn) {
+        if (btn._wired) return;
+        btn._wired = true;
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var action = String(btn.getAttribute('data-mc-task-action') || '');
+          var card = btn.closest('.mc-mission-task-card');
+          if (action === 'respond') {
+            if (typeof openMissionWorkInputModal === 'function') {
+              openMissionWorkInputModal(mc2MissionTaskItemFromEl(card || btn));
+            }
+            return;
+          }
+          if (action === 'unblock' && typeof patchMissionSubgoalStatus === 'function') {
+            patchMissionSubgoalStatus(
+              btn.getAttribute('data-goal-id'),
+              btn.getAttribute('data-subgoal-id'),
+              'todo'
+            );
+            return;
+          }
+          if (action === 'details' && card) {
+            mc2ShowMissionTaskDetails(card);
+          }
+        });
+      });
       root.querySelectorAll('.mc-mission-task-card[data-mc-mission-task]').forEach(function (card) {
-        if (card._wired) return;
-        card._wired = true;
-        card.addEventListener('click', function () {
+        if (card._wiredCard) return;
+        card._wiredCard = true;
+        card.addEventListener('click', function (e) {
+          if (e.target && e.target.closest && e.target.closest('[data-mc-task-action]')) return;
           var agentId = card.getAttribute('data-agent-id');
           var goalId = card.getAttribute('data-goal-id');
-          var subgoalId = card.getAttribute('data-subgoal-id');
           if (agentId && card.getAttribute('data-status') === 'blocked' && !goalId) {
             mc2SetAgentFilter(agentId, 'context');
             return;
           }
-          if (goalId) {
-            selectedTeamGoalId = goalId;
-            mc2SetView('goals');
-            Promise.resolve(mc2RenderGoals()).then(function () {
-              if (typeof scheduleScrollToBlockedTarget === 'function') {
-                scheduleScrollToBlockedTarget({
-                  kind: subgoalId ? 'subgoal' : 'goal',
-                  goalId: goalId,
-                  subgoalId: subgoalId,
-                  title: card.querySelector('.mc-task-card-title')
-                    ? String(card.querySelector('.mc-task-card-title').textContent || '').trim()
-                    : '',
-                }, 0);
-              }
-            });
+          if (card.getAttribute('data-status') === 'blocked' && goalId) {
+            if (typeof openMissionWorkInputModal === 'function') {
+              openMissionWorkInputModal(mc2MissionTaskItemFromEl(card));
+            }
+            return;
           }
+          if (goalId) mc2ShowMissionTaskDetails(card);
         });
       });
     }
@@ -732,20 +800,31 @@
       goals.forEach(function (g) {
         var status = String(g.status || '').toLowerCase();
         var goalId = String(g.id || '');
+        var blockedSubs = typeof countBlockedSubgoalsForGoal === 'function' ? countBlockedSubgoalsForGoal(g) : 0;
+        var needsInput = typeof goalNeedsAttention === 'function' ? goalNeedsAttention(g) : !!String(g.needsUserInput || '').trim();
         if (status === 'blocked') {
           items.push({
             kind: 'error',
-            action: String(g.needsUserInput || '').trim() ? 'goal-input' : 'goal',
+            action: 'goal-input',
             goalId: goalId,
             text: 'Mission blocked: ' + escapeHtml(String(g.title || g.objective || '').slice(0, 60)),
             ts: Number(g.updatedAt) || 0,
           });
           return;
         }
-        if (isGoalPartialWait(g) || String(g.needsUserInput || '').trim()) {
+        if (blockedSubs > 0) {
+          items.push({
+            kind: 'error',
+            action: 'goal-input',
+            goalId: goalId,
+            text: escapeHtml(String(g.title || g.objective || 'Mission').slice(0, 42)) +
+              ': ' + blockedSubs + ' blocked — tap to respond',
+            ts: Number(g.updatedAt) || 0,
+          });
+        } else if (needsInput || isGoalPartialWait(g)) {
           items.push({
             kind: 'warning',
-            action: String(g.needsUserInput || '').trim() ? 'goal-input' : 'goal',
+            action: 'goal-input',
             goalId: goalId,
             text: formatGoalImplementationAttention(g),
             ts: Number(g.updatedAt) || 0,
@@ -800,6 +879,10 @@
       }
       if (action === 'goal') {
         mc2SetView('goals');
+        return;
+      }
+      if (action === 'blocked-tasks') {
+        mc2OpenTasksView('blocked');
         return;
       }
       if (action === 'agent') {

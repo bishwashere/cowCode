@@ -2834,8 +2834,48 @@
       } catch (_) {}
     }
 
+    function countBlockedSubgoalsForGoal(goal) {
+      if (!goal) return 0;
+      var count = 0;
+      function walk(subgoals) {
+        (subgoals || []).forEach(function (sg) {
+          if (!sg || typeof sg !== 'object') return;
+          if (effectiveSubgoalStatus(sg, goal) === 'blocked') count++;
+          walk(sg.subgoals);
+        });
+      }
+      walk(goal.subgoals);
+      return count;
+    }
+
+    function goalAttentionPrompt(goal) {
+      if (!goal) return '';
+      var ask = String(goal.needsUserInput || '').trim();
+      if (ask) return ask;
+      var blockedN = countBlockedSubgoalsForGoal(goal);
+      if (blockedN > 0) {
+        return 'This mission has ' + blockedN + ' blocked task(s). Tell the team what to do next — e.g. your analytics choice, "use default", or step-by-step instructions to unblock.';
+      }
+      if (isGoalPartialWait(goal)) {
+        return goalImplementationBlockedLabel(goal) || 'Implementation is paused until you confirm the next step. Reply with your choice or "use default".';
+      }
+      if (String(goal.status || '').toLowerCase() === 'blocked') {
+        return String(goal.blockedReason || '').trim() || 'This mission is blocked. What should the team do next?';
+      }
+      return '';
+    }
+
+    function goalNeedsAttention(goal) {
+      if (!goal) return false;
+      if (String(goal.needsUserInput || '').trim()) return true;
+      if (countBlockedSubgoalsForGoal(goal) > 0) return true;
+      if (isGoalPartialWait(goal)) return true;
+      if (String(goal.status || '').toLowerCase() === 'blocked') return true;
+      return false;
+    }
+
     function teamUserInputDismissKey(goal) {
-      return String(goal.id || '') + '::' + String(goal.needsUserInput || '').slice(0, 240);
+      return String(goal.id || '') + '::' + goalAttentionPrompt(goal).slice(0, 240);
     }
 
     function isTeamUserInputModalOpen() {
@@ -2859,7 +2899,7 @@
 
     function getGoalsNeedingUserInput() {
       return (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).filter(function (g) {
-        return String(g.needsUserInput || '').trim().length > 0;
+        return goalNeedsAttention(g);
       }).sort(function (a, b) {
         return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
       });
@@ -2886,7 +2926,8 @@
       showTeamUserInputModalError('');
     }
 
-    function openTeamUserInputModal(goal) {
+    function openTeamUserInputModal(goal, opts) {
+      opts = opts || {};
       var modal = document.getElementById('team-user-input-modal');
       var missionEl = document.getElementById('team-user-input-modal-mission');
       var questionEl = document.getElementById('team-user-input-modal-question');
@@ -2894,7 +2935,8 @@
       var textEl = document.getElementById('team-user-input-modal-text');
       if (!modal || !goal) return;
       var id = String(goal.id || '');
-      var ask = String(goal.needsUserInput || '').trim();
+      var ask = String(opts.ask || goal.needsUserInput || '').trim();
+      if (!ask) ask = goalAttentionPrompt(goal);
       if (!id || !ask) return;
       teamUserInputGoalId = id;
       if (missionEl) missionEl.textContent = String(goal.title || 'Untitled mission');
@@ -2915,6 +2957,61 @@
       modal.setAttribute('aria-hidden', 'false');
       if (textEl) setTimeout(function () { textEl.focus(); }, 0);
     }
+
+    function openMissionWorkInputModal(item) {
+      if (!item || !item.goalId) return false;
+      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+        return String(g.id || '') === String(item.goalId || '');
+      });
+      if (!goal) return false;
+      var ask = goalAttentionPrompt(goal);
+      if (item.title && item.kind === 'subgoal') {
+        ask = 'Blocked task: "' + String(item.title) + '". ' + ask;
+      }
+      openTeamUserInputModal(goal, { ask: ask });
+      return true;
+    }
+
+    async function patchMissionSubgoalStatus(goalId, subgoalId, nextStatus) {
+      var gid = String(goalId || '').trim();
+      var sid = String(subgoalId || '').trim();
+      if (!gid || !sid) return false;
+      var goal = (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).find(function (g) {
+        return String(g.id || '') === gid;
+      });
+      if (!goal) return false;
+      function patchTree(subgoals) {
+        return (subgoals || []).map(function (sg) {
+          if (!sg || typeof sg !== 'object') return sg;
+          var next = Object.assign({}, sg);
+          if (String(next.id || '') === sid) {
+            next.status = nextStatus;
+          }
+          if (Array.isArray(next.subgoals) && next.subgoals.length) {
+            next.subgoals = patchTree(next.subgoals);
+          }
+          return next;
+        });
+      }
+      try {
+        var r = await fetch(API + '/api/goals/' + encodeURIComponent(gid), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subgoals: patchTree(goal.subgoals) }),
+        });
+        if (!r.ok) return false;
+        await fetchGoalsSnapshot();
+        if (typeof renderMissionControl === 'function') renderMissionControl();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    window.openMissionWorkInputModal = openMissionWorkInputModal;
+    window.patchMissionSubgoalStatus = patchMissionSubgoalStatus;
+    window.goalNeedsAttention = goalNeedsAttention;
+    window.countBlockedSubgoalsForGoal = countBlockedSubgoalsForGoal;
 
     function renderTeamUserInputModal() {
       var modal = document.getElementById('team-user-input-modal');

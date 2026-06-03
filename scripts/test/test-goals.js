@@ -299,9 +299,24 @@ async function main() {
     assert(legacyManual.waitCondition.waitAppliesTo === 'implementation', 'legacy manual wait defaults waitAppliesTo to implementation');
     assert(listDueGoals().some((g) => g.id === created.id), 'legacy manual wait keeps goal due');
 
+    updateGoal(created.id, {
+      subgoals: [
+        { id: 'blocked-a', title: 'Blocked branch A', status: 'blocked', progress: 0, subgoals: [] },
+        { id: 'open-b', title: 'Open branch B', status: 'todo', progress: 0, subgoals: [] },
+      ],
+    });
+
     const responded = respondToGoalUserInput(created.id, 'PostHog with product analytics only');
     assert(!responded.needsUserInput, 'needsUserInput cleared after response');
     assert(!responded.waitCondition, 'wait condition cleared after response');
+    assert(
+      responded.subgoals.some((sg) => sg.id === 'blocked-a' && sg.status === 'todo'),
+      'blocked subgoals reopen to todo after user response',
+    );
+    assert(
+      responded.subgoals.some((sg) => sg.id === 'open-b' && sg.status === 'todo'),
+      'already-open subgoals stay todo after user response',
+    );
     assert(Number(responded.nextRunAt) <= Date.now(), 'goal scheduled immediately after response');
     assert(responded.lastActivity.includes('User responded'), 'last activity records user response');
     assert(listDueGoals().some((g) => g.id === created.id), 'goal is due again after user response');
