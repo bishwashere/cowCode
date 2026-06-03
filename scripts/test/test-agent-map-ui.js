@@ -280,6 +280,11 @@ const checks = [
       html.includes('mc2EventMatchesAgent'),
   },
   {
+    name: 'Team2 sidebar includes Tasks nav',
+    ok: html.includes('class="mc-nav-item" data-mc-nav="tasks"') &&
+      html.includes('mc-nav-label">Tasks</span>'),
+  },
+  {
     name: 'Team2 Done Today opens completed tasks cards view',
     ok: html.includes('data-mc-nav="tasks"') &&
       html.includes('mc-stat-card-action') &&
