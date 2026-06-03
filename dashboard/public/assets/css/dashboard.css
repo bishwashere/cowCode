@@ -1999,6 +1999,29 @@
       color: var(--muted);
     }
     .modal-card button.secondary:hover { color: var(--text); border-color: var(--muted); filter: none; }
+    .team-user-input-question {
+      margin: 0.75rem 0 0;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .team-user-input-quick {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin: 0.65rem 0 0.35rem;
+    }
+    .team-user-input-textarea {
+      width: 100%;
+      min-height: 4.5rem;
+      resize: vertical;
+      box-sizing: border-box;
+      padding: 0.55rem 0.65rem;
+      border-radius: 0.45rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+    }
     .agent-edit-basics {
       display: grid;
       grid-template-columns: 1fr 1.4fr;

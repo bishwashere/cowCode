@@ -113,6 +113,15 @@ const checks = [
       html.includes('fetchGoalsSnapshot'),
   },
   {
+    name: 'Team user input modal appears on team pages when mission needs input',
+    ok: html.includes('id="team-user-input-modal"') &&
+      html.includes('renderTeamUserInputModal') &&
+      html.includes('/api/goals/') &&
+      html.includes('/respond') &&
+      html.includes('team-user-input-modal-submit') &&
+      html.includes('Needs your input'),
+  },
+  {
     name: 'Goals tab includes detail pane with subgoal tree',
     ok: html.includes('id="team-goal-detail"') &&
       html.includes('renderGoalDetail') &&

@@ -2424,7 +2424,191 @@
       } catch (_) {}
       renderGoalsList();
       renderAgentContext();
+      renderTeamUserInputModal();
     }
+
+    var teamUserInputGoalId = '';
+    var teamUserInputDismissed = {};
+    var teamUserInputModalWired = false;
+    var teamUserInputSubmitBusy = false;
+    var TEAM_USER_INPUT_DISMISSED_KEY = 'cowcode_team_user_input_dismissed_v1';
+
+    function loadTeamUserInputDismissed() {
+      try {
+        var raw = sessionStorage.getItem(TEAM_USER_INPUT_DISMISSED_KEY);
+        teamUserInputDismissed = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        teamUserInputDismissed = {};
+      }
+      if (!teamUserInputDismissed || typeof teamUserInputDismissed !== 'object') teamUserInputDismissed = {};
+    }
+
+    function saveTeamUserInputDismissed() {
+      try {
+        sessionStorage.setItem(TEAM_USER_INPUT_DISMISSED_KEY, JSON.stringify(teamUserInputDismissed || {}));
+      } catch (_) {}
+    }
+
+    function teamUserInputDismissKey(goal) {
+      return String(goal.id || '') + '::' + String(goal.needsUserInput || '').slice(0, 240);
+    }
+
+    function isTeamPageActive() {
+      return document.body.classList.contains('dashboard-team-active') ||
+        document.body.classList.contains('dashboard-team2-active');
+    }
+
+    function getGoalsNeedingUserInput() {
+      return (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).filter(function (g) {
+        return String(g.needsUserInput || '').trim().length > 0;
+      }).sort(function (a, b) {
+        return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+      });
+    }
+
+    function showTeamUserInputModalError(msg) {
+      var el = document.getElementById('team-user-input-modal-error');
+      if (!el) return;
+      if (msg) {
+        el.textContent = msg;
+        el.classList.add('visible');
+      } else {
+        el.textContent = '';
+        el.classList.remove('visible');
+      }
+    }
+
+    function closeTeamUserInputModal() {
+      var modal = document.getElementById('team-user-input-modal');
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      teamUserInputGoalId = '';
+      showTeamUserInputModalError('');
+    }
+
+    function openTeamUserInputModal(goal) {
+      var modal = document.getElementById('team-user-input-modal');
+      var missionEl = document.getElementById('team-user-input-modal-mission');
+      var questionEl = document.getElementById('team-user-input-modal-question');
+      var quickEl = document.getElementById('team-user-input-modal-quick');
+      var textEl = document.getElementById('team-user-input-modal-text');
+      if (!modal || !goal) return;
+      var id = String(goal.id || '');
+      var ask = String(goal.needsUserInput || '').trim();
+      if (!id || !ask) return;
+      teamUserInputGoalId = id;
+      if (missionEl) missionEl.textContent = String(goal.title || 'Untitled mission');
+      if (questionEl) questionEl.textContent = ask;
+      if (textEl) textEl.value = '';
+      showTeamUserInputModalError('');
+      if (quickEl) {
+        var askLower = ask.toLowerCase();
+        var options = [];
+        if (/posthog|analytics|ga4|mixpanel|tracking|measurement/.test(askLower)) {
+          options = ['PostHog', 'Google Analytics (GA4)', 'Mixpanel', 'No analytics yet — use defaults'];
+        }
+        quickEl.innerHTML = options.map(function (label) {
+          return '<button type="button" class="secondary team-user-input-quick-btn" data-quick-response="' + escapeHtml(label) + '">' + escapeHtml(label) + '</button>';
+        }).join('');
+      }
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      if (textEl) setTimeout(function () { textEl.focus(); }, 0);
+    }
+
+    function renderTeamUserInputModal() {
+      if (!isTeamPageActive()) {
+        closeTeamUserInputModal();
+        return;
+      }
+      var modal = document.getElementById('team-user-input-modal');
+      if (!modal) return;
+      var goals = getGoalsNeedingUserInput().filter(function (g) {
+        return !teamUserInputDismissed[teamUserInputDismissKey(g)];
+      });
+      if (!goals.length) {
+        closeTeamUserInputModal();
+        return;
+      }
+      var next = goals[0];
+      if (modal.classList.contains('open') && teamUserInputGoalId === String(next.id || '')) return;
+      openTeamUserInputModal(next);
+    }
+
+    async function submitTeamUserInputResponse(responseText) {
+      if (teamUserInputSubmitBusy || !teamUserInputGoalId) return;
+      var text = String(responseText || '').trim();
+      if (!text) {
+        showTeamUserInputModalError('Enter a response or pick a quick option.');
+        return;
+      }
+      var submitBtn = document.getElementById('team-user-input-modal-submit');
+      teamUserInputSubmitBusy = true;
+      if (submitBtn) submitBtn.disabled = true;
+      showTeamUserInputModalError('');
+      try {
+        var r = await fetch(API + '/api/goals/' + encodeURIComponent(teamUserInputGoalId) + '/respond', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ response: text }),
+        });
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok) {
+          showTeamUserInputModalError(d.error || 'Could not submit response');
+          return;
+        }
+        closeTeamUserInputModal();
+        await fetchGoalsSnapshot();
+        if (typeof renderMissionControl === 'function') renderMissionControl();
+      } catch (err) {
+        showTeamUserInputModalError(err && err.message ? err.message : String(err));
+      } finally {
+        teamUserInputSubmitBusy = false;
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    function wireTeamUserInputModal() {
+      if (teamUserInputModalWired) return;
+      teamUserInputModalWired = true;
+      loadTeamUserInputDismissed();
+      wireClick('team-user-input-modal-dismiss', function () {
+        var goals = getGoalsNeedingUserInput();
+        var goal = goals.find(function (g) { return String(g.id || '') === teamUserInputGoalId; }) || goals[0];
+        if (goal) teamUserInputDismissed[teamUserInputDismissKey(goal)] = true;
+        saveTeamUserInputDismissed();
+        closeTeamUserInputModal();
+      });
+      wireClick('team-user-input-modal-submit', function () {
+        var textEl = document.getElementById('team-user-input-modal-text');
+        submitTeamUserInputResponse(textEl ? textEl.value : '');
+      });
+      wireEl('team-user-input-modal-text', 'keydown', function (ev) {
+        if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) {
+          ev.preventDefault();
+          submitTeamUserInputResponse(ev.target.value);
+        }
+      });
+      wireEl('team-user-input-modal', 'click', function (ev) {
+        if (ev.target === ev.currentTarget) {
+          var goals = getGoalsNeedingUserInput();
+          var goal = goals.find(function (g) { return String(g.id || '') === teamUserInputGoalId; }) || goals[0];
+          if (goal) teamUserInputDismissed[teamUserInputDismissKey(goal)] = true;
+          saveTeamUserInputDismissed();
+          closeTeamUserInputModal();
+        }
+      });
+      document.addEventListener('click', function (ev) {
+        var btn = ev.target && ev.target.closest ? ev.target.closest('.team-user-input-quick-btn') : null;
+        if (!btn) return;
+        var label = btn.getAttribute('data-quick-response') || btn.textContent || '';
+        var textEl = document.getElementById('team-user-input-modal-text');
+        if (textEl) textEl.value = label;
+        submitTeamUserInputResponse(label);
+      });
+    }
+    wireTeamUserInputModal();
 
     async function fetchInitiativesSnapshot() {
       try {

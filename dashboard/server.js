@@ -16,7 +16,7 @@ import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsTe
 import { readTeamActivity } from '../lib/team-activity.js';
 import { readAllAgentContext } from '../lib/agent-context-state.js';
 import { readAgentMetrics } from '../lib/agent-metrics.js';
-import { listGoals, createGoal, updateGoal, getGoal, runGoalTick } from '../lib/goals.js';
+import { listGoals, createGoal, updateGoal, getGoal, runGoalTick, respondToGoalUserInput } from '../lib/goals.js';
 import { listInitiatives, getInitiative, updateInitiative } from '../lib/initiatives.js';
 import { runInternalAgentTurn } from '../lib/internal-agent-turn.js';
 
@@ -560,6 +560,33 @@ app.patch('/api/goals/:id', (req, res) => {
   } catch (err) {
     if (/not found/i.test(String(err?.message || ''))) {
       res.status(404).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/goals/:id/respond', (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const response = String(req.body?.response || req.body?.text || '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'goal id is required' });
+      return;
+    }
+    if (!response) {
+      res.status(400).json({ error: 'response is required' });
+      return;
+    }
+    const goal = respondToGoalUserInput(id, response);
+    res.json({ goal });
+  } catch (err) {
+    if (/not found/i.test(String(err?.message || ''))) {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    if (/required/i.test(String(err?.message || ''))) {
+      res.status(400).json({ error: err.message });
       return;
     }
     res.status(500).json({ error: err.message });

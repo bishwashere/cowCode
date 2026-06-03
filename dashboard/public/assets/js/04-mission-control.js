@@ -553,6 +553,14 @@
         if (String(g.status || '').toLowerCase() === 'blocked') {
           items.push({ kind: 'error', text: 'Mission blocked: ' + escapeHtml(String(g.title || g.objective || '').slice(0, 60)), ts: Number(g.updatedAt) || 0 });
         }
+        var ask = String(g.needsUserInput || '').trim();
+        if (ask) {
+          items.push({
+            kind: 'warning',
+            text: 'Needs your input — ' + escapeHtml(String(g.title || g.objective || 'Mission').slice(0, 48)) + ': ' + escapeHtml(ask.slice(0, 80)),
+            ts: Number(g.updatedAt) || 0,
+          });
+        }
       });
       mc2PendingItems().forEach(function (p) {
         var label = mc2PendingKindLabel(p.kind) + ': ' + mc2PendingTitle(p);

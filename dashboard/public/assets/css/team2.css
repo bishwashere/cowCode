@@ -459,6 +459,30 @@ body.dashboard-team2-active > nav {
 
 .mc-view[hidden] { display: none !important; }
 
+/* Mission home: bottom panels grow with leftover viewport (up to ~3× baseline). */
+#mc2-view-mission {
+  overflow: hidden;
+  min-height: 0;
+}
+
+#mc2-view-mission > .mc-progress-row,
+#mc2-view-mission > .mc-kanban,
+#mc2-view-mission > div:not(.mc-bottom-row) {
+  flex-shrink: 0;
+}
+
+#mc2-view-mission > .mc-bottom-row {
+  flex: 1 1 0;
+  min-height: clamp(8rem, 28vh, 24rem);
+  align-items: stretch;
+}
+
+#mc2-view-mission .mc-bottom-row .mc-panel {
+  min-height: 8rem;
+  height: 100%;
+  max-height: 100%;
+}
+
 /* ── Mission progress card ────────────────────────────────────────────── */
 
 .mc-progress-card {
@@ -1364,7 +1388,7 @@ button.mc-stat-card.mc-stat-card-action {
 }
 
 .mc-panel {
-  min-height: 8.6rem;
+  min-height: 8rem;
 }
 
 .mc-attention-item.error {

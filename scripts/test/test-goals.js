@@ -22,6 +22,7 @@ async function main() {
       buildGoalTickPrompt,
       getGoalMemoryPath,
       readGoalMemory,
+      respondToGoalUserInput,
     } = await import('../../lib/goals.js');
     const { logTeamActivity } = await import('../../lib/team-activity.js');
 
@@ -186,6 +187,22 @@ async function main() {
     assert(afterError.status === 'blocked', `status blocked after error, got ${afterError.status}`);
     const memoryAfterError = readFileSync(memoryPath, 'utf8');
     assert(/Tick failed/.test(memoryAfterError), 'memory stores failure notes');
+
+    updateGoal(created.id, {
+      status: 'active',
+      needsUserInput: 'Which analytics vendor should we use?',
+      waitCondition: { kind: 'manual', reason: 'Awaiting analytics choice' },
+      nextRunAt: Date.now() + 60_000,
+    });
+    assert(!listDueGoals().some((g) => g.id === created.id), 'manual-wait goal with user input is not due');
+    const responded = respondToGoalUserInput(created.id, 'PostHog with product analytics only');
+    assert(!responded.needsUserInput, 'needsUserInput cleared after response');
+    assert(!responded.waitCondition, 'wait condition cleared after response');
+    assert(Number(responded.nextRunAt) <= Date.now(), 'goal scheduled immediately after response');
+    assert(responded.lastActivity.includes('User responded'), 'last activity records user response');
+    assert(listDueGoals().some((g) => g.id === created.id), 'goal is due again after user response');
+    const memoryAfterRespond = readGoalMemory(created.id, { maxChars: 5000 });
+    assert(/User input received:/.test(memoryAfterRespond), 'memory stores user input response');
 
     console.log('goals tests passed');
   } finally {
