@@ -788,6 +788,7 @@
       var s = normalizeSubgoalStatus(status);
       if (s === 'done') return '✓';
       if (s === 'doing') return '→';
+      if (s === 'blocked') return '⊘';
       return '○';
     }
 
@@ -795,7 +796,138 @@
       var s = normalizeSubgoalStatus(status);
       if (s === 'done') return 'mission-done';
       if (s === 'doing') return 'mission-doing';
+      if (s === 'blocked') return 'mission-blocked';
       return 'mission-todo';
+    }
+
+    function walkGoalSubgoalsForBlocked(subgoals, goalId, out) {
+      var refs = out || [];
+      (subgoals || []).forEach(function (sg) {
+        if (!sg || typeof sg !== 'object') return;
+        var sgId = String(sg.id || '').trim();
+        if (normalizeSubgoalStatus(sg.status) === 'blocked') {
+          refs.push({ kind: 'subgoal', goalId: goalId, subgoalId: sgId });
+        }
+        walkGoalSubgoalsForBlocked(sg.subgoals, goalId, refs);
+      });
+      return refs;
+    }
+
+    function findBlockedWorkRefs() {
+      var refs = [];
+      var agents = teamAgentContextSnapshot.agents || {};
+      Object.keys(agents).forEach(function (id) {
+        var ctx = agents[id] || {};
+        if (String(ctx.state || 'idle').toLowerCase() === 'error') {
+          refs.push({ kind: 'agent', goalId: '', subgoalId: '', agentId: id });
+        }
+      });
+      (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).forEach(function (g) {
+        var goalId = String(g.id || '').trim();
+        if (!goalId) return;
+        if (String(g.status || '').toLowerCase() === 'blocked') {
+          refs.push({ kind: 'goal', goalId: goalId, subgoalId: '', agentId: '' });
+        }
+        walkGoalSubgoalsForBlocked(g.subgoals, goalId, refs);
+      });
+      return refs;
+    }
+
+    function findFirstBlockedWorkRef() {
+      var refs = findBlockedWorkRefs();
+      var i;
+      for (i = 0; i < refs.length; i++) {
+        if (refs[i].kind === 'subgoal') return refs[i];
+      }
+      for (i = 0; i < refs.length; i++) {
+        if (refs[i].kind === 'goal') return refs[i];
+      }
+      return refs[0] || null;
+    }
+
+    function highlightBlockedTarget(el) {
+      if (!el || !el.classList) return;
+      el.classList.add('team-blocked-highlight');
+      setTimeout(function () {
+        el.classList.remove('team-blocked-highlight');
+      }, 2200);
+    }
+
+    function openSubgoalAncestors(el) {
+      var node = el;
+      while (node) {
+        if (node.tagName === 'DETAILS' && node.classList && node.classList.contains('team-goal-subgoal-node')) {
+          node.open = true;
+        }
+        node = node.parentElement;
+      }
+    }
+
+    function scrollToBlockedSubgoalMarker(subgoalId) {
+      var id = String(subgoalId || '').trim();
+      if (!id) return false;
+      var el = document.querySelector('[data-subgoal-id="' + id + '"] .team-goal-subgoal-status.blocked') ||
+        document.querySelector('[data-mission-subgoal-id="' + id + '"]');
+      if (!el) return false;
+      openSubgoalAncestors(el);
+      try { el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
+      highlightBlockedTarget(el.classList && el.classList.contains('team-goal-subgoal-status') ? el : el.closest('[data-subgoal-id]') || el);
+      return true;
+    }
+
+    function scrollToBlockedWork(ref) {
+      ref = ref || findFirstBlockedWorkRef();
+      if (!ref) return false;
+      if (ref.kind === 'agent' && ref.agentId) {
+        if (typeof mc2SetAgentFilter === 'function') {
+          mc2SetAgentFilter(ref.agentId, 'context');
+          return true;
+        }
+        if (typeof selectTeamInboxAgent === 'function') selectTeamInboxAgent(ref.agentId);
+        return true;
+      }
+      var goalId = String(ref.goalId || '').trim();
+      if (!goalId) return false;
+      var mission = typeof getCurrentMissionGoal === 'function' ? getCurrentMissionGoal() : null;
+      if (ref.kind === 'subgoal' && ref.subgoalId && mission && String(mission.id || '') === goalId) {
+        if (scrollToBlockedSubgoalMarker(ref.subgoalId)) return true;
+      }
+      selectedTeamGoalId = goalId;
+      if (typeof mc2SetView === 'function') {
+        mc2SetView('goals');
+        if (typeof mc2RenderGoals === 'function') mc2RenderGoals();
+      } else if (typeof setTeamTopTab === 'function') {
+        setTeamTopTab('goals');
+        renderGoalsList();
+      }
+      setTimeout(function () {
+        if (ref.kind === 'subgoal' && ref.subgoalId) {
+          scrollToBlockedSubgoalMarker(ref.subgoalId);
+          return;
+        }
+        var goalStatus = document.querySelector('#team-goal-detail .team-goal-status.blocked, #mc2-goal-detail .team-goal-status.blocked');
+        if (goalStatus) {
+          try { goalStatus.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); } catch (_) {}
+          highlightBlockedTarget(goalStatus);
+        }
+      }, ref.kind === 'subgoal' ? 160 : 120);
+      return true;
+    }
+
+    function navigateToBlockedWork() {
+      if (!findFirstBlockedWorkRef()) {
+        if (typeof mc2SetView === 'function') {
+          mc2SetView('mission');
+          setTimeout(function () {
+            var col = document.getElementById('mc2-col-blocked');
+            if (col) {
+              try { col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch (_) {}
+            }
+          }, 80);
+        }
+        return false;
+      }
+      return scrollToBlockedWork();
     }
 
     function flattenMissionSubgoals(subgoals, out, depth) {
@@ -834,9 +966,15 @@
       var subgoalsHtml = subgoals.length
         ? '<ul class="team-current-mission-subgoal-list">' + subgoals.map(function (sg) {
           var title = String(sg.title || '').trim() || 'Untitled subgoal';
-          var icon = missionSubgoalIcon(sg.status);
-          var cls = missionSubgoalClass(sg.status);
-          return '<li class="' + cls + '" title="' + escapeHtml(title) + '">' + escapeHtml(icon + ' ' + title) + '</li>';
+          var status = normalizeSubgoalStatus(sg.status);
+          var icon = missionSubgoalIcon(status);
+          var cls = missionSubgoalClass(status);
+          var sgId = String(sg.id || '').trim();
+          var statusTag = status === 'blocked'
+            ? ' <span class="team-goal-subgoal-status blocked">blocked</span>'
+            : '';
+          return '<li class="' + cls + '" data-mission-subgoal-id="' + escapeHtml(sgId) + '" title="' + escapeHtml(title) + '">' +
+            escapeHtml(icon + ' ' + title) + statusTag + '</li>';
         }).join('') + '</ul>'
         : '<p class="team-current-mission-empty" style="margin:0;">No subgoals yet.</p>';
       var goalHeading = liveOnly ? 'Activity' : 'Mission';
@@ -1013,10 +1151,12 @@
       var blockedEl = document.getElementById('team-task-blocked');
       if (!badgesEl || !blockedEl) return;
       var summary = computeTeamTaskSummary();
+      var blockedDisabled = summary.blocked <= 0 ? ' disabled' : '';
       badgesEl.innerHTML = '' +
         '<span class="team-task-badge active">[' + escapeHtml(String(summary.active)) + ' Active]</span>' +
         '<span class="team-task-badge waiting">[' + escapeHtml(String(summary.waiting)) + ' Waiting]</span>' +
-        '<span class="team-task-badge blocked">[' + escapeHtml(String(summary.blocked)) + ' Blocked]</span>' +
+        '<button type="button" class="team-task-badge blocked team-task-badge-action"' + blockedDisabled +
+          ' aria-label="View blocked tasks and subtasks">[' + escapeHtml(String(summary.blocked)) + ' Blocked]</button>' +
         '<span class="team-task-badge completed">[' + escapeHtml(String(summary.completedToday)) + ' Completed Today]</span>';
       blockedEl.innerHTML = summary.blockedLabel
         ? '<strong>' + (summary.blockedLabel.indexOf('Research continues') >= 0 ? 'Implementation blocked:' : 'Blocked:') + '</strong> ' + escapeHtml(summary.blockedLabel)
@@ -1074,7 +1214,8 @@
           return dep && dep.title ? dep.title : key;
         }).filter(Boolean).join(', ');
         var children = renderGoalSubgoalTree(sg.subgoals, lookup, level + 1);
-        var summary = '<span class="team-goal-subgoal-row">' +
+        var sgKey = String(sg.id || '').trim();
+        var summary = '<span class="team-goal-subgoal-row" data-subgoal-id="' + escapeHtml(sgKey) + '">' +
           '<span class="team-goal-subgoal-title">' + escapeHtml(title) + '</span>' +
           '<span class="team-goal-subgoal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '<span class="team-goal-subgoal-meta">' + escapeHtml(String(progress)) + '%</span>' +
@@ -1088,8 +1229,8 @@
       }).join('');
     }
 
-    function renderGoalDetail(goal) {
-      var detail = document.getElementById('team-goal-detail');
+    function renderGoalDetail(goal, detailEl) {
+      var detail = detailEl || document.getElementById('team-goal-detail');
       if (!detail) return;
       if (!goal || typeof goal !== 'object') {
         detail.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a goal to view details and subgoals.</p>';
@@ -2748,6 +2889,17 @@
       teamTopTabInitiativesEl.addEventListener('click', function () { setTeamTopTab('initiatives'); });
     }
     setTeamTopTab('roster');
+
+    var teamTaskSummaryBadges = document.getElementById('team-task-summary-badges');
+    if (teamTaskSummaryBadges && !teamTaskSummaryBadges._blockedWired) {
+      teamTaskSummaryBadges._blockedWired = true;
+      teamTaskSummaryBadges.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('.team-task-badge-action.blocked') : null;
+        if (!btn || btn.disabled) return;
+        e.preventDefault();
+        if (typeof navigateToBlockedWork === 'function') navigateToBlockedWork();
+      });
+    }
 
     var teamViewActiveOnlyEl = document.getElementById('team-view-active-only');
     if (teamViewActiveOnlyEl) {

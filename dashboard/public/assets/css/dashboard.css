@@ -240,6 +240,33 @@
       color: #ef4444;
       background: rgba(239, 68, 68, 0.08);
     }
+    button.team-task-badge-action {
+      cursor: pointer;
+      font: inherit;
+      appearance: none;
+      -webkit-appearance: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    button.team-task-badge-action:hover:not(:disabled) {
+      border-color: #f87171;
+      background: rgba(239, 68, 68, 0.16);
+    }
+    button.team-task-badge-action:focus-visible {
+      outline: 2px solid #ef4444;
+      outline-offset: 2px;
+    }
+    button.team-task-badge-action:disabled {
+      cursor: default;
+      opacity: 0.55;
+    }
+    .team-current-mission-subgoal-list li.mission-blocked {
+      color: #ef4444;
+    }
+    .team-blocked-highlight {
+      outline: 2px solid rgba(239, 68, 68, 0.75);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
     .team-task-badge.completed {
       border-color: rgba(99, 102, 241, 0.45);
       color: var(--accent);

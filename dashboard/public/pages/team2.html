@@ -106,10 +106,10 @@
                   <div class="mc-stat-label">Waiting</div>
                   <div class="mc-stat-value waiting" id="mc2-stat-waiting">0</div>
                 </div>
-                <div class="mc-stat-card">
+                <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-action="blocked" aria-label="View blocked tasks and subtasks">
                   <div class="mc-stat-label">Blocked</div>
                   <div class="mc-stat-value blocked" id="mc2-stat-blocked">0</div>
-                </div>
+                </button>
                 <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" aria-label="View tasks completed today">
                   <div class="mc-stat-label">Done Today</div>
                   <div class="mc-stat-value done" id="mc2-stat-done">0</div>
@@ -228,6 +228,9 @@
           <div id="mc2-goals-pending" class="mc-pending-inline"></div>
           <div id="mc2-goals-list" style="display:flex;flex-direction:column;gap:0.45rem;">
             <p style="color:var(--muted);font-size:0.66rem;">Loading missions…</p>
+          </div>
+          <div id="mc2-goal-detail" class="team-goal-detail" style="margin-top:0.65rem;">
+            <p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a mission to view subgoals.</p>
           </div>
         </div>
 

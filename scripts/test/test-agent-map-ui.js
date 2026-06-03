@@ -336,6 +336,23 @@ const checks = [
       html.includes('View tasks completed today'),
   },
   {
+    name: 'Team2 Blocked stat navigates to blocked subgoal',
+    ok: html.includes('data-mc-action="blocked"') &&
+      html.includes('navigateToBlockedWork') &&
+      html.includes('scrollToBlockedSubgoalMarker') &&
+      html.includes('findFirstBlockedWorkRef') &&
+      html.includes('id="mc2-goal-detail"') &&
+      html.includes('View blocked tasks and subtasks') &&
+      html.includes('team-goal-subgoal-status blocked'),
+  },
+  {
+    name: 'Team page blocked badge is clickable',
+    ok: html.includes('team-task-badge-action') &&
+      html.includes('navigateToBlockedWork') &&
+      html.includes('data-mission-subgoal-id') &&
+      html.includes('mission-blocked'),
+  },
+  {
     name: 'Team agent cards show state and active count',
     ok: html.includes('team-agent-card') &&
       html.includes('team-agent-card-active') &&

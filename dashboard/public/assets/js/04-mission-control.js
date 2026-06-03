@@ -940,6 +940,18 @@
       }
       var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
       if (!goals.length) { el.innerHTML = '<p style="color:var(--muted);font-size:0.66rem;">No missions yet. Create one from the Team mission controls.</p>'; return; }
+      var blockedRef = typeof findFirstBlockedWorkRef === 'function' ? findFirstBlockedWorkRef() : null;
+      var detailGoal = null;
+      if (blockedRef && blockedRef.goalId) {
+        detailGoal = goals.find(function (g) { return String(g.id || '') === blockedRef.goalId; }) || null;
+      }
+      if (!detailGoal && typeof getCurrentMissionGoal === 'function') {
+        detailGoal = getCurrentMissionGoal();
+      }
+      if (!detailGoal && goals.length) detailGoal = goals[0];
+      if (typeof renderGoalDetail === 'function') {
+        renderGoalDetail(detailGoal, mc2El('mc2-goal-detail'));
+      }
       el.innerHTML = goals.map(function (g) {
         var status = String(g.status || 'active').toLowerCase();
         var pct = Math.max(0, Math.min(100, Math.round(Number((g.progress && g.progress.pct) || 0))));
@@ -1218,6 +1230,11 @@
       btn.addEventListener('click', function () {
         var nav = btn.getAttribute('data-mc-nav');
         if (nav) mc2SetView(nav);
+      });
+    });
+    document.querySelectorAll('#page-team2 .mc-stat-card-action[data-mc-action="blocked"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (typeof navigateToBlockedWork === 'function') navigateToBlockedWork();
       });
     });
     var mc2AddAgentBtn = document.getElementById('mc2-add-agent-btn');
