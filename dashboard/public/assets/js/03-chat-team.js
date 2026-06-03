@@ -576,8 +576,8 @@
 
     var TEAM_TOP_TAB_DESC = {
       roster: 'Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.',
-      goals: 'Long-running objectives your agents work on autonomously — create goals, track subgoals, and run or pause work.',
-      initiatives: 'Proactive suggestions from goal reflection and team activity — review and promote into goals or subgoals.',
+      goals: 'Long-running missions your agents work on autonomously — create missions, track tasks, and run or pause work.',
+      initiatives: 'Proactive suggestions from mission reflection and team activity — review and add to missions or create new ones.',
     };
 
     function isGoalPartialWait(goal) {
@@ -907,7 +907,7 @@
         function walk(subgoals, pathParts) {
           (subgoals || []).forEach(function (sg) {
             if (!sg || typeof sg !== 'object') return;
-            var title = String(sg.title || '').trim() || 'Untitled subgoal';
+            var title = String(sg.title || '').trim() || 'Untitled task';
             var parts = pathParts.concat(title);
             var status = effectiveSubgoalStatus(sg, g);
             var subgoalId = String(sg.id || '').trim();
@@ -1158,7 +1158,7 @@
         : flattenMissionSubgoals(Array.isArray(goal.subgoals) ? goal.subgoals : [], [], 0);
       var subgoalsHtml = subgoals.length
         ? '<ul class="team-current-mission-subgoal-list">' + subgoals.map(function (sg) {
-          var title = String(sg.title || '').trim() || 'Untitled subgoal';
+          var title = String(sg.title || '').trim() || 'Untitled task';
           var status = normalizeSubgoalStatus(sg.status);
           var icon = missionSubgoalIcon(status);
           var cls = missionSubgoalClass(status);
@@ -1169,10 +1169,10 @@
           return '<li class="' + cls + '" data-mission-subgoal-id="' + escapeHtml(sgId) + '" title="' + escapeHtml(title) + '">' +
             escapeHtml(icon + ' ' + title) + statusTag + '</li>';
         }).join('') + '</ul>'
-        : '<p class="team-current-mission-empty" style="margin:0;">No subgoals yet.</p>';
+        : '<p class="team-current-mission-empty" style="margin:0;">No tasks yet.</p>';
       var goalHeading = liveOnly ? 'Activity' : 'Mission';
       var noteHtml = liveOnly
-        ? '<p class="team-current-mission-empty" style="margin:0.35rem 0 0;">No saved mission yet — this is live agent context from chat. Create a mission to track objectives and subgoals.</p>'
+        ? '<p class="team-current-mission-empty" style="margin:0.35rem 0 0;">No saved mission yet — this is live agent context from chat. Create a mission to track objectives and tasks.</p>'
         : '';
       panel.innerHTML = '' +
         '<h3 class="team-current-mission-title">Current Mission</h3>' +
@@ -1181,7 +1181,7 @@
         '<p class="team-current-mission-meta"><strong>Progress:</strong> ' + escapeHtml(progressText) + '</p>' +
         '<p class="team-current-mission-meta"><strong>Owner:</strong> ' + escapeHtml(owner) + '</p>' +
         '<div class="team-current-mission-subgoals">' +
-          '<h4>' + (liveOnly ? 'Steps' : 'Subgoals') + '</h4>' +
+          '<h4>' + (liveOnly ? 'Steps' : 'Tasks') + '</h4>' +
           subgoalsHtml +
         '</div>' +
         noteHtml;
@@ -1401,7 +1401,7 @@
       var level = Number(depth) || 0;
       return list.map(function (sg) {
         if (!sg || typeof sg !== 'object') return '';
-        var title = String(sg.title || '').trim() || 'Untitled subgoal';
+        var title = String(sg.title || '').trim() || 'Untitled task';
         var status = normalizeSubgoalStatus(sg.status);
         var progress = normalizeSubgoalProgress(sg.progress);
         var assignee = String(sg.assignee || '').trim();
@@ -1431,7 +1431,7 @@
       var detail = detailEl || document.getElementById('team-goal-detail');
       if (!detail) return;
       if (!goal || typeof goal !== 'object') {
-        detail.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a goal to view details and subgoals.</p>';
+        detail.innerHTML = '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">Select a mission to view details and tasks.</p>';
         return;
       }
       var status = String(goal.status || 'active').toLowerCase();
@@ -1446,8 +1446,8 @@
         '<div class="team-goal-detail-row"><strong>Progress:</strong> ' + escapeHtml(String(pct)) + '%</div>' +
         (goal.lastActivity ? '<div class="team-goal-detail-row"><strong>Latest activity:</strong> ' + escapeHtml(String(goal.lastActivity)) + '</div>' : '') +
         '<div class="team-goal-subgoals">' +
-          '<h5>Subgoals (expandable tree)</h5>' +
-          (subgoalTree || '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">No subgoals yet.</p>') +
+          '<h5>Tasks (expandable tree)</h5>' +
+          (subgoalTree || '<p class="team-agent-inbox-empty" style="margin:0;padding:0;">No tasks yet.</p>') +
         '</div>';
     }
 
@@ -1505,7 +1505,7 @@
           '</div>' +
           '<div class="team-goal-meta"><strong>Owner:</strong> ' + escapeHtml(goalOwnerLabel(g)) + '</div>' +
           '<div class="team-goal-meta"><strong>Objective:</strong> ' + escapeHtml(String(g.objective || '').slice(0, 180)) + '</div>' +
-          '<div class="team-goal-meta"><strong>Subgoals:</strong> ' + escapeHtml(String(subgoalCount)) + '</div>' +
+          '<div class="team-goal-meta"><strong>Tasks:</strong> ' + escapeHtml(String(subgoalCount)) + '</div>' +
           '<div class="team-goal-meta"><strong>Open Initiatives:</strong> ' + escapeHtml(String(openInitiativesCount)) + '</div>' +
           '<div class="team-goal-progress"><span style="width:' + pct + '%"></span></div>' +
           '<div class="team-goal-meta"><strong>Progress:</strong> ' + pct + '%</div>' +
@@ -1564,6 +1564,21 @@
           selectedTeamGoalId = id;
           renderGoalsList();
         });
+      });
+    }
+
+    function missionTitleForGoalId(goalId) {
+      var gid = String(goalId || '').trim();
+      if (!gid) return '';
+      var goal = (teamGoalsSnapshot.goals || []).find(function (g) { return String(g.id || '') === gid; });
+      return goal ? String(goal.title || goal.objective || gid).trim() : gid;
+    }
+
+    function humanizeInitiativeActivityLine(line) {
+      var s = String(line || '');
+      return s.replace(/(?:Auto-promoted|Promoted) to subgoal in (goal-[a-z0-9-]+)/gi, function (_m, gid) {
+        var name = missionTitleForGoalId(gid);
+        return 'Added to mission: ' + (name || gid);
       });
     }
 
@@ -1738,8 +1753,8 @@
         ? '<button type="button" class="secondary" data-init-action="accept">Accept</button>' +
           '<button type="button" class="secondary" data-init-action="reject">Reject</button>' +
           (onMission ? '' : (
-            '<button type="button" class="secondary" data-init-action="promote-goal">Promote to Goal</button>' +
-            '<button type="button" class="secondary" data-init-action="promote-subgoal">Promote to Subgoal</button>'
+            '<button type="button" class="secondary" data-init-action="promote-goal">Create new mission</button>' +
+            '<button type="button" class="secondary" data-init-action="promote-subgoal">Add to mission</button>'
           ))
         : '';
       detail.innerHTML = '' +
@@ -1752,7 +1767,9 @@
         '<div class="team-initiative-row"><strong>Created by:</strong> ' + escapeHtml(agentNameById(initiative.createdBy || 'main')) + '</div>' +
         '<div class="team-initiative-row"><strong>Related goals:</strong> ' + escapeHtml(relatedLabel) + '</div>' +
         goalPickerHtml +
-        '<div class="team-initiative-row"><strong>Activity:</strong> ' + escapeHtml(initiativeActivityLines(initiative).join(' | ') || '—') + '</div>' +
+        '<div class="team-initiative-row"><strong>Activity:</strong> ' + escapeHtml(
+          initiativeActivityLines(initiative).map(humanizeInitiativeActivityLine).join(' | ') || '—'
+        ) + '</div>' +
         '<div class="team-initiative-row"><strong>Specialist reviews:</strong> ' + escapeHtml((initiative.specialistReviews || []).join(' | ') || '—') + '</div>' +
         '<div class="team-initiative-actions">' + reviseHtml + reviewHtml + '</div>';
       wireInitiativeDetailActions(detail, initiative);
@@ -2475,6 +2492,35 @@
       });
     }
 
+    function humanizeTeamActivityMessage(msg) {
+      return String(msg || '')
+        .replace(/Auto-promoted initiative to subgoal:/gi, 'Added initiative to mission:')
+        .replace(/Auto-promoted to subgoal in/gi, 'Added to mission')
+        .replace(/Promoted to subgoal in/gi, 'Added to mission')
+        .replace(/\bsubgoal\b/gi, 'task')
+        .replace(/\bsubgoals\b/gi, 'tasks');
+    }
+
+    function activityNavFromEvent(ev) {
+      if (!ev || typeof ev !== 'object') return null;
+      var type = String(ev.type || '');
+      var details = ev.details && typeof ev.details === 'object' ? ev.details : {};
+      if (type === 'initiative_auto_promoted') {
+        return {
+          view: 'tasks',
+          goalId: String(ev.goalId || details.goalId || ''),
+          subgoalId: String(details.subgoalId || ''),
+          initiativeId: String(details.initiativeId || ''),
+        };
+      }
+      return null;
+    }
+
+    function mergeActivityNav(group, ev) {
+      var nav = activityNavFromEvent(ev);
+      if (nav) group.nav = nav;
+    }
+
     function formatTeamActivityText(event) {
       var type = String(event && event.type || '');
       var agent = agentNameById(String(event && event.agentId || ''));
@@ -2542,7 +2588,18 @@
       if (type === 'turn_done') {
         return '<span class="accent">' + escapeHtml(agent || 'agent') + '</span> finished the task. ' + escapeHtml(msg || '');
       }
-      if (msg) return escapeHtml(msg);
+      if (type === 'initiative_auto_promoted') {
+        var initTitle = String(event.title || '').trim();
+        var missionName = missionTitleForGoalId(String(event.goalId || (details && details.goalId) || ''));
+        var confMatch = msg.match(/\((\d+)%\s*confidence\)/i);
+        var confPct = confMatch ? confMatch[1] : '';
+        var line = 'Added <span class="accent">' + escapeHtml(initTitle || 'initiative') + '</span> to mission';
+        if (missionName) line += ' <span class="accent">' + escapeHtml(missionName) + '</span>';
+        if (confPct) line += ' (' + escapeHtml(confPct) + '% confidence)';
+        line += ' — tap to open <span class="accent">Tasks</span>';
+        return line;
+      }
+      if (msg) return escapeHtml(humanizeTeamActivityMessage(msg));
       return escapeHtml(type || 'event');
     }
 
@@ -2553,6 +2610,7 @@
       var skill = String(event && event.skillId || '');
       var action = String(event && event.action || '');
       var msg = String(event && event.message || '');
+      var details = event && typeof event.details === 'object' ? event.details : null;
       if (type === 'skill_start') {
         var task = action ? (skill + ':' + action) : skill;
         return 'Started <span class="accent">' + escapeHtml(task || 'task') + '</span>.';
@@ -2584,7 +2642,15 @@
       if (type === 'delegation_error') {
         return 'Delegation to <span class="accent">' + escapeHtml(target || 'agent') + '</span> failed: ' + escapeHtml(msg || 'Error');
       }
-      if (msg) return escapeHtml(msg);
+      if (type === 'initiative_auto_promoted') {
+        var initTitleSub = String(event.title || '').trim();
+        var missionNameSub = missionTitleForGoalId(String(event.goalId || (details && details.goalId) || ''));
+        var lineSub = 'Added <span class="accent">' + escapeHtml(initTitleSub || 'initiative') + '</span> to mission';
+        if (missionNameSub) lineSub += ' <span class="accent">' + escapeHtml(missionNameSub) + '</span>';
+        lineSub += ' — tap for Tasks';
+        return lineSub;
+      }
+      if (msg) return escapeHtml(humanizeTeamActivityMessage(msg));
       return escapeHtml(type || 'event');
     }
 
@@ -2648,6 +2714,7 @@
           _keys: {},
         };
         pushUniqueActivityLine(group, formatTeamActivitySubline(ev));
+        mergeActivityNav(group, ev);
         openTurn[aid] = groups.length;
         groups.push(group);
         return group;
@@ -2657,6 +2724,7 @@
         group.events.push(ev);
         group.ts = Math.max(group.ts || 0, Number(ev.ts) || 0);
         pushUniqueActivityLine(group, formatTeamActivitySubline(ev));
+        mergeActivityNav(group, ev);
       }
 
       function appendSkillToTurn(ev) {
@@ -2735,6 +2803,7 @@
               _keys: {},
             };
             pushUniqueActivityLine(solo, formatTeamActivitySubline(ev));
+            mergeActivityNav(solo, ev);
             groups.push(solo);
           }
           return;
@@ -2766,12 +2835,16 @@
           _keys: {},
         };
         pushUniqueActivityLine(standalone, formatTeamActivityText(ev));
+        mergeActivityNav(standalone, ev);
         groups.push(standalone);
       });
 
       flushSkillBuffer(skillBuffer);
 
       groups.forEach(function (group) {
+        if (group.events && group.events.length) {
+          group.events.forEach(function (ev) { mergeActivityNav(group, ev); });
+        }
         if (!group.events || group.events.length <= 1) {
           delete group._keys;
           delete group.events;
@@ -2811,6 +2884,15 @@
       var linesHtml = lines.map(function (line) {
         return '<div class="mc-activity-line">' + line + '</div>';
       }).join('');
+      var nav = group && group.nav;
+      var navClass = nav && nav.view ? ' mc-movement-clickable' : '';
+      var navAttrs = '';
+      if (nav && nav.view) {
+        navAttrs = ' data-mc-movement-nav="' + escapeHtml(nav.view) + '"';
+        if (nav.goalId) navAttrs += ' data-goal-id="' + escapeHtml(nav.goalId) + '"';
+        if (nav.subgoalId) navAttrs += ' data-subgoal-id="' + escapeHtml(nav.subgoalId) + '"';
+        if (nav.initiativeId) navAttrs += ' data-initiative-id="' + escapeHtml(nav.initiativeId) + '"';
+      }
       if (opts.style === 'team') {
         return '<div class="team-activity-item" data-ts="' + escapeHtml(String(ts)) + '">' +
           '<div class="team-activity-time">' + timeHtml + '</div>' +
@@ -2822,7 +2904,7 @@
       }
       var a = (agentMapData || []).find(function (x) { return String(x.id) === agentId; }) || { id: agentId };
       var avatarHtml = typeof mc2AvatarHtml === 'function' ? mc2AvatarHtml(a) : '';
-      return '<div class="mc-movement-item mc-activity-group" data-ts="' + escapeHtml(String(ts)) + '">' +
+      return '<div class="mc-movement-item mc-activity-group' + navClass + '" data-ts="' + escapeHtml(String(ts)) + '"' + navAttrs + '>' +
         '<span class="mc-movement-time">' + timeHtml + '</span>' +
         avatarHtml +
         '<div class="mc-activity-body">' +

@@ -1470,9 +1470,53 @@
         openAgentCreateModal({ fromAgentId: selectedChatAgentId });
       });
     }
+    function mc2HandleMovementClick(row) {
+      if (!row) return;
+      var nav = row.getAttribute('data-mc-movement-nav') || 'tasks';
+      var goalId = row.getAttribute('data-goal-id') || '';
+      var subgoalId = row.getAttribute('data-subgoal-id') || '';
+      var initiativeId = row.getAttribute('data-initiative-id') || '';
+      if (nav === 'initiatives' && initiativeId) {
+        selectedTeamInitiativeId = initiativeId;
+        mc2SetView('initiatives');
+        if (typeof renderInitiativesPanels === 'function') renderInitiativesPanels();
+        return;
+      }
+      if (goalId) selectedTeamGoalId = goalId;
+      if (nav === 'goals') {
+        mc2SetView('goals');
+        Promise.resolve(mc2RenderGoals()).then(function () {
+          if (subgoalId && typeof scheduleScrollToBlockedTarget === 'function') {
+            scheduleScrollToBlockedTarget({
+              kind: 'subgoal',
+              goalId: goalId,
+              subgoalId: subgoalId,
+              title: '',
+            }, 0);
+          }
+        });
+        return;
+      }
+      mc2OpenTasksView('all');
+      Promise.resolve(mc2RenderTasks()).then(function () {
+        if (!subgoalId) return;
+        var safeId = String(subgoalId).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        var card = document.querySelector(
+          '#page-team2 .mc-mission-task-card[data-subgoal-id="' + safeId + '"]'
+        );
+        if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    }
+
     var mc2PendingRoot = document.getElementById('page-team2');
     if (mc2PendingRoot) {
       mc2PendingRoot.addEventListener('click', function (e) {
+        var movementRow = e.target && e.target.closest ? e.target.closest('[data-mc-movement-nav]') : null;
+        if (movementRow) {
+          e.preventDefault();
+          mc2HandleMovementClick(movementRow);
+          return;
+        }
         var blockedBtn = e.target && e.target.closest ? e.target.closest('[data-mc-action="blocked"]') : null;
         if (blockedBtn) {
           e.preventDefault();

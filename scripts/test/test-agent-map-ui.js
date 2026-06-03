@@ -102,8 +102,8 @@ const checks = [
     name: 'Team top tabs show one-line descriptions on switch',
     ok: html.includes('id="team-top-tab-desc"') &&
       html.includes('TEAM_TOP_TAB_DESC') &&
-      html.includes('Long-running objectives your agents work on autonomously') &&
-      html.includes('Proactive suggestions from goal reflection and team activity'),
+      html.includes('Long-running missions your agents work on autonomously') &&
+      html.includes('Proactive suggestions from mission reflection and team activity'),
   },
   {
     name: 'Team page includes goals UI and API hooks',
@@ -268,6 +268,9 @@ const checks = [
       html.includes('id="mc2-initiative-detail"') &&
       html.includes('data-init-action="promote-subgoal"') &&
       html.includes('data-init-action="undo-promotion"') &&
+      html.includes('initiative_auto_promoted') &&
+      html.includes('Added initiative to mission') &&
+      html.includes('data-mc-movement-nav') &&
       html.includes('renderInitiativesPanels') &&
       html.includes('mc2RenderInitiatives') &&
       html.includes('aria-label="Active mission"') &&

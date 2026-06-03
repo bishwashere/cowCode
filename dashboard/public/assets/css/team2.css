@@ -929,6 +929,13 @@ button.mc-mission-task-card {
 .mc2-initiatives-main.team-initiatives-main {
   margin-top: 0;
 }
+.mc-movement-clickable {
+  cursor: pointer;
+}
+.mc-movement-clickable:hover {
+  background: rgba(167, 139, 250, 0.08);
+  border-radius: 6px;
+}
 .mc-task-card-actions {
   display: flex;
   flex-wrap: wrap;
