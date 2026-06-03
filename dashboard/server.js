@@ -1673,20 +1673,21 @@ app.get('/api/projects', (_req, res) => {
 });
 
 app.post('/api/projects', (req, res) => {
-  const { name, description, url } = req.body || {};
+  const { name, description, url, setup_notes } = req.body || {};
   if (!name || !String(name).trim()) { res.status(400).json({ error: 'name required' }); return; }
   try {
     res.status(201).json(createProject({
       name: String(name).trim(),
       description: String(description || '').trim(),
       url: String(url || '').trim(),
+      setup_notes: String(setup_notes || '').trim(),
     }));
   }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.patch('/api/projects/:id', (req, res) => {
-  const { name, description, url } = req.body || {};
+  const { name, description, url, setup_notes } = req.body || {};
   const id = Number(req.params.id);
   const existing = getProject(id);
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
@@ -1697,6 +1698,7 @@ app.patch('/api/projects/:id', (req, res) => {
       name: nextName,
       description: description !== undefined ? String(description || '').trim() : existing.description,
       url: url !== undefined ? String(url || '').trim() : undefined,
+      setup_notes: setup_notes !== undefined ? String(setup_notes || '').trim() : undefined,
     });
     if (!p) { res.status(404).json({ error: 'Not found' }); return; }
     res.json(p);

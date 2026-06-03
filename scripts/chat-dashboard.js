@@ -39,6 +39,7 @@ import {
   enrichMessageWithProjectContext,
 } from '../lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from '../lib/goals-context.js';
+import { buildProjectWorkflowContextBlock } from '../lib/project-workflow.js';
 import { getGithubSourceIntentHint } from '../lib/github-context.js';
 import { appendUserFacingPrompt } from '../lib/user-reply-style.js';
 import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from '../lib/user-facing-reply.js';
@@ -234,6 +235,8 @@ async function main() {
     if (goalsBlock) systemPrompt += goalsBlock;
     const projectsBlock = buildProjectsContextBlock({ userText: message, historyMessages });
     if (projectsBlock) systemPrompt += projectsBlock;
+    const workflowBlock = buildProjectWorkflowContextBlock({ userText: message, historyMessages, agentId });
+    if (workflowBlock) systemPrompt += workflowBlock;
     systemPrompt = appendUserFacingPrompt(systemPrompt);
   }
 
@@ -258,6 +261,7 @@ async function main() {
       } catch (_) {}
     }
     if (!textToSend) {
+      ctx._originalUserText = message;
       const turn = await runAgentTurn({
         userText: message,
         ctx,

@@ -48,6 +48,14 @@ async function main() {
     const db = getProjectsDb();
     const cols = db.prepare('PRAGMA table_info(projects)').all().map((c) => c.name);
     assert(cols.includes('url'), 'projects table has url column');
+    assert(cols.includes('setup_notes'), 'projects table has setup_notes column');
+
+    const withSetup = createProject({
+      name: 'WithSetup',
+      description: 'Has notes',
+      setup_notes: 'mongodb://localhost/test',
+    });
+    assert(withSetup.setup_notes.includes('mongodb'), `setup notes: ${withSetup.setup_notes}`);
 
     const reloaded = getProject(p2.id);
     assert(reloaded.name === 'Site' && reloaded.url === 'https://nextpostai.com', 'reload ok');

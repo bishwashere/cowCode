@@ -2614,6 +2614,10 @@
         <label for="project-edit-desc">Description <span class="field-hint">(optional)</span></label>
         <input id="project-edit-desc" type="text" placeholder="Short description" autocomplete="off">
       </div>
+      <div class="form-row">
+        <label for="project-edit-setup">Setup notes <span class="field-hint">(optional — MongoDB, env, deployment)</span></label>
+        <textarea id="project-edit-setup" rows="3" placeholder="Connection strings, API URLs, env vars…" autocomplete="off"></textarea>
+      </div>
       <p id="project-edit-modal-error" class="modal-error" role="alert"></p>
       <div class="modal-actions">
         <button type="button" id="project-edit-modal-cancel" class="secondary">Cancel</button>
@@ -7478,6 +7482,7 @@
     var mc2InboxAgentFilter = '';
     var mc2TasksAgentFilter = '';
     var mc2SelectedProjectId = '';
+    var mc2ProjectsSnapshot = [];
     var mc2SidebarProjectsTimer = 0;
     var mc2TimelineScrollRaf = 0;
     var mc2TimelineHighlightKey = '';
@@ -7686,6 +7691,7 @@
         el.innerHTML = '<span class="mc-sidebar-projects-empty">Unavailable</span>';
         return;
       }
+      mc2ProjectsSnapshot = projects;
       if (!projects.length) {
         el.innerHTML = '<span class="mc-sidebar-projects-empty">No projects</span>';
         return;
@@ -8292,24 +8298,56 @@
       });
     }
 
-    function mc2RenderGoals() {
+    function mc2ProjectNameById(projectId) {
+      var pid = String(projectId || '').trim();
+      if (!pid) return '';
+      var match = (mc2ProjectsSnapshot || []).find(function (p) { return String(p.id || '') === pid; });
+      return match ? String(match.name || '') : '';
+    }
+
+    async function mc2RenderGoals() {
       var el = mc2El('mc2-goals-list');
       if (!el) return;
+      var api = window.cowCodeProjectsApi;
+      if (api && typeof api.listProjects === 'function') {
+        try {
+          var projList = await api.listProjects();
+          if (Array.isArray(projList)) mc2ProjectsSnapshot = projList;
+        } catch (_) {}
+      }
       var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
       if (!goals.length) { el.innerHTML = '<p style="color:var(--muted);font-size:0.66rem;">No missions yet. Create one from the Team mission controls.</p>'; return; }
       el.innerHTML = goals.map(function (g) {
         var status = String(g.status || 'active').toLowerCase();
         var pct = Math.max(0, Math.min(100, Math.round(Number((g.progress && g.progress.pct) || 0))));
-        var colorClass = status === 'active' ? 'active' : status === 'blocked' ? 'blocked' : '';
+        var subs = Array.isArray(g.subgoals) ? g.subgoals : [];
+        var doneSubs = subs.filter(function (s) { return String(s.status || '').toLowerCase() === 'done'; }).length;
+        var projectName = mc2ProjectNameById(g.projectId);
+        var projectLine = projectName
+          ? '<div class="mc-progress-meta">Project: <button type="button" class="mc-panel-link" data-mc-nav="projects" data-project-id="' + escapeHtml(String(g.projectId || '')) + '">' + escapeHtml(projectName) + '</button></div>'
+          : '';
         return '<div class="mc-progress-card" style="cursor:default;">' +
           '<div class="mc-progress-head">' +
             '<h3>' + escapeHtml(String(g.title || g.objective || 'Untitled mission')) + '</h3>' +
             '<span class="team-goal-status ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '</div>' +
           '<div class="mc-progress-bar"><span style="width:' + pct + '%"></span></div>' +
-          '<div class="mc-progress-meta">' + pct + '% · Owner: ' + escapeHtml(goalOwnerLabel(g)) + '</div>' +
+          '<div class="mc-progress-meta">' + pct + '% · Owner: ' + escapeHtml(goalOwnerLabel(g)) +
+            (subs.length ? ' · ' + doneSubs + '/' + subs.length + ' tasks' : '') + '</div>' +
+          projectLine +
         '</div>';
       }).join('');
+      el.querySelectorAll('.mc-panel-link[data-project-id]').forEach(function (btn) {
+        if (btn._wired) return;
+        btn._wired = true;
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          mc2SelectedProjectId = btn.getAttribute('data-project-id') || '';
+          mc2SetView('projects');
+          if (mc2SelectedProjectId) mc2ScrollToProject(mc2SelectedProjectId);
+        });
+      });
     }
 
     function mc2RenderInitiatives() {
@@ -8942,6 +8980,8 @@
         if (nameEl) nameEl.value = String(project.name || '');
         if (urlEl) urlEl.value = String(project.url || '');
         if (descEl) descEl.value = String(project.description || '');
+        var setupEl = document.getElementById('project-edit-setup');
+        if (setupEl) setupEl.value = String(project.setup_notes || '');
         showProjectEditError('');
         modal.classList.add('open');
         modal.setAttribute('aria-hidden', 'false');
@@ -8962,6 +9002,7 @@
         var nameEl = document.getElementById('project-edit-name');
         var urlEl = document.getElementById('project-edit-url');
         var descEl = document.getElementById('project-edit-desc');
+        var setupEl = document.getElementById('project-edit-setup');
         var name = nameEl ? String(nameEl.value || '').trim() : '';
         if (!name) {
           showProjectEditError('Project name is required.');
@@ -8978,6 +9019,7 @@
               name: name,
               url: urlEl ? String(urlEl.value || '').trim() : '',
               description: descEl ? String(descEl.value || '').trim() : '',
+              setup_notes: setupEl ? String(setupEl.value || '').trim() : '',
             }),
           });
           if (!r) return;

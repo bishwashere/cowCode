@@ -37,10 +37,10 @@ export const DEFAULT_ENABLED = [
 ];
 
 /** Always injected at runtime for chat; never toggled in config/UI. */
-export const IMPLICIT_CHAT_SKILLS = ['background-tasks'];
+export const IMPLICIT_CHAT_SKILLS = ['background-tasks', 'project-workflow'];
 
 /** Hidden from dashboard skill toggles (managed implicitly with team links). */
-export const UI_HIDDEN_SKILL_IDS = new Set(['agent-send', 'background-tasks', 'evaluate-team-capability']);
+export const UI_HIDDEN_SKILL_IDS = new Set(['agent-send', 'background-tasks', 'evaluate-team-capability', 'project-workflow']);
 
 const MD_NAMES = ['skill.md', 'SKILL.md'];
 const COMPACT_DESC_MAX = 280;

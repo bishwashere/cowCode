@@ -71,6 +71,7 @@ import {
   enrichMessageWithProjectContext,
 } from './lib/projects-context.js';
 import { buildGoalsContextBlock, getGoalsDiscoveryIntentHint } from './lib/goals-context.js';
+import { buildProjectWorkflowContextBlock, syncTurnToProjectWork } from './lib/project-workflow.js';
 import { getGithubSourceIntentHint } from './lib/github-context.js';
 import { appendUserFacingPrompt } from './lib/user-reply-style.js';
 import { formatUserFacingReply, logOutboundReplyDecorations, looksLikeToolAuditReply } from './lib/user-facing-reply.js';
@@ -1092,11 +1093,14 @@ async function main() {
         if (goalsBlock) systemPromptWithPlan += goalsBlock;
         const projectsBlock = buildProjectsContextBlock({ userText: text, historyMessages });
         if (projectsBlock) systemPromptWithPlan += projectsBlock;
+        const workflowBlock = buildProjectWorkflowContextBlock({ userText: text, historyMessages, agentId });
+        if (workflowBlock) systemPromptWithPlan += workflowBlock;
         systemPromptWithPlan = appendUserFacingPrompt(systemPromptWithPlan);
       }
     }
     const llmOptions = agentId ? { agentId } : {};
     console.log('[path] runAgentTurn systemPromptLen=', systemPromptWithPlan.length, 'toolsCount=', toolsForRequest.length);
+    ctx._originalUserText = text;
     let turnResult = null;
     if (presetDelegationPlan && delegatedTarget) {
       try {

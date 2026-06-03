@@ -62,6 +62,7 @@
     "test:projects": "node scripts/test/test-projects-db.js",
     "test:projects-ui": "node scripts/test/test-projects-ui.js",
     "test:projects-context": "node scripts/test/test-projects-context.js",
+    "test:project-workflow": "node scripts/test/test-project-workflow.js",
     "test:goals-context": "node scripts/test/test-goals-context.js",
     "test:user-reply-style": "node scripts/test/test-user-reply-style.js",
     "test:casual-greetings": "node scripts/test/test-casual-greetings.js",
