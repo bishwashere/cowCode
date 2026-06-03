@@ -326,28 +326,29 @@ const checks = [
   {
     name: 'Team2 Done Today opens completed tasks cards view',
     ok: html.includes('data-mc-nav="tasks"') &&
+      html.includes('data-mc-tasks-filter="done"') &&
       html.includes('mc-stat-card-action') &&
       html.includes('id="mc2-view-tasks"') &&
       html.includes('id="mc2-tasks-list"') &&
       html.includes('id="mc2-tasks-agent-filter"') &&
       html.includes('mc2RenderTasks') &&
+      html.includes('mc2OpenTasksView') &&
+      html.includes('flattenMissionWorkItems') &&
+      html.includes('mc2MissionTaskCard') &&
       html.includes('mc2TaskDisplayTitle') &&
       html.includes('mc-task-card') &&
-      html.includes('View tasks completed today'),
+      html.includes('View completed tasks'),
   },
   {
-    name: 'Team2 Blocked stat navigates to blocked subgoal',
+    name: 'Team2 Blocked stat opens tasks view with blocked filter',
     ok: html.includes('data-mc-action="blocked"') &&
-      html.includes('window.navigateToBlockedWork') &&
-      html.includes('scheduleScrollToBlockedTarget') &&
-      html.includes('navigateToBlockedWork') &&
-      html.includes('scrollToBlockedSubgoalMarker') &&
-      html.includes('findFirstBlockedWorkRef') &&
-      html.includes('id="mc2-goal-detail"') &&
-      html.includes('View blocked tasks and subtasks') &&
-      html.includes('team-goal-subgoal-status blocked') &&
-      html.includes('data-mc-action="blocked"') &&
-      html.includes('scrollToFirstBlockedSubgoalTag'),
+      html.includes('mc2OpenTasksView') &&
+      html.includes('id="mc2-tasks-filters"') &&
+      html.includes('data-mc-tasks-filter="blocked"') &&
+      html.includes('flattenMissionWorkItems') &&
+      html.includes('groupMissionWorkItems') &&
+      html.includes('mc-mission-task-card') &&
+      html.includes('View blocked tasks and subtasks'),
   },
   {
     name: 'Team page blocked badge is clickable',

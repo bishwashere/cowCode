@@ -110,7 +110,7 @@
                   <div class="mc-stat-label">Blocked</div>
                   <div class="mc-stat-value blocked" id="mc2-stat-blocked">0</div>
                 </button>
-                <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" aria-label="View tasks completed today">
+                <button type="button" class="mc-stat-card mc-stat-card-action" data-mc-nav="tasks" data-mc-tasks-filter="done" aria-label="View completed tasks">
                   <div class="mc-stat-label">Done Today</div>
                   <div class="mc-stat-value done" id="mc2-stat-done">0</div>
                 </button>
@@ -177,11 +177,11 @@
           </div>
         </div>
 
-        <!-- Completed tasks view -->
+        <!-- Mission tasks view (blocked / open / completed) -->
         <div id="mc2-view-tasks" class="mc-view" hidden>
           <div id="mc2-tasks-pending" class="mc-pending-inline"></div>
           <div class="mc-activity-toolbar">
-            <p class="mc-section-title" id="mc2-tasks-title">COMPLETED TASKS</p>
+            <p class="mc-section-title" id="mc2-tasks-title">MISSION TASKS</p>
             <label class="mc-agent-filter" for="mc2-tasks-agent-filter">
               <span>Agent</span>
               <select id="mc2-tasks-agent-filter" class="mc2-agent-filter-select" aria-label="Filter tasks by agent">
@@ -189,13 +189,19 @@
               </select>
             </label>
           </div>
-          <div class="team-agent-panel-ranges mc2-range-controls" aria-label="Completed tasks timeline">
+          <div id="mc2-tasks-filters" class="mc2-tasks-filters" role="tablist" aria-label="Task status filters">
+            <button type="button" class="mc2-tasks-filter active" data-mc-tasks-filter="all" aria-pressed="true">All</button>
+            <button type="button" class="mc2-tasks-filter" data-mc-tasks-filter="blocked" aria-pressed="false">Blocked</button>
+            <button type="button" class="mc2-tasks-filter" data-mc-tasks-filter="open" aria-pressed="false">Open</button>
+            <button type="button" class="mc2-tasks-filter" data-mc-tasks-filter="done" aria-pressed="false">Completed</button>
+          </div>
+          <div id="mc2-tasks-range-wrap" class="team-agent-panel-ranges mc2-range-controls" aria-label="Completed tasks timeline">
             <button type="button" class="team-agent-panel-range active" data-range="today" aria-pressed="true">Today</button>
             <button type="button" class="team-agent-panel-range" data-range="yesterday" aria-pressed="false">Yesterday</button>
             <button type="button" class="team-agent-panel-range" data-range="last7" aria-pressed="false">Last week</button>
             <button type="button" class="team-agent-panel-range" data-range="last30" aria-pressed="false">Last 30 days</button>
           </div>
-          <div class="mc-agents-overview" id="mc2-tasks-list">
+          <div class="mc-agents-overview mc-tasks-list-wrap" id="mc2-tasks-list">
             <p style="color:var(--muted);font-size:0.66rem;">Loading tasks…</p>
           </div>
         </div>

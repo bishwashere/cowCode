@@ -838,6 +838,90 @@ button.mc-stat-card-action:focus-visible {
 }
 .mc-task-card-meta .done-tag { color: #60a5fa; }
 
+.mc2-tasks-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+}
+.mc2-tasks-filter {
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--muted);
+  font-size: 0.64rem;
+  cursor: pointer;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.mc2-tasks-filter:hover { border-color: #60a5fa; color: var(--text); }
+.mc2-tasks-filter.active {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(30, 41, 92, 0.55);
+  color: #dbeafe;
+}
+.mc2-tasks-filter[data-mc-tasks-filter="blocked"].active {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(69, 10, 10, 0.45);
+  color: #fecaca;
+}
+
+.mc-tasks-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.mc-tasks-section-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mc-tasks-section-count {
+  color: var(--muted);
+  font-weight: 500;
+}
+.mc-tasks-section-sub {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--muted);
+}
+.mc-tasks-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+button.mc-mission-task-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.mc-task-card-path {
+  margin: 0.15rem 0 0.25rem;
+  font-size: 0.6rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.mc-task-card-desc {
+  margin: 0 0 0.3rem;
+  font-size: 0.62rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.mc-task-card-mission {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
 /* ── Bottom row ───────────────────────────────────────────────────────── */
 
 .mc-bottom-row {

@@ -875,6 +875,93 @@
       return refs[0] || null;
     }
 
+    function effectiveSubgoalStatus(subgoal, goal) {
+      var status = normalizeSubgoalStatus(subgoal && subgoal.status);
+      if (status === 'done') return 'done';
+      if (status === 'blocked') return 'blocked';
+      if (goal && dashboardSubgoalBlockedByWait(subgoal, goal.waitCondition)) return 'blocked';
+      return status;
+    }
+
+    function flattenMissionWorkItems() {
+      var items = [];
+      (Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : []).forEach(function (g) {
+        var missionTitle = String(g.title || g.objective || 'Untitled mission').trim();
+        var goalId = String(g.id || '').trim();
+        if (!goalId) return;
+        var goalStatus = String(g.status || 'active').toLowerCase();
+        if (goalStatus === 'blocked') {
+          items.push({
+            kind: 'goal',
+            status: 'blocked',
+            title: missionTitle,
+            missionTitle: missionTitle,
+            goalId: goalId,
+            subgoalId: '',
+            path: missionTitle,
+            assignee: String(g.ownerAgentId || '').trim(),
+            progress: normalizeSubgoalProgress(g.progress && g.progress.pct),
+            description: String(g.blockedReason || g.objective || '').trim(),
+          });
+        }
+        function walk(subgoals, pathParts) {
+          (subgoals || []).forEach(function (sg) {
+            if (!sg || typeof sg !== 'object') return;
+            var title = String(sg.title || '').trim() || 'Untitled subgoal';
+            var parts = pathParts.concat(title);
+            var status = effectiveSubgoalStatus(sg, g);
+            items.push({
+              kind: 'subgoal',
+              status: status,
+              title: title,
+              missionTitle: missionTitle,
+              goalId: goalId,
+              subgoalId: String(sg.id || '').trim(),
+              path: parts.join(' → '),
+              assignee: String(sg.assignee || g.ownerAgentId || '').trim(),
+              progress: normalizeSubgoalProgress(sg.progress),
+              description: String(sg.description || '').trim(),
+            });
+            walk(sg.subgoals, parts);
+          });
+        }
+        walk(g.subgoals, [missionTitle]);
+      });
+      var agents = teamAgentContextSnapshot.agents || {};
+      Object.keys(agents).forEach(function (id) {
+        var ctx = agents[id] || {};
+        if (String(ctx.state || 'idle').toLowerCase() === 'error') {
+          items.push({
+            kind: 'agent',
+            status: 'blocked',
+            title: String(ctx.currentThought || ctx.lastAction || 'Agent blocked').trim(),
+            missionTitle: '',
+            goalId: '',
+            subgoalId: '',
+            agentId: id,
+            path: agentNameById(id),
+            assignee: id,
+            progress: 0,
+            description: String(ctx.lastAction || '').trim(),
+          });
+        }
+      });
+      return items;
+    }
+
+    function groupMissionWorkItems(items) {
+      var groups = { blocked: [], doing: [], todo: [], done: [] };
+      (items || []).forEach(function (it) {
+        var bucket = groups[it.status] ? it.status : 'todo';
+        if (!groups[bucket]) bucket = 'todo';
+        groups[bucket].push(it);
+      });
+      return groups;
+    }
+
+    window.flattenMissionWorkItems = flattenMissionWorkItems;
+    window.groupMissionWorkItems = groupMissionWorkItems;
+
     function highlightBlockedTarget(el) {
       if (!el || !el.classList) return;
       el.classList.add('team-blocked-highlight');
@@ -1001,17 +1088,26 @@
       return true;
     }
 
+    function ensureMissionControlPage() {
+      var mcPage = document.getElementById('page-team2');
+      if (mcPage && mcPage.classList.contains('active')) return true;
+      var route = (location.hash || '').slice(1).split('/')[0];
+      if (route === 'team' || route === 'agents') return true;
+      location.hash = '#team';
+      return false;
+    }
+
     function navigateToBlockedWork() {
+      ensureMissionControlPage();
+      if (typeof mc2OpenTasksView === 'function') {
+        mc2OpenTasksView('blocked');
+        return true;
+      }
       var ref = findFirstBlockedWorkRef();
       if (ref && scrollToBlockedWork(ref)) return true;
       if (typeof mc2SetView === 'function') {
-        if (document.querySelector('#mc2-col-blocked .mc-kanban-card')) {
-          mc2SetView('mission');
-          setTimeout(scrollMc2BlockedKanban, 80);
-          return true;
-        }
-        mc2SetView('goals');
-        scheduleScrollToBlockedTarget(null, 0);
+        mc2SetView('tasks');
+        if (typeof mc2RenderTasks === 'function') mc2RenderTasks();
         return true;
       }
       if (typeof setTeamTopTab === 'function') {
@@ -2706,6 +2802,13 @@
       } catch (_) {}
       renderGoalsList();
       renderAgentContext();
+      renderCurrentMission();
+      renderTeamTaskSummary();
+      if (typeof mc2ActiveView === 'string' && mc2ActiveView === 'tasks' && typeof mc2RenderTasks === 'function') {
+        mc2RenderTasks();
+      } else if (typeof renderMissionControl === 'function' && !shouldPauseTeamDashboardRefresh()) {
+        renderMissionControl();
+      }
       if (!shouldPauseTeamDashboardRefresh()) renderTeamUserInputModal();
     }
 

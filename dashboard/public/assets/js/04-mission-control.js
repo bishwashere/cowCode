@@ -10,8 +10,31 @@
     var mc2TimelineHighlightKey = '';
     var mc2TimelineSpyEnabled = false;
     var mc2PendingActionBusy = false;
+    var mc2TasksFilter = 'all';
 
     function mc2El(id) { return document.getElementById(id); }
+
+    function mc2SetTasksFilter(filter) {
+      var next = String(filter || 'all').trim();
+      if (['all', 'blocked', 'open', 'done'].indexOf(next) < 0) next = 'all';
+      mc2TasksFilter = next;
+      document.querySelectorAll('#mc2-tasks-filters .mc2-tasks-filter').forEach(function (btn) {
+        var active = btn.getAttribute('data-mc-tasks-filter') === mc2TasksFilter;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      var rangeWrap = mc2El('mc2-tasks-range-wrap');
+      if (rangeWrap) rangeWrap.hidden = mc2TasksFilter !== 'done' && mc2TasksFilter !== 'all';
+    }
+
+    function mc2OpenTasksView(filter) {
+      mc2SetTasksFilter(filter || 'all');
+      mc2SetView('tasks');
+      mc2RenderTasks();
+    }
+
+    window.mc2OpenTasksView = mc2OpenTasksView;
+    window.mc2SetTasksFilter = mc2SetTasksFilter;
 
     function mc2AgentInitials(a) {
       var name = agentCardShortName(a);
@@ -490,31 +513,175 @@
       '</div>';
     }
 
+    function mc2MissionTaskStatusLabel(status) {
+      var s = String(status || 'todo').toLowerCase();
+      if (s === 'blocked') return 'blocked';
+      if (s === 'doing') return 'in progress';
+      if (s === 'done') return 'done';
+      return 'open';
+    }
+
+    function mc2MissionTaskCard(item) {
+      var status = String(item.status || 'todo').toLowerCase();
+      var assigneeId = String(item.assignee || item.agentId || '').trim();
+      var a = (agentMapData || []).find(function (x) { return String(x.id) === assigneeId; }) || { id: assigneeId || 'main' };
+      var agentHtml = assigneeId
+        ? '<span class="mc-task-card-agent">' + mc2AvatarHtml(a) + '<span>' + escapeHtml(agentNameById(assigneeId)) + '</span></span>'
+        : '';
+      var missionLine = item.missionTitle && item.kind !== 'goal'
+        ? '<span class="mc-task-card-mission">' + escapeHtml(item.missionTitle) + '</span>'
+        : '';
+      var pathLine = item.path && item.kind === 'subgoal'
+        ? '<div class="mc-task-card-path">' + escapeHtml(item.path) + '</div>'
+        : '';
+      var desc = String(item.description || '').trim();
+      var descHtml = desc ? '<p class="mc-task-card-desc">' + escapeHtml(desc.slice(0, 220)) + '</p>' : '';
+      var progress = Number(item.progress);
+      var progressLabel = isFinite(progress) && progress > 0 ? (progress + '%') : '';
+      return '<button type="button" class="mc-task-card mc-mission-task-card" data-mc-mission-task="1"' +
+        ' data-goal-id="' + escapeHtml(String(item.goalId || '')) + '"' +
+        ' data-subgoal-id="' + escapeHtml(String(item.subgoalId || '')) + '"' +
+        ' data-agent-id="' + escapeHtml(String(item.agentId || assigneeId || '')) + '"' +
+        ' data-status="' + escapeHtml(status) + '">' +
+        '<div class="mc-task-card-title">' + escapeHtml(item.title || 'Untitled') + '</div>' +
+        pathLine +
+        descHtml +
+        '<div class="mc-task-card-meta">' +
+          '<span class="team-goal-subgoal-status ' + escapeHtml(status) + '">' + escapeHtml(mc2MissionTaskStatusLabel(status)) + '</span>' +
+          agentHtml +
+          missionLine +
+          (progressLabel ? '<span>' + escapeHtml(progressLabel) + '</span>' : '') +
+        '</div>' +
+      '</button>';
+    }
+
+    function mc2MissionTasksSection(title, items) {
+      if (!items.length) return '';
+      return '<section class="mc-tasks-section">' +
+        '<h4 class="mc-tasks-section-title">' + escapeHtml(title) + ' <span class="mc-tasks-section-count">' + items.length + '</span></h4>' +
+        '<div class="mc-tasks-section-body">' + items.map(mc2MissionTaskCard).join('') + '</div>' +
+      '</section>';
+    }
+
+    function mc2FilterMissionItems(items) {
+      if (!mc2TasksAgentFilter) return items;
+      return items.filter(function (it) {
+        var aid = String(it.assignee || it.agentId || '').trim();
+        return aid === mc2TasksAgentFilter;
+      });
+    }
+
+    function mc2WireMissionTaskCards(root) {
+      if (!root) return;
+      root.querySelectorAll('.mc-mission-task-card[data-mc-mission-task]').forEach(function (card) {
+        if (card._wired) return;
+        card._wired = true;
+        card.addEventListener('click', function () {
+          var agentId = card.getAttribute('data-agent-id');
+          var goalId = card.getAttribute('data-goal-id');
+          var subgoalId = card.getAttribute('data-subgoal-id');
+          if (agentId && card.getAttribute('data-status') === 'blocked' && !goalId) {
+            mc2SetAgentFilter(agentId, 'context');
+            return;
+          }
+          if (goalId) {
+            selectedTeamGoalId = goalId;
+            mc2SetView('goals');
+            Promise.resolve(mc2RenderGoals()).then(function () {
+              if (typeof scheduleScrollToBlockedTarget === 'function') {
+                scheduleScrollToBlockedTarget({
+                  kind: subgoalId ? 'subgoal' : 'goal',
+                  goalId: goalId,
+                  subgoalId: subgoalId,
+                  title: card.querySelector('.mc-task-card-title')
+                    ? String(card.querySelector('.mc-task-card-title').textContent || '').trim()
+                    : '',
+                }, 0);
+              }
+            });
+          }
+        });
+      });
+    }
+
     function mc2RenderTasks() {
       var el = mc2El('mc2-tasks-list');
       if (!el) return;
       mc2SyncAgentFilterControls();
-      var range = teamAgentPanelRange || 'today';
-      var tasks = listCompletedTasks({ range: range, agentId: mc2TasksAgentFilter });
+      mc2SetTasksFilter(mc2TasksFilter);
       var titleEl = mc2El('mc2-tasks-title');
-      var rangeLabel = teamAgentRangeLabel(range);
-      if (titleEl) {
-        titleEl.textContent = 'COMPLETED TASKS — ' + rangeLabel.toUpperCase() + ' (' + tasks.length + ')';
+      var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var groups = typeof groupMissionWorkItems === 'function'
+        ? groupMissionWorkItems(mc2FilterMissionItems(allItems))
+        : { blocked: [], doing: [], todo: [], done: [] };
+      var openCount = groups.todo.length + groups.doing.length;
+      var html = '';
+      var filter = mc2TasksFilter;
+
+      if (filter === 'all' || filter === 'blocked' || filter === 'open') {
+        if (titleEl) {
+          titleEl.textContent = filter === 'blocked'
+            ? 'BLOCKED — ' + groups.blocked.length
+            : (filter === 'open' ? 'OPEN & IN PROGRESS — ' + openCount : 'MISSION TASKS');
+        }
+        if (filter === 'all') {
+          html += mc2MissionTasksSection('Blocked', groups.blocked);
+          html += mc2MissionTasksSection('In progress', groups.doing);
+          html += mc2MissionTasksSection('Open', groups.todo);
+        } else if (filter === 'blocked') {
+          html += groups.blocked.length
+            ? mc2MissionTasksSection('Blocked', groups.blocked)
+            : '<p class="mc-kanban-empty">No blocked mission tasks right now.</p>';
+        } else {
+          html += mc2MissionTasksSection('In progress', groups.doing);
+          html += mc2MissionTasksSection('Open', groups.todo);
+          if (!groups.doing.length && !groups.todo.length) {
+            html = '<p class="mc-kanban-empty">No open mission tasks.</p>';
+          }
+        }
       }
-      var label = mc2TasksAgentFilter ? agentNameById(mc2TasksAgentFilter) : 'all agents';
-      if (!tasks.length) {
+
+      if (filter === 'all' || filter === 'done') {
+        var range = teamAgentPanelRange || 'today';
+        var rangeLabel = teamAgentRangeLabel(range);
+        var tasks = listCompletedTasks({ range: range, agentId: mc2TasksAgentFilter });
+        if (filter === 'done' && titleEl) {
+          titleEl.textContent = 'COMPLETED — ' + rangeLabel.toUpperCase() + ' (' + tasks.length + ')';
+        }
+        html += '<section class="mc-tasks-section mc-tasks-section-done">' +
+          '<h4 class="mc-tasks-section-title">Completed <span class="mc-tasks-section-count">' + tasks.length + '</span>' +
+          (filter === 'all' ? ' <span class="mc-tasks-section-sub">' + escapeHtml(rangeLabel) + '</span>' : '') +
+          '</h4>' +
+          '<div class="mc-tasks-section-body">';
+        if (!tasks.length) {
+          html += '<p class="mc-kanban-empty">No completed agent turns for this range.</p>';
+        } else {
+          mc2TimelineSpyEnabled = filter === 'done';
+          html += tasks.map(mc2TaskCard).join('');
+        }
+        html += '</div></section>';
+      } else {
         mc2TimelineSpyEnabled = false;
-        el.innerHTML = '<p class="mc-kanban-empty">No completed tasks for ' + escapeHtml(label) + ' in ' + escapeHtml(rangeLabel.toLowerCase()) + '.</p>';
-        return;
       }
-      mc2TimelineSpyEnabled = true;
-      el.innerHTML = tasks.map(mc2TaskCard).join('');
-      el.querySelectorAll('.mc-task-card[data-mc-task-agent]').forEach(function (card) {
+
+      if (!html) html = '<p class="mc-kanban-empty">No mission tasks yet.</p>';
+      el.innerHTML = html;
+      mc2WireMissionTaskCards(el);
+      el.querySelectorAll('.mc-task-card[data-mc-task-agent]:not([data-mc-mission-task])').forEach(function (card) {
+        if (card._wiredTurn) return;
+        card._wiredTurn = true;
         card.addEventListener('click', function () {
           var aid = card.getAttribute('data-mc-task-agent');
           if (aid) mc2SetAgentFilter(aid, 'context');
         });
       });
+      if (filter === 'blocked' && groups.blocked.length) {
+        var firstBlocked = el.querySelector('.mc-mission-task-card[data-status="blocked"]');
+        if (firstBlocked) {
+          try { firstBlocked.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+          if (typeof highlightBlockedTarget === 'function') highlightBlockedTarget(firstBlocked);
+        }
+      }
       mc2SyncTimelineHighlightForScroll();
     }
 
@@ -1229,6 +1396,11 @@
     document.querySelectorAll('#page-team2 .mc-stat-card-action[data-mc-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var nav = btn.getAttribute('data-mc-nav');
+        if (nav === 'tasks') {
+          var taskFilter = btn.getAttribute('data-mc-tasks-filter') || 'all';
+          mc2OpenTasksView(taskFilter);
+          return;
+        }
         if (nav) mc2SetView(nav);
       });
     });
@@ -1244,8 +1416,13 @@
         var blockedBtn = e.target && e.target.closest ? e.target.closest('[data-mc-action="blocked"]') : null;
         if (blockedBtn) {
           e.preventDefault();
-          if (typeof navigateToBlockedWork === 'function') navigateToBlockedWork();
-          else if (typeof window.navigateToBlockedWork === 'function') window.navigateToBlockedWork();
+          mc2OpenTasksView('blocked');
+          return;
+        }
+        var tasksFilterBtn = e.target && e.target.closest ? e.target.closest('.mc2-tasks-filter[data-mc-tasks-filter]') : null;
+        if (tasksFilterBtn) {
+          e.preventDefault();
+          mc2OpenTasksView(tasksFilterBtn.getAttribute('data-mc-tasks-filter') || 'all');
           return;
         }
         var attentionBtn = e.target && e.target.closest ? e.target.closest('[data-attention-action]') : null;
