@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 /**
  * Static checks: dashboard boots home status + mission control (split assets layout).
+ * Runtime check: dashboard/server.js starts without parse/runtime crash (regression for async route handlers).
  */
-import fs from 'fs';
+import fs, { mkdtempSync, rmSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
+import { tmpdir } from 'os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(__dirname, '../..');
 const publicDir = path.join(__dirname, '../../dashboard/public');
 const htmlPath = path.join(publicDir, 'index.html');
 const serverPath = path.join(__dirname, '../../dashboard/server.js');
@@ -107,6 +111,10 @@ const checks = [
       serverJs.includes('approvePendingProposal'),
   },
   {
+    name: 'initiative promote route is async (await promoteInitiativeToSubgoal)',
+    ok: /app\.post\('\/api\/initiatives\/:id\/promote',\s*async\s*\(req,\s*res\)\s*=>\s*\{[\s\S]*await promoteInitiativeToSubgoal\(/.test(serverJs),
+  },
+  {
     name: 'home page has status overview element ids',
     ok: fullHtml.includes('id="chat-status-text"') &&
       fullHtml.includes('id="chat-overview-uptime"') &&
@@ -136,15 +144,88 @@ const checks = [
   },
 ];
 
-let failed = 0;
-for (const c of checks) {
-  const status = c.ok ? 'PASS' : 'FAIL';
-  console.log(`[${status}] ${c.name}`);
-  if (!c.ok) failed++;
+function pickPort() {
+  return 19000 + Math.floor(Math.random() * 1000);
 }
 
-if (failed) {
-  console.error(`\n${failed} check(s) failed.`);
-  process.exit(1);
+async function waitForDashboard(url, timeoutMs = 15000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return;
+    } catch (_) {}
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error(`Dashboard not ready: ${url}`);
 }
-console.log('\nAll dashboard boot checks passed.');
+
+async function testDashboardServerStarts() {
+  const port = pickPort();
+  const url = `http://127.0.0.1:${port}/`;
+  const stateDir = mkdtempSync(path.join(tmpdir(), 'cowcode-dashboard-boot-'));
+  let child = null;
+  let stderr = '';
+  try {
+    child = spawn(process.execPath, ['dashboard/server.js'], {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        COWCODE_STATE_DIR: stateDir,
+        COWCODE_DASHBOARD_PORT: String(port),
+        COWCODE_DASHBOARD_HOST: '127.0.0.1',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    const exitEarly = new Promise((_, reject) => {
+      child.on('exit', (code) => {
+        if (code != null && code !== 0) {
+          reject(new Error(`Dashboard exited ${code}: ${stderr.slice(-800)}`));
+        }
+      });
+    });
+    await Promise.race([waitForDashboard(url), exitEarly]);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`GET / returned ${res.status}`);
+    return `HTTP ${res.status} on port ${port}`;
+  } finally {
+    if (child && !child.killed) {
+      child.kill('SIGTERM');
+      await new Promise((r) => setTimeout(r, 250));
+      if (!child.killed) child.kill('SIGKILL');
+    }
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+}
+
+async function main() {
+  let failed = 0;
+  for (const c of checks) {
+    const status = c.ok ? 'PASS' : 'FAIL';
+    console.log(`[${status}] ${c.name}`);
+    if (!c.ok) failed++;
+  }
+
+  const runtimeName = 'dashboard/server.js starts and serves GET /';
+  try {
+    const output = await testDashboardServerStarts();
+    console.log(`[PASS] ${runtimeName}`);
+    console.log(`       ${output}`);
+  } catch (err) {
+    console.log(`[FAIL] ${runtimeName}`);
+    console.log(`       ${err?.message || err}`);
+    failed++;
+  }
+
+  if (failed) {
+    console.error(`\n${failed} check(s) failed.`);
+    process.exit(1);
+  }
+  console.log('\nAll dashboard boot checks passed.');
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
