@@ -725,6 +725,16 @@ button.mc-stat-card-action:focus-visible {
   font-weight: 600;
 }
 .mc-kanban-card-tag.blocked { background: rgba(239,68,68,0.15); color: #ef4444; }
+.mc-kanban-card-tag.discovery { background: rgba(124, 58, 237, 0.15); color: var(--accent); }
+
+.mc-kanban-card-completed .mc-kanban-card-title { color: #86efac; }
+.mc-kanban-card-completed .mc-kanban-card-when { color: var(--muted); }
+
+.mc-kanban-card-attention.error { border-color: rgba(239, 68, 68, 0.35); background: rgba(127, 29, 29, 0.12); }
+.mc-kanban-card-attention.warning { border-color: rgba(234, 179, 8, 0.28); background: rgba(113, 63, 18, 0.12); }
+
+.mc-kanban-card-discovery { border-color: rgba(124, 58, 237, 0.25); }
+.mc-kanban-card-discovery .mc-kanban-card-title { color: #ddd6fe; }
 
 .mc-kanban-empty {
   color: var(--muted);
@@ -1574,10 +1584,10 @@ button.mc-stat-card.mc-stat-card-action {
   font-size: 0.66rem;
 }
 
-.mc-kanban-col:nth-child(1) .mc-kanban-col-head { color: var(--mc-green); }
-.mc-kanban-col:nth-child(2) .mc-kanban-col-head { color: var(--mc-yellow); }
-.mc-kanban-col:nth-child(3) .mc-kanban-col-head { color: var(--mc-yellow); }
-.mc-kanban-col:nth-child(4) .mc-kanban-col-head { color: var(--mc-red); }
+.mc-kanban-col:nth-child(1) .mc-kanban-col-head { color: var(--mc-red); }
+.mc-kanban-col:nth-child(2) .mc-kanban-col-head { color: #60a5fa; }
+.mc-kanban-col:nth-child(3) .mc-kanban-col-head { color: var(--mc-green); }
+.mc-kanban-col:nth-child(4) .mc-kanban-col-head { color: var(--accent); }
 
 .mc-kanban-col-count {
   border: none;

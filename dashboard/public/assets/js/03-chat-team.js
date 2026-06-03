@@ -921,8 +921,10 @@
               fromInitiative: /^init-/.test(subgoalId),
               path: parts.join(' → '),
               assignee: String(sg.assignee || g.ownerAgentId || '').trim(),
+              delegatedFrom: String(sg.delegatedFrom || '').trim(),
               progress: normalizeSubgoalProgress(sg.progress),
               description: String(sg.description || '').trim(),
+              updatedAt: Number(sg.updatedAt || g.updatedAt) || 0,
             });
             walk(sg.subgoals, parts);
           });
@@ -1040,7 +1042,7 @@
     }
 
     function scrollMc2BlockedKanban() {
-      var col = document.getElementById('mc2-col-blocked');
+      var col = document.getElementById('mc2-col-attention');
       if (!col) return false;
       try { col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch (_) {}
       highlightBlockedTarget(col);

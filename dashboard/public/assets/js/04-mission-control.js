@@ -511,50 +511,322 @@
       }
     }
 
-    function mc2RenderKanban() {
+    function mc2InitiativeWasAutoPromoted(initiative) {
+      var raw = initiative && initiative.activity;
+      var lines = Array.isArray(raw) ? raw : (raw ? [String(raw)] : []);
+      return lines.some(function (line) {
+        return String(line || '').indexOf('Auto-promoted to subgoal in ') >= 0;
+      });
+    }
+
+    function mc2InitiativeDiscoveryIcon(initiative) {
+      var type = String(initiative && initiative.type || 'observation').toLowerCase();
+      if (type === 'risk' || type === 'gap' || type === 'warning') return '⚠';
+      return '💡';
+    }
+
+    function mc2KanbanCompletedCard(item) {
+      var title = escapeHtml(String(item.title || 'Completed task'));
+      var meta = [];
+      if (item.delegatedFrom) {
+        meta.push('Assigned by ' + escapeHtml(agentNameById(item.delegatedFrom) || item.delegatedFrom));
+      }
+      if (item.assignee) {
+        meta.push('Completed by ' + escapeHtml(agentNameById(item.assignee) || item.assignee));
+      } else if (item.agentId) {
+        meta.push('Completed by ' + escapeHtml(agentNameById(item.agentId) || item.agentId));
+      }
+      if (!meta.length) meta.push('Completed');
+      var when = item.ts ? mc2RelTime(Number(item.ts)) : '';
+      var attrs = ' class="mc-kanban-card mc-kanban-card-completed"';
+      if (item.goalId) attrs += ' data-goal-id="' + escapeHtml(String(item.goalId)) + '"';
+      if (item.subgoalId) attrs += ' data-subgoal-id="' + escapeHtml(String(item.subgoalId)) + '"';
+      if (item.agentId) attrs += ' data-mc-agent="' + escapeHtml(String(item.agentId)) + '"';
+      if (item.kind) attrs += ' data-mc-kanban-kind="' + escapeHtml(String(item.kind)) + '"';
+      return '<div' + attrs + '>' +
+        '<div class="mc-kanban-card-title">✓ ' + title + '</div>' +
+        meta.map(function (line) { return '<div class="mc-kanban-card-meta">' + line + '</div>'; }).join('') +
+        (when ? '<div class="mc-kanban-card-meta mc-kanban-card-when">' + escapeHtml(when) + '</div>' : '') +
+      '</div>';
+    }
+
+    function mc2KanbanAttentionCard(item) {
+      var icon = item.kind === 'error' ? '🔴' : '⚠';
+      var attrs = ' class="mc-kanban-card mc-kanban-card-attention ' + escapeHtml(item.kind || 'warning') + '"';
+      attrs += ' data-mc-kanban-kind="attention" data-attention-action="' + escapeHtml(item.action || '') + '"';
+      if (item.goalId) attrs += ' data-goal-id="' + escapeHtml(item.goalId) + '"';
+      if (item.agentId) attrs += ' data-agent-id="' + escapeHtml(item.agentId) + '"';
+      if (item.pendingId) attrs += ' data-pending-id="' + escapeHtml(item.pendingId) + '"';
+      return '<div' + attrs + ' role="button" tabindex="0">' +
+        '<div class="mc-kanban-card-title">' + icon + ' ' + item.text + '</div>' +
+        (item.ts ? '<div class="mc-kanban-card-meta mc-kanban-card-when">' + mc2RelTime(item.ts) + '</div>' : '') +
+      '</div>';
+    }
+
+    function mc2KanbanDiscoveryCard(initiative) {
+      var id = String(initiative.id || '');
+      var icon = mc2InitiativeDiscoveryIcon(initiative);
+      var title = escapeHtml(String(initiative.title || 'Untitled discovery'));
+      var confidence = Math.round((Number(initiative.confidence) || 0) * 100);
+      return '<div class="mc-kanban-card mc-kanban-card-discovery" data-mc-kanban-kind="discovery" data-initiative-id="' + escapeHtml(id) + '" role="button" tabindex="0">' +
+        '<div class="mc-kanban-card-title">' + icon + ' ' + title + '</div>' +
+        '<div class="mc-kanban-card-meta"><span class="mc-kanban-card-tag discovery">Auto-promoted</span></div>' +
+        '<div class="mc-kanban-card-meta">Confidence ' + escapeHtml(String(confidence)) + '%</div>' +
+      '</div>';
+    }
+
+    function mc2KanbanProgressSubgoalCard(item) {
+      var assigneeId = String(item.assignee || '').trim();
+      var a = (agentMapData || []).find(function (x) { return String(x.id) === assigneeId; }) || { id: assigneeId || 'main' };
+      return '<div class="mc-kanban-card mc-kanban-card-progress" data-mc-kanban-kind="subgoal"' +
+        ' data-goal-id="' + escapeHtml(String(item.goalId || '')) + '"' +
+        ' data-subgoal-id="' + escapeHtml(String(item.subgoalId || '')) + '"' +
+        ' data-agent-id="' + escapeHtml(assigneeId) + '">' +
+        '<div class="mc-kanban-card-title">' + escapeHtml(String(item.title || 'In progress')) + '</div>' +
+        (assigneeId
+          ? '<div class="mc-kanban-card-meta mc-kanban-card-agent">' + mc2AvatarHtml(a) + '<span>' + escapeHtml(agentNameById(assigneeId)) + '</span></div>'
+          : '') +
+        (item.progress ? '<div class="mc-kanban-card-meta">' + escapeHtml(String(item.progress)) + '% complete</div>' : '') +
+      '</div>';
+    }
+
+    function mc2CollectKanbanAttentionItems() {
       var agents = agentMapData || [];
       var ctxMap = teamAgentContextSnapshot.agents || {};
-      var working = [], waiting = [], blocked = [], nextQueue = [];
-      var NEXT_QUEUE_MAX_IDLE_MS = 6 * 60 * 60 * 1000;
-      var NEXT_QUEUE_STANDBY_RE = /\b(standing by|idle|standby|next task|no active task)\b/i;
+      var items = [];
       agents.forEach(function (a) {
         var id = String(a.id || '');
         var ctx = ctxMap[id] || { state: 'idle' };
         var s = String(ctx.state || 'idle').toLowerCase();
-        var queuedText = String(ctx.currentGoal || ctx.currentStep || '').trim();
         var lastTs = Number(ctx.updatedAt) || 0;
-        var isRecent = !!lastTs && (Date.now() - lastTs) <= NEXT_QUEUE_MAX_IDLE_MS;
-        var isStandby = NEXT_QUEUE_STANDBY_RE.test(queuedText);
-        if (s === 'working') working.push({ a: a, ctx: ctx });
-        else if (s === 'waiting') waiting.push({ a: a, ctx: ctx });
-        else if (s === 'error') blocked.push({ a: a, ctx: ctx });
-        else if (queuedText && isRecent && !isStandby) nextQueue.push({ a: a, ctx: ctx });
+        if (s === 'error') {
+          var reason = String(ctx.currentThought || ctx.lastAction || '').trim() || 'blocked';
+          items.push({
+            kind: 'error',
+            action: 'agent',
+            agentId: id,
+            text: escapeHtml(agentCardShortName(a)) + ' blocked — ' + escapeHtml(reason.slice(0, 60)),
+            ts: lastTs,
+          });
+        } else if (s === 'waiting') {
+          var waitFor = String(ctx.waitingFor || '').trim();
+          var desc = waitFor ? 'waiting for ' + escapeHtml(agentNameById(waitFor)) : 'waiting for response';
+          items.push({
+            kind: 'warning',
+            action: 'agent',
+            agentId: id,
+            text: escapeHtml(agentCardShortName(a)) + ' ' + desc,
+            ts: lastTs,
+          });
+        }
       });
-      function renderCol(colId, countId, items, emptyMsg) {
-        var col = mc2El(colId);
-        var count = mc2El(countId);
-        if (!col) return;
-        if (count) count.textContent = items.length;
-        if (!items.length) { col.innerHTML = '<p class="mc-kanban-empty">' + emptyMsg + '</p>'; return; }
-        col.innerHTML = items.map(function (item) { return mc2KanbanCard(item.a, item.ctx); }).join('');
-        col.querySelectorAll('.mc-kanban-card[data-mc-agent]').forEach(function (card) {
-          card.addEventListener('click', function (e) {
-            var ctxLink = e.target && e.target.closest ? e.target.closest('[data-mc-open-context]') : null;
-            if (ctxLink) {
-              e.preventDefault();
-              e.stopPropagation();
-              mc2SetAgentFilter(ctxLink.getAttribute('data-mc-agent') || card.getAttribute('data-mc-agent') || '', 'context');
-              return;
-            }
-            var aid = card.getAttribute('data-mc-agent');
-            if (aid) mc2OpenTaskDetailForAgent(aid);
+      var goals = Array.isArray(teamGoalsSnapshot.goals) ? teamGoalsSnapshot.goals : [];
+      goals.forEach(function (g) {
+        var status = String(g.status || '').toLowerCase();
+        var goalId = String(g.id || '');
+        var blockedSubs = typeof countBlockedSubgoalsForGoal === 'function' ? countBlockedSubgoalsForGoal(g) : 0;
+        var needsInput = typeof goalNeedsAttention === 'function' ? goalNeedsAttention(g) : !!String(g.needsUserInput || '').trim();
+        if (status === 'blocked') {
+          items.push({
+            kind: 'error',
+            action: 'goal-input',
+            goalId: goalId,
+            text: 'Mission blocked: ' + escapeHtml(String(g.title || g.objective || '').slice(0, 60)),
+            ts: Number(g.updatedAt) || 0,
+          });
+          return;
+        }
+        if (blockedSubs > 0) {
+          items.push({
+            kind: 'error',
+            action: 'goal-input',
+            goalId: goalId,
+            text: escapeHtml(String(g.title || g.objective || 'Mission').slice(0, 42)) +
+              ': ' + blockedSubs + ' blocked — tap to respond',
+            ts: Number(g.updatedAt) || 0,
+          });
+        } else if (needsInput || (typeof isGoalPartialWait === 'function' && isGoalPartialWait(g))) {
+          items.push({
+            kind: 'warning',
+            action: 'goal-input',
+            goalId: goalId,
+            text: typeof formatGoalImplementationAttention === 'function'
+              ? formatGoalImplementationAttention(g)
+              : escapeHtml(String(g.needsUserInput || g.title || '').slice(0, 72)),
+            ts: Number(g.updatedAt) || 0,
+          });
+        }
+      });
+      mc2PendingItems().forEach(function (p) {
+        var pendingId = String(p.id || '');
+        var label = mc2PendingKindLabel(p.kind) + ': ' + mc2PendingTitle(p);
+        items.push({
+          kind: 'warning',
+          action: 'pending',
+          pendingId: pendingId,
+          text: 'Awaiting approval — ' + escapeHtml(label.slice(0, 72)),
+          ts: Number(p.createdAt) || 0,
+        });
+      });
+      items.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+      return items.slice(0, 8);
+    }
+
+    function mc2CollectKanbanCompletedItems() {
+      var items = [];
+      var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      allItems.forEach(function (it) {
+        if (String(it.status || '').toLowerCase() !== 'done') return;
+        items.push({
+          kind: 'subgoal',
+          title: it.title,
+          goalId: it.goalId,
+          subgoalId: it.subgoalId,
+          assignee: it.assignee,
+          delegatedFrom: it.delegatedFrom,
+          ts: Number(it.updatedAt) || 0,
+        });
+      });
+      if (typeof listCompletedTasks === 'function') {
+        listCompletedTasks({ range: 'today' }).slice(0, 8).forEach(function (task) {
+          items.push({
+            kind: 'turn',
+            title: typeof mc2TaskDisplayTitle === 'function' ? mc2TaskDisplayTitle(task) : String(task.prompt || task.summary || 'Completed task'),
+            agentId: task.agentId,
+            ts: Number(task.ts) || 0,
           });
         });
       }
-      renderCol('mc2-col-working', 'mc2-col-count-working', working, 'No active work');
-      renderCol('mc2-col-next', 'mc2-col-count-next', nextQueue, 'Nothing queued');
-      renderCol('mc2-col-waiting', 'mc2-col-count-waiting', waiting, 'No agents waiting');
-      renderCol('mc2-col-blocked', 'mc2-col-count-blocked', blocked, 'All clear');
+      items.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
+      var seen = {};
+      return items.filter(function (it) {
+        var key = String(it.kind || '') + '|' + String(it.subgoalId || it.title || '') + '|' + String(it.agentId || '');
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      }).slice(0, 8);
+    }
+
+    function mc2CollectKanbanProgressItems() {
+      var agents = agentMapData || [];
+      var ctxMap = teamAgentContextSnapshot.agents || {};
+      var items = [];
+      agents.forEach(function (a) {
+        var id = String(a.id || '');
+        var ctx = ctxMap[id] || { state: 'idle' };
+        if (String(ctx.state || 'idle').toLowerCase() === 'working') {
+          items.push({ kind: 'agent', a: a, ctx: ctx });
+        }
+      });
+      var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      allItems.forEach(function (it) {
+        if (String(it.status || '').toLowerCase() === 'doing') items.push({ kind: 'subgoal', item: it });
+      });
+      return items;
+    }
+
+    function mc2CollectKanbanDiscoveryItems() {
+      var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives.slice() : [];
+      return initiatives.filter(function (it) {
+        return mc2InitiativeWasAutoPromoted(it);
+      }).sort(function (a, b) {
+        return (Number(b.confidence) || 0) - (Number(a.confidence) || 0);
+      }).slice(0, 8);
+    }
+
+    function mc2WireKanbanCol(col) {
+      if (!col) return;
+      col.querySelectorAll('.mc-kanban-card[data-mc-agent]').forEach(function (card) {
+        card.addEventListener('click', function (e) {
+          var ctxLink = e.target && e.target.closest ? e.target.closest('[data-mc-open-context]') : null;
+          if (ctxLink) {
+            e.preventDefault();
+            e.stopPropagation();
+            mc2SetAgentFilter(ctxLink.getAttribute('data-mc-agent') || card.getAttribute('data-mc-agent') || '', 'context');
+            return;
+          }
+          var aid = card.getAttribute('data-mc-agent');
+          if (aid) mc2OpenTaskDetailForAgent(aid);
+        });
+      });
+      col.querySelectorAll('.mc-kanban-card[data-mc-kanban-kind="attention"]').forEach(function (card) {
+        card.addEventListener('click', function () {
+          mc2HandleAttentionClick(card);
+        });
+      });
+      col.querySelectorAll('.mc-kanban-card[data-mc-kanban-kind="subgoal"]').forEach(function (card) {
+        card.addEventListener('click', function () {
+          if (typeof mc2ShowMissionTaskDetails === 'function') mc2ShowMissionTaskDetails(card);
+        });
+      });
+      col.querySelectorAll('.mc-kanban-card[data-mc-kanban-kind="discovery"]').forEach(function (card) {
+        card.addEventListener('click', function () {
+          var initiativeId = card.getAttribute('data-initiative-id') || '';
+          if (!initiativeId) return;
+          selectedTeamInitiativeId = initiativeId;
+          mc2SetView('initiatives');
+          if (typeof renderInitiativesPanels === 'function') renderInitiativesPanels();
+        });
+      });
+      col.querySelectorAll('.mc-kanban-card.mc-kanban-card-completed').forEach(function (card) {
+        card.addEventListener('click', function () {
+          if (card.getAttribute('data-subgoal-id') && typeof mc2ShowMissionTaskDetails === 'function') {
+            mc2ShowMissionTaskDetails(card);
+            return;
+          }
+          var aid = card.getAttribute('data-mc-agent');
+          if (aid) mc2OpenTaskDetailForAgent(aid);
+        });
+      });
+    }
+
+    function mc2RenderKanbanCol(colId, countId, html, emptyMsg) {
+      var col = mc2El(colId);
+      var count = mc2El(countId);
+      if (!col) return;
+      var itemCount = html ? (html.match(/mc-kanban-card/g) || []).length : 0;
+      if (count) count.textContent = itemCount;
+      if (!itemCount) {
+        col.innerHTML = '<p class="mc-kanban-empty">' + emptyMsg + '</p>';
+        return;
+      }
+      col.innerHTML = html;
+      mc2WireKanbanCol(col);
+    }
+
+    function mc2RenderKanban() {
+      var attention = mc2CollectKanbanAttentionItems();
+      var completed = mc2CollectKanbanCompletedItems();
+      var progress = mc2CollectKanbanProgressItems();
+      var discoveries = mc2CollectKanbanDiscoveryItems();
+
+      mc2RenderKanbanCol(
+        'mc2-col-attention',
+        'mc2-col-count-attention',
+        attention.map(mc2KanbanAttentionCard).join(''),
+        'All clear'
+      );
+      mc2RenderKanbanCol(
+        'mc2-col-completed',
+        'mc2-col-count-completed',
+        completed.map(mc2KanbanCompletedCard).join(''),
+        'Nothing completed yet'
+      );
+      mc2RenderKanbanCol(
+        'mc2-col-progress',
+        'mc2-col-count-progress',
+        progress.map(function (entry) {
+          if (entry.kind === 'agent') return mc2KanbanCard(entry.a, entry.ctx);
+          return mc2KanbanProgressSubgoalCard(entry.item);
+        }).join(''),
+        'No active work'
+      );
+      mc2RenderKanbanCol(
+        'mc2-col-discoveries',
+        'mc2-col-count-discoveries',
+        discoveries.map(mc2KanbanDiscoveryCard).join(''),
+        'No discoveries yet'
+      );
     }
 
     function mc2RenderAgentsOverview() {

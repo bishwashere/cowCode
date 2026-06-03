@@ -123,6 +123,20 @@ const checks = [
       missionControlJs.includes('goal-input'),
   },
   {
+    name: 'mission kanban uses informative work-state column labels',
+    ok: fullHtml.includes('NEEDS ATTENTION') &&
+      fullHtml.includes('WORK COMPLETED') &&
+      fullHtml.includes('WORK IN PROGRESS') &&
+      fullHtml.includes('AUTO DISCOVERIES') &&
+      fullHtml.includes('id="mc2-col-attention"') &&
+      fullHtml.includes('id="mc2-col-completed"') &&
+      fullHtml.includes('id="mc2-col-progress"') &&
+      fullHtml.includes('id="mc2-col-discoveries"') &&
+      missionControlJs.includes('mc2CollectKanbanCompletedItems') &&
+      missionControlJs.includes('mc2CollectKanbanDiscoveryItems') &&
+      !fullHtml.includes('>NOW <'),
+  },
+  {
     name: 'home page has status overview element ids',
     ok: fullHtml.includes('id="chat-status-text"') &&
       fullHtml.includes('id="chat-overview-uptime"') &&
