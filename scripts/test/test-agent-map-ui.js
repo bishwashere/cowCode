@@ -385,9 +385,9 @@ const checks = [
     ok: /buildInboundLinks\(agents\)/.test(html),
   },
   {
-    name: 'Top nav uses Team and Mission Control (no Agents tab)',
-    ok: html.includes('data-page="team2">Team</a>') &&
-      html.includes('data-page="team">Mission Control</a>') &&
+    name: 'Top nav Team opens Mission Control route and Classic opens roster',
+    ok: html.includes('data-page="team">Team</a>') &&
+      html.includes('data-page="team2">Classic</a>') &&
       !html.includes('data-page="agents"'),
   },
   {
