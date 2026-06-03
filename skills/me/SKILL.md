@@ -1,12 +1,12 @@
 ---
 id: me
 name: Me
-description: Build a profile of what CowCode knows about the user from MEMORY.md, memory/*.md, dashboard Projects tracker, and recent chat logs. Use when the user asks "what do you know about me?", "what projects do I have?", "what have you learned about me?", "summarize what you know about me", or similar.
+description: Build a profile of what Pasture Protocol knows about the user from MEMORY.md, memory/*.md, dashboard Projects tracker, and recent chat logs. Use when the user asks "what do you know about me?", "what projects do I have?", "what have you learned about me?", "summarize what you know about me", or similar.
 ---
 
 # Me
 
-Builds a **profile** of what CowCode knows about the user and presents it in a human-friendly format.
+Builds a **profile** of what Pasture Protocol knows about the user and presents it in a human-friendly format.
 
 ## When to use
 
@@ -27,7 +27,7 @@ No arguments are required. The skill reads **MEMORY.md**, **memory/*.md**, the d
 - Reads your notes: **MEMORY.md** and any **memory/*.md** in the workspace.
 - Includes projects from the dashboard **Projects** page (`projects.db`).
 - Reads **chat logs** from the last several days (date-based and, when available, this chat’s private log).
-- Combines them into a short profile (notes, recent topics, and any explicit facts) so you can see what CowCode knows about you at a glance.
+- Combines them into a short profile (notes, recent topics, and any explicit facts) so you can see what Pasture Protocol knows about you at a glance.
 
 ## How to present the result
 
@@ -39,5 +39,5 @@ Use this whenever the user wants to see their profile or what the system knows a
 
 ```tool-schema
 me_profile
-  description: Build a profile of what CowCode knows about the user from MEMORY.md, memory/*.md, and recent chat logs. No parameters.
+  description: Build a profile of what Pasture Protocol knows about the user from MEMORY.md, memory/*.md, and recent chat logs. No parameters.
 ```

@@ -107,7 +107,7 @@ Merge an open pull request.
 
 ### `search_code`
 Search code across GitHub.
-- **query** (required) - GitHub code search query (e.g. `cowcode language:js repo:owner/repo`)
+- **query** (required) - GitHub code search query (e.g. `pastureprotocol language:js repo:owner/repo`)
 - **per_page** (optional) - max results, 1–30 (default: 10)
 
 ---

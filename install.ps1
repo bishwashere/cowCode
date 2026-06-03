@@ -1,7 +1,7 @@
 # Pasture Protocol Windows installer
 # Download -> install -> deps -> setup -> start (pm2)
 # Code: %USERPROFILE%\.local\share\pastureprotocol   State: %USERPROFILE%\.pasture
-# Install: iwr -useb https://raw.githubusercontent.com/bishwashere/cowCode/master/install.ps1 | iex
+# Install: iwr -useb https://raw.githubusercontent.com/bishwashere/pastureprotocol/master/install.ps1 | iex
 
 param(
     [switch]$SkipSetup

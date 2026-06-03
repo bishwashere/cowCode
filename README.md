@@ -113,11 +113,13 @@ On Windows with Git Bash, you can use the Linux/macOS one-liner instead (`instal
 ### Option B - From a git clone
 
 ```bash
-git clone https://github.com/bishwashere/cowCode.git
-cd Pasture Protocol
+git clone https://github.com/bishwashere/pastureprotocol.git
+cd pastureprotocol
 pnpm install
 node setup.js      # interactive first-run setup
 ```
+
+<small>Upgrading from cowCode? Run `pasture update` (or `cowcode update` — the old command forwards to `pasture`). State migrates from `~/.cowcode` to `~/.pasture` automatically.</small>
 
 ---
 
