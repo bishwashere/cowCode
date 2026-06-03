@@ -612,7 +612,7 @@ app.patch('/api/initiatives/:id', (req, res) => {
   }
 });
 
-app.post('/api/initiatives/:id/promote', (req, res) => {
+app.post('/api/initiatives/:id/promote', async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     const mode = String(req.body?.mode || '').trim().toLowerCase();
