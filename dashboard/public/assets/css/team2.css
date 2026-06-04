@@ -299,6 +299,84 @@ body.dashboard-team2-active > nav {
   font-size: 0.72rem;
 }
 
+.mc2-mongo-map {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.1rem;
+}
+
+.mc2-mongo-map-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.mc2-mongo-map-head span {
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+
+.mc2-mongo-map-head small {
+  color: var(--muted);
+  font-size: 0.54rem;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.mc2-mongo-map-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mc2-mongo-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) auto;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.mc2-mongo-map-row input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0.32rem 0.4rem;
+  font: inherit;
+  font-size: 0.66rem;
+}
+
+.mc2-mongo-map-add,
+.mc2-mongo-map-remove {
+  font: inherit;
+  font-size: 0.62rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mc2-mongo-map-add {
+  align-self: flex-start;
+  padding: 0.25rem 0.5rem;
+}
+
+.mc2-mongo-map-remove {
+  padding: 0.3rem 0.4rem;
+  color: var(--muted);
+}
+
+.mc2-mongo-map-add:hover,
+.mc2-mongo-map-remove:hover {
+  border-color: var(--muted);
+}
+
 .mc2-connector-actions {
   display: flex;
   align-items: center;

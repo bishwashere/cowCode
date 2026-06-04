@@ -39,6 +39,17 @@ After each meaningful turn, progress is also mirrored automatically on the **Pro
 
 Example: *"Work on NextPostAI — what should we do next?"* → health check → proposed tasks → you approve → mission appears under **Missions** with subgoals; updates show on **Projects** and completed turns on **Tasks/Cards**.
 
+## Connectors
+
+Mission Control includes a **Projects → Connectors** panel for project-specific integrations. The MongoDB connector stores the database URI plus optional collection hints. A hint is a key/value pair where the key describes the purpose and the value is the collection name, for example:
+
+| Key | Collection name |
+|-----|-----------------|
+| `analytics` | `analytics-user` |
+| `billing` | `billing-events` |
+
+Agents can use these hints to understand which collection likely contains analytics, billing, events, users, or other project-specific data without guessing from opaque collection names.
+
 ## How to use
 
 1. **Add a project** - type a name, optional URL, and optional description in the toolbar, click **+ Add Project**.

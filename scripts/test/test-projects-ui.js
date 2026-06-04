@@ -7,7 +7,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '../../dashboard/public');
 const html = readFileSync(join(__dirname, '../../dashboard/public/index.html'), 'utf8');
 const team2 = readFileSync(join(publicDir, 'pages/team2.html'), 'utf8');
+const mc2Projects = readFileSync(join(publicDir, 'pages/mc2/view-projects.html'), 'utf8');
 const projectsJs = readFileSync(join(publicDir, 'assets/js/06-projects.js'), 'utf8');
+const team2Css = readFileSync(join(publicDir, 'assets/css/team2.css'), 'utf8');
 const serverJs = readFileSync(join(__dirname, '../../dashboard/server.js'), 'utf8');
 
 const projectModal = readFileSync(join(publicDir, 'assets/partials/project-edit-modal.html'), 'utf8');
@@ -33,11 +35,20 @@ const checks = [
   },
   {
     name: 'Team projects view has Connector section',
-    ok: team2.includes('id="mc2-proj-connectors"') &&
-      team2.includes('CONNECTOR') &&
+    ok: team2.includes('MC2_VIEWS') &&
+      mc2Projects.includes('id="mc2-proj-connectors"') &&
+      mc2Projects.includes('CONNECTOR') &&
       projectsJs.includes('renderMc2Connectors') &&
-      projectsJs.includes("'github'") &&
-      projectsJs.includes("'mongodb'"),
+      projectsJs.includes("id: 'github'") &&
+      projectsJs.includes("id: 'mongodb'"),
+  },
+  {
+    name: 'MongoDB connector supports collection hints',
+    ok: projectsJs.includes('data-mongo-map-key') &&
+      projectsJs.includes('data-mongo-map-collection') &&
+      projectsJs.includes('collections: normalizeMongoCollections') &&
+      projectsJs.includes('analytics-user') &&
+      team2Css.includes('.mc2-mongo-map'),
   },
   {
     name: 'Connectors API and project patch support',

@@ -468,7 +468,7 @@
         {
           id: 'mongodb',
           label: 'MongoDB',
-          desc: 'Connection string for this project database.',
+          desc: 'Connection string plus purpose-to-collection hints for agents.',
           field: 'uri',
           placeholder: 'mongodb://localhost:27017/myapp',
           secret: true,
@@ -508,11 +508,74 @@
         var patch = {};
         patch[connectorId] = {};
         patch[connectorId][field] = String(value || '').trim();
+        return saveProjectConnectorPatch(projectId, patch);
+      }
+
+      async function saveProjectConnectorPatch(projectId, patch) {
         var r = await projFetch('/projects/' + projectId, {
           method: 'PATCH',
           body: JSON.stringify({ connectors: patch }),
         });
         return r && r.ok;
+      }
+
+      function normalizeMongoCollections(rows) {
+        var out = {};
+        (rows || []).forEach(function (row) {
+          var key = String(row && row.key || '').trim();
+          var collection = String(row && row.collection || '').trim();
+          if (!key || !collection) return;
+          out[key] = collection;
+        });
+        return out;
+      }
+
+      function readMongoCollectionRows(card) {
+        return Array.prototype.slice.call(card.querySelectorAll('.mc2-mongo-map-row')).map(function (row) {
+          var keyEl = row.querySelector('[data-mongo-map-key]');
+          var collectionEl = row.querySelector('[data-mongo-map-collection]');
+          return {
+            key: keyEl ? keyEl.value : '',
+            collection: collectionEl ? collectionEl.value : '',
+          };
+        });
+      }
+
+      function mongoCollectionRowsHtml(collections) {
+        var entries = Object.entries(collections && typeof collections === 'object' && !Array.isArray(collections) ? collections : {});
+        entries.sort(function (a, b) { return a[0].localeCompare(b[0]); });
+        entries.push(['', '']);
+        return entries.map(function (entry, i) {
+          var remove = entry[0] || entry[1]
+            ? '<button type="button" class="mc2-mongo-map-remove" aria-label="Remove MongoDB collection mapping">Remove</button>'
+            : '';
+          return (
+            '<div class="mc2-mongo-map-row" data-mongo-map-row>' +
+              '<input data-mongo-map-key type="text" placeholder="key, e.g. analytics" value="' + esc(entry[0]) + '" autocomplete="off">' +
+              '<input data-mongo-map-collection type="text" placeholder="collection, e.g. analytics-user" value="' + esc(entry[1]) + '" autocomplete="off">' +
+              remove +
+            '</div>'
+          );
+        }).join('');
+      }
+
+      function ensureBlankMongoMapRow(card) {
+        var wrap = card.querySelector('[data-mongo-map-rows]');
+        if (!wrap) return;
+        var rows = Array.prototype.slice.call(wrap.querySelectorAll('.mc2-mongo-map-row'));
+        var hasBlank = rows.some(function (row) {
+          var keyEl = row.querySelector('[data-mongo-map-key]');
+          var collectionEl = row.querySelector('[data-mongo-map-collection]');
+          return !String(keyEl && keyEl.value || '').trim() && !String(collectionEl && collectionEl.value || '').trim();
+        });
+        if (hasBlank) return;
+        var div = document.createElement('div');
+        div.className = 'mc2-mongo-map-row';
+        div.setAttribute('data-mongo-map-row', '');
+        div.innerHTML =
+          '<input data-mongo-map-key type="text" placeholder="key, e.g. analytics" autocomplete="off">' +
+          '<input data-mongo-map-collection type="text" placeholder="collection, e.g. analytics-user" autocomplete="off">';
+        wrap.appendChild(div);
       }
 
       async function renderMc2Connectors(projectId) {
@@ -541,6 +604,7 @@
         CONNECTOR_DEFS.forEach(function (def) {
           var stored = connectors[def.id] || {};
           var value = String(stored[def.field] || '');
+          var mongoCollections = def.id === 'mongodb' ? (stored.collections || {}) : {};
           if (!value && def.globalKey === 'github' && globalStatus.github && globalStatus.github.defaultRepo) {
             value = globalStatus.github.defaultRepo;
           }
@@ -556,19 +620,59 @@
               '<label for="mc2-conn-' + esc(def.id) + '">' + esc(def.label) + '</label>' +
               '<input id="mc2-conn-' + esc(def.id) + '" type="' + (def.secret ? 'password' : 'text') + '" placeholder="' + esc(def.placeholder) + '" autocomplete="off">' +
             '</div>' +
+            (def.id === 'mongodb'
+              ? '<div class="mc2-mongo-map" data-mongo-map>' +
+                  '<div class="mc2-mongo-map-head">' +
+                    '<span>Collection hints</span>' +
+                    '<small>Optional key → collection name pairs agents can use.</small>' +
+                  '</div>' +
+                  '<div class="mc2-mongo-map-rows" data-mongo-map-rows>' + mongoCollectionRowsHtml(mongoCollections) + '</div>' +
+                  '<button type="button" class="mc2-mongo-map-add">+ Add collection hint</button>' +
+                '</div>'
+              : '') +
             '<div class="mc2-connector-actions">' +
               '<button type="button" class="mc2-connector-save" data-connector-id="' + esc(def.id) + '" data-connector-field="' + esc(def.field) + '">Save</button>' +
               '<span class="mc2-connector-saved" hidden>Saved</span>' +
             '</div>';
           var input = card.querySelector('input');
           if (input) input.value = value;
+          if (def.id === 'mongodb') {
+            card.addEventListener('click', function (e) {
+              var removeBtn = e.target && e.target.closest ? e.target.closest('.mc2-mongo-map-remove') : null;
+              if (removeBtn) {
+                var row = removeBtn.closest('.mc2-mongo-map-row');
+                if (row) row.remove();
+                ensureBlankMongoMapRow(card);
+                return;
+              }
+              var addBtn = e.target && e.target.closest ? e.target.closest('.mc2-mongo-map-add') : null;
+              if (addBtn) {
+                ensureBlankMongoMapRow(card);
+                var rows = card.querySelectorAll('.mc2-mongo-map-row');
+                var last = rows[rows.length - 1];
+                var first = last && last.querySelector('[data-mongo-map-key]');
+                if (first) first.focus();
+              }
+            });
+            card.addEventListener('input', function (e) {
+              if (e.target && (e.target.matches('[data-mongo-map-key]') || e.target.matches('[data-mongo-map-collection]'))) {
+                ensureBlankMongoMapRow(card);
+              }
+            });
+          }
           var saveBtn = card.querySelector('.mc2-connector-save');
           var savedEl = card.querySelector('.mc2-connector-saved');
           if (saveBtn) {
             saveBtn.addEventListener('click', async function () {
               var nextVal = input ? input.value : '';
+              var ok;
               saveBtn.disabled = true;
-              var ok = await saveProjectConnector(pid, def.id, def.field, nextVal);
+              if (def.id === 'mongodb') {
+                var patch = { mongodb: { uri: String(nextVal || '').trim(), collections: normalizeMongoCollections(readMongoCollectionRows(card)) } };
+                ok = await saveProjectConnectorPatch(pid, patch);
+              } else {
+                ok = await saveProjectConnector(pid, def.id, def.field, nextVal);
+              }
               saveBtn.disabled = false;
               if (!ok) return;
               if (savedEl) {

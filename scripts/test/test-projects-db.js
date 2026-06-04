@@ -61,11 +61,23 @@ async function main() {
     const withConnectors = updateProject(p1.id, {
       connectors: {
         github: { repo: 'owner/repo' },
-        mongodb: { uri: 'mongodb://localhost:27017/app' },
+        mongodb: {
+          uri: 'mongodb://localhost:27017/app',
+          collections: { analytics: 'analytics-user' },
+        },
       },
     });
     assert(withConnectors.connectors.github.repo === 'owner/repo', 'github connector saved');
     assert(withConnectors.connectors.mongodb.uri.includes('mongodb'), 'mongodb connector saved');
+    assert(withConnectors.connectors.mongodb.collections.analytics === 'analytics-user', 'mongodb collection hint saved');
+
+    const withMongoPatch = updateProject(p1.id, {
+      connectors: {
+        mongodb: { collections: { billing: 'billing-events' } },
+      },
+    });
+    assert(withMongoPatch.connectors.mongodb.uri.includes('mongodb'), 'mongodb uri preserved on collection patch');
+    assert(withMongoPatch.connectors.mongodb.collections.billing === 'billing-events', 'mongodb collection patch saved');
 
     const reloaded = getProject(p2.id);
     assert(reloaded.name === 'Site' && reloaded.url === 'https://nextpostai.com', 'reload ok');
