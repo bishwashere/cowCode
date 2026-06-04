@@ -3190,7 +3190,9 @@
         if (out.length >= maxGroups) return;
         appendGroup(g);
       });
-      return out.slice(0, maxGroups);
+      return out.sort(function (a, b) {
+        return (Number(b.ts) || 0) - (Number(a.ts) || 0);
+      }).slice(0, maxGroups);
     }
 
     window.buildMissionControlMovementGroups = buildMissionControlMovementGroups;

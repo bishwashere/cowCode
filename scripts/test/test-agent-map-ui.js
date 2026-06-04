@@ -273,6 +273,7 @@ const checks = [
       html.includes('data-mc-movement-nav') &&
       html.includes('buildMissionControlMovementGroups') &&
       html.includes('MC2_PINNED_MOVEMENT_TYPES') &&
+      appJs.includes('return out.sort(function (a, b)') &&
       html.includes('missionTaskActionButtonsHtml') &&
       html.includes('wireMissionTaskActions') &&
       html.includes('data-mc-goal-action') &&
