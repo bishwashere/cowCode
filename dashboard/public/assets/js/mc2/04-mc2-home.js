@@ -59,6 +59,15 @@
       });
     }
 
+    function mc2AutoPromotedInitiativeNeedsAttention(initiative, taskItem) {
+      if (!mc2InitiativeWasAutoPromoted(initiative)) return false;
+      var status = String(initiative && initiative.status || 'open').toLowerCase();
+      if (status === 'rejected' || status === 'completed') return false;
+      if (!taskItem) return false;
+      var taskStatus = String(taskItem.status || '').toLowerCase();
+      return taskStatus !== 'done' && taskStatus !== 'completed' && taskStatus !== 'removed';
+    }
+
     function mc2InitiativeDiscoveryIcon(initiative) {
       var type = String(initiative && initiative.type || 'observation').toLowerCase();
       if (type === 'risk' || type === 'gap' || type === 'warning') return '⚠';
@@ -277,13 +286,13 @@
 
       var initiatives = Array.isArray(teamInitiativesSnapshot.initiatives) ? teamInitiativesSnapshot.initiatives : [];
       initiatives.forEach(function (it) {
-        if (!mc2InitiativeWasAutoPromoted(it)) return;
         var initiativeId = String(it.id || '');
         var subgoalId = initiativeId ? 'init-' + initiativeId : '';
         var ts = Number(it.updatedAt) || 0;
         var taskItem = (subgoalId && typeof findMissionTaskItem === 'function')
           ? findMissionTaskItem({ subgoalId: subgoalId, title: it.title })
           : null;
+        if (!mc2AutoPromotedInitiativeNeedsAttention(it, taskItem)) return;
         mc2PushActionRequiredItem(items, {
           kind: 'warning',
           action: 'initiative-review',

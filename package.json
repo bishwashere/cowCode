@@ -61,6 +61,7 @@
     "test:e2e-expect": "node scripts/test/test-e2e-expect.js",
     "test:team-activity": "node scripts/test/test-team-activity.js",
     "test:mc2-movement-order": "node scripts/test/test-mc2-movement-order.js",
+    "test:mc2-attention-clearing": "node scripts/test/test-mc2-attention-clearing.js",
     "test:team-inbox": "node scripts/test/test-team-inbox.js",
     "test:agent-context-state": "node scripts/test/test-agent-context-state.js",
     "test:agent-metrics": "node scripts/test/test-agent-metrics.js",
