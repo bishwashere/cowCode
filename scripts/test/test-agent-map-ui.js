@@ -443,6 +443,10 @@ const checks = [
       html.includes('toggleTeamPageFullscreen') &&
       html.includes('body.team-page-fullscreen'),
   },
+  {
+    name: 'mc2TaskDisplayTitle filters out mission tick system prompt',
+    ok: /You are executing a persistent background mission tick/i.test(appJs),
+  },
 ];
 
 let failed = 0;
@@ -450,6 +454,68 @@ for (const c of checks) {
   const status = c.ok ? 'PASS' : 'FAIL';
   console.log(`[${status}] ${c.name}`);
   if (!c.ok) failed++;
+}
+
+// ── Behavioral unit tests for mc2TaskDisplayTitle ────────────────────────────
+// Extract the function from the source and evaluate it to verify filtering.
+{
+  // Build a minimal browser-like scope and eval the function
+  const fnMatch = appJs.match(/function mc2TaskDisplayTitle\(task\)\s*\{[\s\S]*?\n    \}/);
+  if (!fnMatch) {
+    console.error('[FAIL] mc2TaskDisplayTitle function not found in source');
+    failed++;
+  } else {
+    // eslint-disable-next-line no-new-func
+    const mc2TaskDisplayTitle = new Function('task', fnMatch[0].replace('function mc2TaskDisplayTitle(task) ', '').replace(/^\{/, '').replace(/\}$/, ''));
+
+    const TICK_PROMPT = 'You are executing a persistent background mission tick. Mission ID: mission-abc123 Mission title: Grow NextPostAI';
+    const USER_PROMPT = 'What is the status of our launch?';
+    const HANDLED_MSG = 'Handled in 3600ms using 3 skills.';
+    const COMPLETED_MSG = 'Completed turn successfully.';
+
+    const behaviorChecks = [
+      {
+        name: 'mc2TaskDisplayTitle: mission tick prompt → falls through to summary',
+        input: { prompt: TICK_PROMPT, summary: 'Ran competitive analysis.' },
+        expected: 'Ran competitive analysis.',
+      },
+      {
+        name: 'mc2TaskDisplayTitle: mission tick prompt with no summary → "Completed task"',
+        input: { prompt: TICK_PROMPT, summary: '' },
+        expected: 'Completed task',
+      },
+      {
+        name: 'mc2TaskDisplayTitle: real user message → used as title',
+        input: { prompt: USER_PROMPT, summary: 'Some summary' },
+        expected: USER_PROMPT,
+      },
+      {
+        name: 'mc2TaskDisplayTitle: "Handled in N ms" prompt → falls through to summary',
+        input: { prompt: HANDLED_MSG, summary: 'Drafted onboarding email.' },
+        expected: 'Drafted onboarding email.',
+      },
+      {
+        name: 'mc2TaskDisplayTitle: "Completed turn" prompt → falls through to summary',
+        input: { prompt: COMPLETED_MSG, summary: 'Finished sprint review.' },
+        expected: 'Finished sprint review.',
+      },
+    ];
+
+    for (const bc of behaviorChecks) {
+      try {
+        const result = mc2TaskDisplayTitle(bc.input);
+        const ok = result === bc.expected;
+        console.log(`[${ok ? 'PASS' : 'FAIL'}] ${bc.name}`);
+        if (!ok) {
+          console.error(`  Expected: "${bc.expected}"\n  Got:      "${result}"`);
+          failed++;
+        }
+      } catch (err) {
+        console.error(`[FAIL] ${bc.name} — ${err.message}`);
+        failed++;
+      }
+    }
+  }
 }
 
 if (failed) {

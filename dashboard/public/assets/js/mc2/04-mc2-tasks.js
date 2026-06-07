@@ -1,7 +1,11 @@
 /* MC2 Tasks page — list, filters, inline detail panel */
     function mc2TaskDisplayTitle(task) {
       var prompt = String(task && task.prompt || '').trim();
-      if (prompt && !/^Handled in \d+/i.test(prompt) && !/^Completed turn/i.test(prompt)) {
+      if (prompt
+        && !/^Handled in \d+/i.test(prompt)
+        && !/^Completed turn/i.test(prompt)
+        && !/^You are executing a persistent background mission tick/i.test(prompt)
+      ) {
         return prompt.slice(0, 160);
       }
       var summary = String(task && task.summary || '').trim();

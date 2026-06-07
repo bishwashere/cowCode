@@ -328,19 +328,22 @@
       return name.slice(0, 2).toUpperCase();
     }
 
+    // Ordered by golden angle (137.5°) so that any N consecutive entries
+    // are maximally spread across the hue wheel — small teams always get
+    // visually distinct colors, large teams still vary.
     var MC2_AGENT_COLORS = [
-      '#6366f1', // indigo
-      '#ec4899', // pink
-      '#f59e0b', // amber
-      '#10b981', // emerald
-      '#3b82f6', // blue
-      '#ef4444', // red
-      '#8b5cf6', // violet
-      '#14b8a6', // teal
-      '#f97316', // orange
-      '#84cc16', // lime
-      '#06b6d4', // cyan
-      '#e879f9', // fuchsia
+      '#ef4444', //  0°  red
+      '#22c55e', // 137° green
+      '#a855f7', // 275° purple
+      '#f59e0b', //  52° amber
+      '#0ea5e9', // 190° sky
+      '#f43f5e', // 328° rose
+      '#84cc16', // 105° lime
+      '#6366f1', // 242° indigo
+      '#f97316', //  20° orange
+      '#10b981', // 157° emerald
+      '#d946ef', // 295° fuchsia
+      '#eab308', //  72° yellow
     ];
 
     function agentColorFromId(id) {
