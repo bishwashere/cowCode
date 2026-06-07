@@ -412,7 +412,7 @@ button.mc-stat-card.mc-stat-card-action {
 
 .mc-kanban-col-head {
   margin-bottom: 0.12rem;
-  font-size: 0.66rem;
+  font-size: 0.76rem;
 }
 
 .mc-kanban-col:nth-child(1) .mc-kanban-col-head { color: var(--mc-green); }
