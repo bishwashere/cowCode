@@ -415,10 +415,10 @@ button.mc-stat-card.mc-stat-card-action {
   font-size: 0.66rem;
 }
 
-.mc-kanban-col:nth-child(1) .mc-kanban-col-head { color: var(--mc-red); }
+.mc-kanban-col:nth-child(1) .mc-kanban-col-head { color: var(--mc-green); }
 .mc-kanban-col:nth-child(2) .mc-kanban-col-head { color: #60a5fa; }
-.mc-kanban-col:nth-child(3) .mc-kanban-col-head { color: var(--mc-green); }
-.mc-kanban-col:nth-child(4) .mc-kanban-col-head { color: var(--accent); }
+.mc-kanban-col:nth-child(3) .mc-kanban-col-head { color: var(--accent); }
+.mc-kanban-col:nth-child(4) .mc-kanban-col-head { color: var(--mc-red); }
 
 .mc-kanban-col-count {
   border: none;

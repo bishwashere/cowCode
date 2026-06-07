@@ -139,7 +139,9 @@
     }
 
     function mc2KanbanAttentionCard(item) {
-      var icon = item.kind === 'error' ? '🔴' : '⚠';
+      var icon = item.tag && item.discoveryType
+        ? (item.discoveryType === 'risk' || item.discoveryType === 'gap' || item.discoveryType === 'warning' ? '⚠' : '💡')
+        : (item.kind === 'error' ? '🔴' : '⚠');
       var attrs = ' class="mc-kanban-card mc-kanban-card-attention ' + escapeHtml(item.kind || 'warning') + '"';
       attrs += ' data-mc-kanban-kind="attention" data-attention-action="' + escapeHtml(item.action || '') + '"';
       if (item.missionId) attrs += ' data-mission-id="' + escapeHtml(item.missionId) + '"';
@@ -184,6 +186,24 @@
           ? '<div class="mc-kanban-card-meta mc-kanban-card-agent">' + mc2AvatarHtml(a) + '<span>' + escapeHtml(agentNameById(assigneeId)) + '</span></div>'
           : '') +
         (item.progress ? '<div class="mc-kanban-card-meta">' + escapeHtml(String(item.progress)) + '% complete</div>' : '') +
+      '</div>';
+    }
+
+    function mc2KanbanOpenTaskCard(item) {
+      var assigneeId = String(item.assignee || item.agentId || '').trim();
+      var a = assigneeId
+        ? ((agentMapData || []).find(function (x) { return String(x.id) === assigneeId; }) || { id: assigneeId })
+        : null;
+      return '<div class="mc-kanban-card mc-kanban-card-open" data-mc-kanban-kind="task"' +
+        ' data-mission-id="' + escapeHtml(String(item.missionId || '')) + '"' +
+        ' data-task-id="' + escapeHtml(String(item.taskId || '')) + '"' +
+        ' data-title="' + escapeHtml(String(item.title || '')) + '"' +
+        (assigneeId ? ' data-agent-id="' + escapeHtml(assigneeId) + '"' : '') + '>' +
+        '<div class="mc-kanban-card-title">' + escapeHtml(String(item.title || 'Open task')) + '</div>' +
+        (a && assigneeId
+          ? '<div class="mc-kanban-card-meta mc-kanban-card-agent">' + mc2AvatarHtml(a) + '<span>' + escapeHtml(agentNameById(assigneeId)) + '</span></div>'
+          : '<div class="mc-kanban-card-meta">Not yet assigned</div>') +
+        (item.missionTitle ? '<div class="mc-kanban-card-meta">' + escapeHtml(String(item.missionTitle)) + '</div>' : '') +
       '</div>';
     }
 
@@ -308,6 +328,7 @@
           suggestedTaskId: suggestedTaskId,
           title: String(it.title || 'Untitled proposal').trim().slice(0, 96),
           tag: 'Proposed',
+          discoveryType: String(it.type || 'observation').toLowerCase(),
           subtitle: mc2ProposedSuggestedTaskSubtitle(it),
           ts: ts,
         });
@@ -362,6 +383,7 @@
         title: item.title,
         subtitle: item.subtitle,
         tag: item.tag,
+        discoveryType: item.discoveryType,
         text: escapeHtml(item.title) + (item.subtitle ? ' — ' + escapeHtml(item.subtitle) : ''),
         ts: item.ts,
       };
@@ -414,6 +436,18 @@
       allItems.forEach(function (it) {
         if (String(it.status || '').toLowerCase() === 'doing') items.push({ kind: 'task', item: it });
       });
+      return items;
+    }
+
+    function mc2CollectKanbanOpenItems() {
+      var allItems = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
+      var items = [];
+      allItems.forEach(function (it) {
+        var s = String(it.status || 'todo').toLowerCase();
+        if (s === 'doing' || s === 'done' || s === 'blocked') return;
+        items.push(it);
+      });
+      items.sort(function (a, b) { return (Number(a.updatedAt) || 0) - (Number(b.updatedAt) || 0); });
       return items;
     }
 
@@ -537,22 +571,6 @@
 
     function mc2RenderKanban() {
       mc2RenderKanbanCol(
-        'mc2-col-attention',
-        'mc2-col-count-attention',
-        mc2CollectKanbanAttentionItems(),
-        mc2KanbanAttentionCard,
-        'All clear',
-        'attention'
-      );
-      mc2RenderKanbanCol(
-        'mc2-col-completed',
-        'mc2-col-count-completed',
-        mc2CollectKanbanCompletedItems(),
-        mc2KanbanCompletedCard,
-        'Nothing completed yet',
-        'completed'
-      );
-      mc2RenderKanbanCol(
         'mc2-col-progress',
         'mc2-col-count-progress',
         mc2CollectKanbanProgressItems(),
@@ -564,12 +582,28 @@
         'progress'
       );
       mc2RenderKanbanCol(
-        'mc2-col-discoveries',
-        'mc2-col-count-discoveries',
-        mc2CollectKanbanDiscoveryItems(),
-        mc2KanbanDiscoveryCard,
-        'No discoveries yet',
-        'discoveries'
+        'mc2-col-open',
+        'mc2-col-count-open',
+        mc2CollectKanbanOpenItems(),
+        mc2KanbanOpenTaskCard,
+        'No open tasks',
+        'open'
+      );
+      mc2RenderKanbanCol(
+        'mc2-col-completed',
+        'mc2-col-count-completed',
+        mc2CollectKanbanCompletedItems(),
+        mc2KanbanCompletedCard,
+        'Nothing completed yet',
+        'completed'
+      );
+      mc2RenderKanbanCol(
+        'mc2-col-attention',
+        'mc2-col-count-attention',
+        mc2CollectKanbanAttentionItems(),
+        mc2KanbanAttentionCard,
+        'All clear',
+        'attention'
       );
     }
 

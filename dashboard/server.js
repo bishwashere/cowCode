@@ -443,6 +443,7 @@ app.get('/api/agents', (_req, res) => {
         hasLlm: !!config.llm,
         agentMessaging: getAgentMessagingPolicy(id),
         hasAgentLinks: getAgentMessagingPolicy(id).allow.length > 0,
+        color: typeof config.color === 'string' ? config.color : null,
         avatarUrl: (() => {
           if (!hasAgentAvatar(id)) return null;
           try {

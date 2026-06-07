@@ -382,7 +382,7 @@
     function mc2AvatarHtml(a, opts) {
       var large = opts && opts.large;
       var cls = 'mc-agent-avatar' + (large ? ' mc-agent-avatar--large' : '');
-      var color = agentColorFromId(a && a.id);
+      var color = (a && a.color) || agentColorFromId(a && a.id);
       var borderStyle = ' style="border-color:' + color + '"';
       if (a && a.avatarUrl) {
         return (
@@ -408,6 +408,7 @@
       if (!t) return true;
       if (/^Handled in \d+/i.test(t)) return true;
       if (/^Completed turn/i.test(t)) return true;
+      if (/^You are executing a persistent background mission tick/i.test(t)) return true;
       if (isEphemeralMissionLabel(t)) return true;
       if (/\b(standing by|idle|standby|next task|no active task|processing request|received user message|starting turn|waiting for|in progress)\b/i.test(t)) return true;
       return false;
