@@ -75,6 +75,7 @@
     "test:projects-context": "node scripts/test/test-projects-context.js",
     "test:mongodb": "node scripts/test/test-mongodb.js",
     "test:project-workflow": "node scripts/test/test-project-workflow.js",
+    "test:project-workflow-e2e": "node scripts/test/test-project-workflow-e2e.js",
     "test:missions-context": "node scripts/test/test-missions-context.js",
     "test:user-reply-style": "node scripts/test/test-user-reply-style.js",
     "test:casual-greetings": "node scripts/test/test-casual-greetings.js",

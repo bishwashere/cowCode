@@ -77,6 +77,7 @@ Each skill folder has an `inputs.md` listing **user messages** the E2E uses. Tho
 | [speech/](speech/inputs.md) | `test-speech-e2e.js` | `--test` |
 | [gog/](gog/inputs.md) | `test-gog-e2e.js` | `--test` |
 | [tide/](tide/inputs.md) | `test-tide.js` | direct (payload) |
+| [project-workflow-e2e/](project-workflow-e2e/inputs.md) | `test-project-workflow-e2e.js` | `--test` (multi-turn) |
 
 ### Dashboard Tests panel (all `scripts/test/<id>/inputs.md` + matching script)
 
@@ -93,6 +94,7 @@ Discovery rule: folder `scripts/test/<id>/inputs.md` plus `scripts/test/test-<id
 | memory-index-files, output-parse, read, retrospective, search, server-inspect | unit / E2E | ✅ |
 | session-bootstrap, skill-install, speech, telegram-send, tide, tide-checklist | unit / E2E | ✅ |
 | update-build, vision, workspace-chat-days, workspace-path, write | unit / E2E | ✅ |
+| project-workflow-e2e | E2E (multi-turn) | ✅ |
 | dashboard-boot, dashboard-browser | static + Playwright | — |
 
 Not in UI (wrappers only): `test-agent-send.js`, `test-agent-title.js` → run `test-agent-team-e2e.js` via pnpm aliases.
