@@ -469,6 +469,15 @@
         return mc2NormalizeTaskPrompt(lastAction).slice(0, 160);
       }
 
+      // Use the same task-resolution logic the click handler uses, so the card title
+      // matches what the detail panel shows instead of falling through to the mission name.
+      if (typeof findMissionTaskForAgent === 'function') {
+        var agentTask = findMissionTaskForAgent(agentId, ctx);
+        if (agentTask && agentTask.title && !mc2GenericTaskNoise(agentTask.title)) {
+          return agentTask.title.slice(0, 160);
+        }
+      }
+
       var mission = missionLabelForAgent(agentId, ctx);
       if (mission && !mc2GenericTaskNoise(mission)) return mission;
 
