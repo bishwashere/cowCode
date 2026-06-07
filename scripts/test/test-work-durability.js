@@ -105,31 +105,63 @@ async function main() {
     assert(aiMission?.title === 'Launch TestProduct', 'AI projectName used in mission title');
     assert((aiMission?.tasks || []).length === 3, 'AI deliverables become tasks');
 
-    // Known-project early return: a message that mentions a registered project by name
-    // should become a new_mission_candidate WITHOUT calling the AI classifier.
-    process.env.PASTURE_STATE_DIR = stateDir; // already set, but be explicit
-    // Register a mock project so mentionsKnownProject fires.
+    // ── Known-project three-tier tests ────────────────────────────────────────
+    // Use separate project names per tier so earlier mission creation doesn't
+    // cause deterministicFastPath to return existing_mission_task_update.
     const { createProject } = await import('../../lib/projects-db.js');
-    createProject({ name: 'testproject', url: 'https://example.com' });
-    let knownProjLlmCalls = 0;
-    const knownProjResult = await prepareWorkDurabilityWithAi({
-      userText: 'how can i improve testproject customer signups',
+    createProject({ name: 'alphapp', url: 'https://alpha.example.com' });
+    createProject({ name: 'betapp', url: 'https://beta.example.com' });
+    createProject({ name: 'gammaapp', url: 'https://gamma.example.com' });
+
+    // TIER 1 — HIGH confidence: project + explicit multi-deliverable list
+    // → auto-create mission, skip AI durability classifier entirely.
+    let highTierLlmCalls = 0;
+    const highTierResult = await prepareWorkDurabilityWithAi({
+      userText: 'for alphapp I need:\n1. a new onboarding flow\n2. updated signup copy\n3. analytics tracking',
       agentId: 'main',
       llmChat: async (messages) => {
         const system = String(messages?.[0]?.content || '');
         if (system.includes('decompose persistent user work')) {
-          return JSON.stringify({ subtasks: [{ title: 'Improve signup funnel', type: 'marketing', suggestedAgent: 'marketer', confidence: 0.85, reason: 'Signup improvements are marketing work.' }] });
+          return JSON.stringify({ subtasks: [{ title: 'Redesign onboarding flow', type: 'product', suggestedAgent: 'alex', confidence: 0.85, reason: 'Product work.' }] });
         }
-        knownProjLlmCalls += 1;
+        highTierLlmCalls += 1;
         return JSON.stringify({ workMode: 'direct_answer', requiresPersistence: false, confidence: 0.9, reason: 'Generic advice' });
       },
     });
-    assert(knownProjLlmCalls === 0, 'known-project path skips AI durability classifier');
-    assert(knownProjResult.kind === 'new_mission_candidate', 'known-project message becomes new mission');
-    assert(knownProjResult.persistence === 'create_lightweight_mission', 'known-project creates mission');
-    assert(knownProjResult.projectName === 'testproject', 'known-project name captured');
-    assert(knownProjResult.missionId, 'known-project mission created before delegation');
-    assert(knownProjResult.decomposition === 'ai-constrained', 'known-project uses AI decomposition for tasks');
+    assert(highTierLlmCalls === 0, 'high-confidence known-project skips AI durability classifier');
+    assert(highTierResult.kind === 'new_mission_candidate', 'high-confidence creates new mission');
+    assert(highTierResult.persistence === 'create_lightweight_mission', 'high-confidence persistence correct');
+    assert(highTierResult.projectName === 'alphapp', 'high-confidence project name captured');
+    assert(highTierResult.missionId, 'high-confidence mission created before delegation');
+    assert(highTierResult.decomposition === 'ai-constrained', 'high-confidence uses AI decomposition for tasks');
+
+    // TIER 2 — MEDIUM confidence: project + action verb but no deliverables
+    // → mission_suggest, agent asks confirmation, no mission created yet.
+    let midTierLlmCalls = 0;
+    const midTierResult = await prepareWorkDurabilityWithAi({
+      userText: 'how can i improve betapp customer signups',
+      agentId: 'main',
+      llmChat: async () => {
+        midTierLlmCalls += 1;
+        return JSON.stringify({ workMode: 'direct_answer', requiresPersistence: false, confidence: 0.9, reason: 'Generic advice' });
+      },
+    });
+    assert(midTierLlmCalls === 0, 'medium-confidence known-project skips AI durability classifier');
+    assert(midTierResult.kind === 'mission_suggest', 'medium-confidence returns mission_suggest');
+    assert(midTierResult.persistence === 'none', 'medium-confidence does not persist immediately');
+    assert(!midTierResult.missionId, 'medium-confidence does not create mission yet');
+    assert(midTierResult.projectName === 'betapp', 'medium-confidence captures project name');
+
+    // TIER 3 — NO action intent: just mentioning the project without work verbs
+    // → falls through to AI or one_off_delegated_answer, no auto-mission.
+    const noActionResult = await prepareWorkDurabilityWithAi({
+      userText: 'tell me about gammaapp',
+      agentId: 'main',
+      llmChat: async () => JSON.stringify({ workMode: 'one_off_delegated_answer', requiresPersistence: false, confidence: 0.8, reason: 'Status question.' }),
+    });
+    assert(noActionResult.kind !== 'new_mission_candidate', 'general project mention does not auto-create mission');
+    assert(noActionResult.kind !== 'mission_suggest', 'general project mention does not suggest mission either');
+    assert(!noActionResult.missionId, 'general project mention creates no mission');
 
     const followup = await prepareWorkDurabilityWithAi({
       userText: 'Make the positioning less corporate',

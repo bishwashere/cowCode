@@ -625,7 +625,9 @@ async function fetchCrons() {
     }
 
     function openTeamPage() {
-      location.hash = '#team';
+      history.pushState(null, '', '/team');
+      if (typeof dashboardRouteFromPath === 'function') dashboardRouteFromPath();
+      else if (typeof dashboardRouteFromHash === 'function') dashboardRouteFromHash();
     }
 
     function setTeamPageFullscreen(on) {
@@ -1511,7 +1513,9 @@ async function fetchCrons() {
       if (tile === 'longterm') loadMemoryMd('MEMORY.md', 'mem-longterm-textarea');
       if (tile === 'history') renderMemoryHistoryList();
       if (tile === 'notes') renderMemoryNotesList();
-      location.hash = '#memory';
+      history.pushState(null, '', '/memory');
+      if (typeof dashboardRouteFromPath === 'function') dashboardRouteFromPath();
+      else if (typeof dashboardRouteFromHash === 'function') dashboardRouteFromHash();
     }
 
     async function loadMemoryLog(id, textareaId, onLoad) {

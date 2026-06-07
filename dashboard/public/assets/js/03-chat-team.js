@@ -1117,9 +1117,11 @@
     function ensureMissionControlPage() {
       var mcPage = document.getElementById('page-team');
       if (mcPage && mcPage.classList.contains('active')) return true;
-      var route = (location.hash || '').slice(1).split('/')[0];
+      var route = (location.pathname || '/').replace(/^\//, '').split('/')[0];
       if (route === 'team' || route === 'agents') return true;
-      location.hash = '#team';
+      history.pushState(null, '', '/team');
+      if (typeof dashboardRouteFromPath === 'function') dashboardRouteFromPath();
+      else if (typeof dashboardRouteFromHash === 'function') dashboardRouteFromHash();
       return false;
     }
 

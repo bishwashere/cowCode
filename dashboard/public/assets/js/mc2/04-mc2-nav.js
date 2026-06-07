@@ -17,7 +17,7 @@
       });
       if (!skipHistory) {
         var urlSeg = view === 'mission' ? 'home' : view;
-        try { history.replaceState(null, '', '#team/' + urlSeg); } catch (_) {}
+        try { history.replaceState(null, '', '/team/' + urlSeg); } catch (_) {}
       }
       if (visibleView === 'activity') mc2RenderActivity();
       if (view === 'missions') mc2RenderMissions();

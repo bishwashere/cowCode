@@ -39,15 +39,16 @@ const API = '';
       return true;
     }
 
-    function dashboardRouteFromHash() {
+    function dashboardRouteFromPath() {
       try {
-        var p = parseHash();
+        var p = parsePath();
         setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId, p.mc2View);
       } catch (err) {
         console.error('[dashboard] route failed:', err);
         setPage('home');
       }
     }
+    var dashboardRouteFromHash = dashboardRouteFromPath;
     var selectedTeamMissionId = '';
     var selectedTeamSuggestedTaskId = '';
     var teamPageFullscreen = false;
@@ -116,8 +117,8 @@ const API = '';
       if (openIdentityFileId) openIdentityEditor(openIdentityFileId);
     }
     var MC2_VIEW_ROUTES = ['home', 'mission', 'tasks', 'agents', 'projects', 'activity', 'missions', 'context', 'inbox', 'outbox'];
-    function parseHash() {
-      var raw = (location.hash || '#home').slice(1) || 'home';
+    function parsePath() {
+      var raw = (location.pathname || '/home').replace(/^\//, '') || 'home';
       var slash = raw.indexOf('/');
       var name = slash >= 0 ? raw.slice(0, slash) : raw;
       var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
@@ -162,11 +163,12 @@ const API = '';
     document.querySelectorAll('nav a[data-page]').forEach(function (a) {
       a.addEventListener('click', function (e) {
         e.preventDefault();
-        location.hash = '#' + a.dataset.page;
+        history.pushState(null, '', '/' + a.dataset.page);
+        dashboardRouteFromPath();
       });
     });
-    window.addEventListener('hashchange', function () {
-      dashboardRouteFromHash();
+    window.addEventListener('popstate', function () {
+      dashboardRouteFromPath();
     });
 
     async function fetchStatus() {

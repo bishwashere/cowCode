@@ -45,7 +45,7 @@ function mc2BindTimelineScrollSpy(viewEl) {
           showAgentEditorError(err.message || String(err), 'modal');
         }
       });
-      wireClick('team-agent-back', function () { location.hash = '#team'; });
+      wireClick('team-agent-back', function () { history.pushState(null, '', '/team'); dashboardRouteFromPath(); });
       wireClick('team-agent-save', submitTeamAgentPage);
       wireClick('team-agent-md-save', async function () {
         var agentId = agentEditorState.page.agentId;
@@ -145,4 +145,5 @@ function mc2BindTimelineScrollSpy(viewEl) {
         }).observe(canvas);
       });
     })();
-    if (typeof dashboardRouteFromHash === 'function') dashboardRouteFromHash();
+    if (typeof dashboardRouteFromPath === 'function') dashboardRouteFromPath();
+    else if (typeof dashboardRouteFromHash === 'function') dashboardRouteFromHash();

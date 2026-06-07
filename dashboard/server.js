@@ -1863,7 +1863,8 @@ app.delete('/api/projects/branches/:id', (req, res) => {
 // Static files
 app.use(express.static(join(__dirname, 'public')));
 
-app.get('/', (_req, res) => {
+// SPA fallback — serve index.html for every non-API path so /team/tasks works on reload
+app.get('*', (req, res) => {
   res.set('Cache-Control', 'no-cache');
   res.sendFile(join(__dirname, 'public', 'index.html'));
 });

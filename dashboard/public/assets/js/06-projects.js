@@ -751,5 +751,5 @@
         initProjectsPage();
       });
       // Also init if navigated directly
-      if (location.hash === '#projects') initProjectsPage();
+      if (location.pathname === '/projects' || location.pathname === '/projects/') initProjectsPage();
     })();
