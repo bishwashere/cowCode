@@ -2,6 +2,10 @@
 /**
  * Project workflow E2E: multi-turn conversational tests through the real app path.
  *
+ * Self-contained: every test creates an isolated temp state dir, seeds whatever
+ * fixtures it needs, runs real --test turns, and deletes the dir on exit.
+ * No dependency on the caller's ~/.pasture projects, missions, or agents.
+ *
  * Rules (see E2E.md):
  * - NO mocking of internal functions after the first user message is sent.
  * - Setup allowed: createProject() seeds a project catalog entry only — no mission,
@@ -10,27 +14,53 @@
  * - Each turn calls `runE2E` with the same stateDir. History is persisted to disk
  *   between turns, exactly as in real usage.
  * - AI judge evaluates each reply — a "sorry" chain or empty acknowledgment fails.
+ * - Every temp state dir is deleted in a finally block — no leftover test state.
+ *
+ * Requirements to run on any machine:
+ * - A valid LLM config in ~/.pasture/config.json or PASTURE_STATE_DIR/config.json.
+ * - API keys in ~/.pasture/.env (or the env dir).
+ * - If neither is present the suite skips gracefully (exit 0).
  *
  * Usage:
  *   node scripts/test/test-project-workflow-e2e.js
+ *   pnpm run test:project-workflow-e2e
  */
 
 import { runSkillTests } from './skill-test-runner.js';
 import { judgeUserGotWhatTheyWanted } from './e2e-judge.js';
 import { createTempStateDir, runE2E, isNoLlmError } from './e2e-run.js';
-import { mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 /**
- * Write a minimal agents/main/agent.json to the temp stateDir BEFORE the first
- * runE2E call. Without this, ensureMainAgentInitialized() (which runs at agent
- * startup inside the child process) sees an empty agent.json and falls back to
- * copying the legacy config.json — which may include 'agent-send' in skills.enabled
- * from the user's real setup. That causes the LLM to call agent-send, which then
- * fails with "Known agents: none." because no team is configured in the fresh dir.
+ * Create a temp state dir, run the test body, then always delete the dir.
+ * Ensures no leftover projects, missions, or chat history after each test.
  *
- * A non-empty agent.json skips the legacy migration. The agent gets DEFAULT_ENABLED
- * skills (no agent-send), which is the correct baseline for single-agent project work.
+ * @param {(stateDir: string) => Promise<any>} fn
+ */
+async function withTempStateDir(fn) {
+  const stateDir = createTempStateDir();
+  try {
+    return await fn(stateDir);
+  } finally {
+    try { rmSync(stateDir, { recursive: true, force: true }); } catch (_) {}
+  }
+}
+
+/**
+ * Write a minimal agents/main/config.json to the temp stateDir BEFORE the first
+ * runE2E call.
+ *
+ * Why: ensureMainAgentInitialized() inside the child process sees an empty
+ * agents/main/config.json and, if it IS empty, migrates the global config.json
+ * (which was copied from the user's real ~/.pasture). That real config may have
+ * 'agent-send' in skills.enabled plus 'alex'/'marketer' in agentMessaging.allow.
+ * The LLM then calls agent-send, which fails with "Known agents: none."
+ *
+ * A non-empty stub stops the migration. The agent uses DEFAULT_ENABLED skills
+ * (no agent-send), which is the correct baseline for single-agent project work.
  */
 function initMainAgentStub(stateDir) {
   mkdirSync(join(stateDir, 'agents', 'main'), { recursive: true });
@@ -42,32 +72,20 @@ function initMainAgentStub(stateDir) {
 }
 
 /**
- * Seeds only the project catalog entry (name, description, url).
- * No mission. No tasks. No plan. The agent must figure out what to do.
+ * Seed a project catalog entry (name, description, url) in stateDir.
+ * No mission, no tasks, no plan — the agent must figure those out.
+ * All writes go into stateDir; deleted by withTempStateDir on cleanup.
  */
 async function seedProjectOnly(stateDir, { name, description, url }) {
-  const prevStateDir = process.env.PASTURE_STATE_DIR;
+  const prev = process.env.PASTURE_STATE_DIR;
   process.env.PASTURE_STATE_DIR = stateDir;
   try {
     const { createProject } = await import('../../lib/projects-db.js');
     createProject({ name, description, url });
   } finally {
-    if (prevStateDir !== undefined) process.env.PASTURE_STATE_DIR = prevStateDir;
+    if (prev !== undefined) process.env.PASTURE_STATE_DIR = prev;
     else delete process.env.PASTURE_STATE_DIR;
   }
-}
-
-/**
- * Run a multi-turn conversation sequentially on the same stateDir.
- * Each message is a separate --test invocation; disk-persisted history carries over.
- * Returns the reply from the final turn.
- */
-async function runConversation(messages, { stateDir, timeoutMs } = {}) {
-  let lastResult;
-  for (const message of messages) {
-    lastResult = await runE2E(message, { stateDir, timeoutMs });
-  }
-  return lastResult;
 }
 
 function assert(cond, msg) {
@@ -76,7 +94,7 @@ function assert(cond, msg) {
 
 /**
  * Ask the AI judge whether the user got what they wanted.
- * `criteria` replaces the generic hint with scenario-specific rules.
+ * `criteria` replaces the generic hint with scenario-specific pass/fail rules.
  */
 async function judge(input, reply, stateDir, criteria) {
   return judgeUserGotWhatTheyWanted(input, reply, stateDir, {
@@ -96,17 +114,18 @@ Answer with exactly one line: YES or NO. Then add one short sentence explaining 
   });
 }
 
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 async function main() {
-  console.log('Project workflow E2E (multi-turn conversational, no inner mocking)\n');
+  console.log('Project workflow E2E (multi-turn conversational, self-contained, cleanup on exit)\n');
 
   const tests = [
-    // ── 1. Known project ─────────────────────────────────────────────────────
+    // ── 1. Known project ──────────────────────────────────────────────────────
     {
       name: 'known project — agent acknowledges it and offers concrete next steps',
       input: "What's the status of NextPostAI and what should we focus on next?",
       expectMode: 'behavior',
-      run: async () => {
-        const stateDir = createTempStateDir();
+      run: () => withTempStateDir(async (stateDir) => {
         initMainAgentStub(stateDir);
         await seedProjectOnly(stateDir, {
           name: 'NextPostAI',
@@ -135,16 +154,15 @@ async function main() {
         );
         assert(pass, `Judge: ${reason}`);
         return { reply, skillsCalled };
-      },
+      }),
     },
 
-    // ── 2. Brand-new project, no catalog entry ───────────────────────────────
+    // ── 2. Brand-new project, no catalog entry ────────────────────────────────
     {
       name: 'new project introduced cold — agent engages, does not deflect',
       input: "I've been building a SaaS called TideApp that helps small teams track their weekly sprints. I want to start growing it.",
       expectMode: 'behavior',
-      run: async () => {
-        const stateDir = createTempStateDir();
+      run: () => withTempStateDir(async (stateDir) => {
         initMainAgentStub(stateDir);
         const { reply, skillsCalled } = await runE2E(
           "I've been building a SaaS called TideApp that helps small teams track their weekly sprints. I want to start growing it.",
@@ -170,23 +188,22 @@ async function main() {
         );
         assert(pass, `Judge: ${reason}`);
         return { reply, skillsCalled };
-      },
+      }),
     },
 
-    // ── 3. Two-turn: introduce then confirm setup ────────────────────────────
+    // ── 3. Two-turn: introduce then confirm setup ─────────────────────────────
     {
       name: 'new project two-turn: introduce → approve setup',
       input: 'Turn 1: introduce TideApp → Turn 2: yes, set it up',
       expectMode: 'behavior',
-      run: async () => {
-        const stateDir = createTempStateDir();
+      run: () => withTempStateDir(async (stateDir) => {
         initMainAgentStub(stateDir);
-        // Turn 1 — give the agent enough context to work with
+        // Turn 1 — give the agent enough context
         await runE2E(
           "I want to grow a product called TideApp — it's a sprint tracking tool for small engineering teams. The URL is tideapp.io.",
           { stateDir },
         );
-        // Turn 2 — approve whatever the agent suggested
+        // Turn 2 — approve
         const { reply, skillsCalled } = await runE2E(
           "Yes, go ahead and set it up. Let's create a plan.",
           { stateDir },
@@ -205,16 +222,15 @@ async function main() {
         );
         assert(pass, `Judge: ${reason}`);
         return { reply, skillsCalled };
-      },
+      }),
     },
 
-    // ── 4. Plan proposal — agent must NOT claim all work is done immediately ─
+    // ── 4. Plan proposal — must NOT claim all work is done immediately ─────────
     {
       name: 'plan proposal — proposes tasks without falsely claiming all work is done',
       input: 'Can you put together a growth plan for NextPostAI and start working on it?',
       expectMode: 'behavior',
-      run: async () => {
-        const stateDir = createTempStateDir();
+      run: () => withTempStateDir(async (stateDir) => {
         initMainAgentStub(stateDir);
         await seedProjectOnly(stateDir, {
           name: 'NextPostAI',
@@ -226,7 +242,7 @@ async function main() {
           { stateDir },
         );
         assert(reply && reply.trim().length > 0, 'Expected non-empty reply');
-        // Hard check: agent must not claim everything is already done in the same breath
+        // Hard check: agent must not claim all tasks are done in the same response that created them
         const falselyAllDone =
           /all.*(?:tasks?|steps?|work).*(?:done|complete|finished)|(?:completed|finished) all|everything.*done/i.test(reply);
         assert(
@@ -247,16 +263,15 @@ async function main() {
         );
         assert(pass, `Judge: ${reason}`);
         return { reply, skillsCalled };
-      },
+      }),
     },
 
-    // ── 5. Three-turn: introduce → approve → "what are we working on?" ───────
+    // ── 5. Three-turn: introduce → approve → status check ─────────────────────
     {
       name: 'three-turn workflow: introduce project → approve plan → ask for current status',
       input: 'Turn 1: introduce PastureDemo → Turn 2: approve → Turn 3: what are we working on?',
       expectMode: 'behavior',
-      run: async () => {
-        const stateDir = createTempStateDir();
+      run: () => withTempStateDir(async (stateDir) => {
         initMainAgentStub(stateDir);
         // Turn 1 — introduce a brand-new project
         await runE2E(
@@ -268,7 +283,7 @@ async function main() {
           "Yes, go ahead and create the mission and the tasks.",
           { stateDir },
         );
-        // Turn 3 — status check; the agent should refer to the actual state
+        // Turn 3 — status; agent must reference what was just created
         const finalMessage = "What are we working on for PastureDemo right now?";
         const { reply, skillsCalled } = await runE2E(finalMessage, { stateDir });
         assert(reply && reply.trim().length > 0, 'Expected non-empty status reply on turn 3');
@@ -289,16 +304,15 @@ async function main() {
         );
         assert(pass, `Judge: ${reason}`);
         return { reply, skillsCalled };
-      },
+      }),
     },
 
-    // ── 6. No mission yet — agent proposes one without being told how ─────────
+    // ── 6. Project in catalog, no mission — agent proposes without being told how
     {
       name: 'project exists, no mission — agent proposes where to start without being handed steps',
       input: "Let's start working on NextPostAI. Where should we begin?",
       expectMode: 'behavior',
-      run: async () => {
-        const stateDir = createTempStateDir();
+      run: () => withTempStateDir(async (stateDir) => {
         initMainAgentStub(stateDir);
         await seedProjectOnly(stateDir, {
           name: 'NextPostAI',
@@ -325,18 +339,16 @@ async function main() {
         );
         assert(pass, `Judge: ${reason}`);
         return { reply, skillsCalled };
-      },
+      }),
     },
 
-    // ── 7. No project context at all — agent asks instead of hallucinating a plan
+    // ── 7. Completely clean state — agent must ask, not hallucinate ────────────
     {
       name: 'no context — agent asks clarifying questions instead of fabricating a generic plan',
       input: "I want to get more customers. What's the plan?",
       expectMode: 'behavior',
-      run: async () => {
-        const stateDir = createTempStateDir();
+      run: () => withTempStateDir(async (stateDir) => {
         initMainAgentStub(stateDir);
-        // Completely clean state — no project, no mission, no history
         const { reply, skillsCalled } = await runE2E(
           "I want to get more customers. What's the plan?",
           { stateDir },
@@ -360,7 +372,7 @@ async function main() {
         );
         assert(pass, `Judge: ${reason}`);
         return { reply, skillsCalled };
-      },
+      }),
     },
   ];
 
