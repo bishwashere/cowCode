@@ -73,6 +73,7 @@
     "test:projects": "node scripts/test/test-projects-db.js",
     "test:projects-ui": "node scripts/test/test-projects-ui.js",
     "test:projects-context": "node scripts/test/test-projects-context.js",
+    "test:mongodb": "node scripts/test/test-mongodb.js",
     "test:project-workflow": "node scripts/test/test-project-workflow.js",
     "test:missions-context": "node scripts/test/test-missions-context.js",
     "test:user-reply-style": "node scripts/test/test-user-reply-style.js",
@@ -89,12 +90,13 @@
     "test:all": "pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner"
   },
   "dependencies": {
-    "express": "^4.21.0",
     "@inquirer/select": "^5.0.4",
     "@whiskeysockets/baileys": "^6.7.9",
     "better-sqlite3": "^11.6.0",
     "croner": "^10.0.1",
     "dotenv": "^17.2.4",
+    "express": "^4.21.0",
+    "mongodb": "^7.2.0",
     "node-telegram-bot-api": "^0.67.0",
     "pino": "^9.5.0",
     "playwright": "^1.49.0",

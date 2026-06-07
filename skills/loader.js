@@ -34,6 +34,7 @@ export const DEFAULT_ENABLED = [
   'github',
   'gmail',
   'calendar',
+  'mongodb',
 ];
 
 /** Always injected at runtime for chat; never toggled in config/UI. */
