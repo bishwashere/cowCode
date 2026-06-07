@@ -409,6 +409,9 @@
       if (/^Handled in \d+/i.test(t)) return true;
       if (/^Completed turn/i.test(t)) return true;
       if (/^You are executing a persistent background mission tick/i.test(t)) return true;
+      if (/^Received (?:reply|delegated task) from\b/i.test(t)) return true;
+      if (/^Delegation to .+ failed/i.test(t)) return true;
+      if (/^Task failed/i.test(t)) return true;
       if (isEphemeralMissionLabel(t)) return true;
       if (/\b(standing by|idle|standby|next task|no active task|processing request|received user message|starting turn|waiting for|in progress)\b/i.test(t)) return true;
       return false;

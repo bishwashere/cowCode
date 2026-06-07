@@ -518,6 +518,53 @@ for (const c of checks) {
   }
 }
 
+// ── Behavioral unit tests for mc2GenericTaskNoise ────────────────────────────
+// Read shared JS source and eval mc2GenericTaskNoise directly.
+{
+  const sharedJs = readDashboardJs(assetsJsDir)
+    .filter((p) => p.includes('04-mc2-shared'))
+    .map((p) => fs.readFileSync(p, 'utf8'))
+    .join('');
+
+  const noiseFnMatch = sharedJs.match(/function mc2GenericTaskNoise\(text\)\s*\{[\s\S]*?\n    \}/);
+  if (!noiseFnMatch) {
+    console.error('[FAIL] mc2GenericTaskNoise not found in 04-mc2-shared.js');
+    failed++;
+  } else {
+    // Build the function with stubs for the helpers it calls
+    const body = noiseFnMatch[0]
+      .replace('function mc2GenericTaskNoise(text) ', '')
+      .replace(/isEphemeralMissionLabel\([^)]+\)/g, 'false');
+    // eslint-disable-next-line no-new-func
+    const mc2GenericTaskNoise = new Function('text', body.slice(1, -1));
+
+    const noiseChecks = [
+      { label: 'mission tick prompt is noise', input: 'You are executing a persistent background mission tick. Mission ID: m-123', expected: true },
+      { label: '"Received reply from developer" is noise', input: 'Received reply from developer', expected: true },
+      { label: '"Received delegated task from main" is noise', input: 'Received delegated task from main', expected: true },
+      { label: '"Delegation to marketer failed: timeout" is noise', input: 'Delegation to marketer failed: timeout', expected: true },
+      { label: '"Task failed: network error" is noise', input: 'Task failed: network error', expected: true },
+      { label: 'real user message is NOT noise', input: 'What is the status of our chess999 launch?', expected: false },
+      { label: 'real task title is NOT noise', input: 'Clarify what Chess999 is (ruleset, platform, target users)', expected: false },
+    ];
+
+    for (const nc of noiseChecks) {
+      try {
+        const result = mc2GenericTaskNoise(nc.input);
+        const ok = result === nc.expected;
+        console.log(`[${ok ? 'PASS' : 'FAIL'}] mc2GenericTaskNoise: ${nc.label}`);
+        if (!ok) {
+          console.error(`  Expected: ${nc.expected}\n  Got:      ${result}\n  Input:    "${nc.input}"`);
+          failed++;
+        }
+      } catch (err) {
+        console.error(`[FAIL] mc2GenericTaskNoise: ${nc.label} — ${err.message}`);
+        failed++;
+      }
+    }
+  }
+}
+
 if (failed) {
   console.error(`\n${failed} check(s) failed.`);
   process.exit(1);
