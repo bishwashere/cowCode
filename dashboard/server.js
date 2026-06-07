@@ -443,7 +443,13 @@ app.get('/api/agents', (_req, res) => {
         hasLlm: !!config.llm,
         agentMessaging: getAgentMessagingPolicy(id),
         hasAgentLinks: getAgentMessagingPolicy(id).allow.length > 0,
-        avatarUrl: hasAgentAvatar(id) ? `/agent-avatar/${encodeURIComponent(id)}` : null,
+        avatarUrl: (() => {
+          if (!hasAgentAvatar(id)) return null;
+          try {
+            const mtime = statSync(getAgentAvatarPath(id)).mtimeMs;
+            return `/agent-avatar/${encodeURIComponent(id)}?v=${Math.floor(mtime)}`;
+          } catch (_) { return null; }
+        })(),
       };
     });
     res.json({ agents });
@@ -808,7 +814,7 @@ app.get('/agent-avatar/:id', (req, res) => {
   const avatarPath = getAgentAvatarPath(id);
   if (!existsSync(avatarPath)) { res.status(404).end(); return; }
   res.setHeader('Content-Type', 'image/png');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(avatarPath);
 });
 
