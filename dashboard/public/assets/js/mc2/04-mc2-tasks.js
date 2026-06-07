@@ -70,8 +70,14 @@
         : '';
       var desc = String(item.description || '').trim();
       var descHtml = desc ? '<p class="mc-task-card-desc">' + escapeHtml(desc.slice(0, 220)) + '</p>' : '';
+      var expectedOutput = String(item.expectedOutput || '').trim();
+      var outputHtml = expectedOutput
+        ? '<p class="mc-task-card-output"><span class="mc-task-card-output-label">Output:</span> ' + escapeHtml(expectedOutput.slice(0, 120)) + '</p>'
+        : '';
       var progress = Number(item.progress);
       var progressLabel = isFinite(progress) && progress > 0 ? (progress + '%') : '';
+      var confidenceRaw = Number(item.routeConfidence || item.confidence || 0);
+      var confidenceLabel = confidenceRaw > 0 ? (Math.round(confidenceRaw * 100) + '% confidence') : '';
       var missionId = String(item.missionId || '');
       var taskId = String(item.taskId || '');
       var selected = mc2SelectedTask && (
@@ -101,6 +107,7 @@
         '<div class="mc-task-card-title">' + escapeHtml(item.title || 'Untitled') + '</div>' +
         pathLine +
         descHtml +
+        outputHtml +
         '<div class="mc-task-card-meta">' +
           '<span class="team-mission-task-status ' + escapeHtml(status) + '">' + escapeHtml(mc2MissionTaskStatusLabel(status)) + '</span>' +
           agentHtml +
@@ -109,6 +116,7 @@
           labelLine +
           delegatedLine +
           (progressLabel ? '<span>' + escapeHtml(progressLabel) + '</span>' : '') +
+          (confidenceLabel ? '<span class="mc-task-card-confidence">' + escapeHtml(confidenceLabel) + '</span>' : '') +
         '</div>' +
         actionsHtml +
       '</div>';

@@ -163,10 +163,12 @@
       var agentLink = assignee
         ? '<button type="button" class="mc-panel-link" data-mc-task-agent-context="' + escapeHtml(assignee) + '">Assignee tasks (' + escapeHtml(agentNameById(assignee)) + ') →</button>'
         : '';
+      var expectedOutput = String(item.expectedOutput || '').trim();
       var fields = [
         { label: 'Status', value: statusLabel },
         mission ? { label: 'Mission', value: mission } : null,
         assignee ? { label: 'Assigned To', value: agentNameById(assignee) } : null,
+        expectedOutput ? { label: 'Output', value: expectedOutput } : null,
         item.createdAt ? { label: 'Created', value: mc2FormatTaskTimestamp(item.createdAt) } : null,
         item.completedAt && status === 'done' ? { label: 'Completed', value: mc2FormatTaskTimestamp(item.completedAt) } : null,
         { label: 'Skills Used', value: skillsLabel },
