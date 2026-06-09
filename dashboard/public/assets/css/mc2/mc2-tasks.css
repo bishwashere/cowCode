@@ -568,3 +568,4 @@ button.mc-mission-task-card {
   border-radius: 4px;
   width: 100% !important;
 }
+.mc-task-timing-bar--blocked .mc-task-timing-wait { background: #ef4444; }

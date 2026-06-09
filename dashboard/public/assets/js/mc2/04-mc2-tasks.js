@@ -100,7 +100,7 @@
       var waitPct = Math.round((waitMs / total) * 100);
       var activePct = 100 - waitPct;
 
-      return '<div class="mc-task-timing-bar" title="' + escapeHtml(label) + '">' +
+      return '<div class="mc-task-timing-bar mc-task-timing-bar--' + status + '" title="' + escapeHtml(label) + '">' +
         (waitPct > 0 ? '<span class="mc-task-timing-wait" style="width:' + waitPct + '%"></span>' : '') +
         (activePct > 0 && (status === 'doing' || status === 'done')
           ? '<span class="mc-task-timing-active" style="width:' + activePct + '%"></span>'
