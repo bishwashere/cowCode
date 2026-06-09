@@ -915,14 +915,28 @@
             description: String(g.blockedReason || g.objective || '').trim(),
           });
         }
+        // Build a set of task IDs that have a delegated successor so we can
+        // skip the original when the delegated version already represents the work.
+        var delegatedFromIds = {};
+        (function collectDelegatedFrom(tasks) {
+          (tasks || []).forEach(function (sg) {
+            if (!sg || typeof sg !== 'object') return;
+            var from = String(sg.delegatedFrom || '').trim();
+            if (from) delegatedFromIds[from] = true;
+            collectDelegatedFrom(sg.tasks);
+          });
+        }(g.tasks));
+
         function walk(tasks, pathParts) {
           (tasks || []).forEach(function (sg) {
             if (!sg || typeof sg !== 'object') return;
             if (mc2IsChatDerivedDelegatedTask(sg)) return;
+            var taskId = String(sg.id || '').trim();
+            // Skip the original task when a delegated version already tracks this work.
+            if (taskId && delegatedFromIds[taskId]) return;
             var title = String(sg.title || '').trim() || 'Untitled task';
             var parts = pathParts.concat(title);
             var status = effectiveTaskStatus(sg, g);
-            var taskId = String(sg.id || '').trim();
             items.push({
               kind: 'task',
               status: status,
@@ -970,10 +984,9 @@
     }
 
     function groupMissionWorkItems(items) {
-      var groups = { blocked: [], doing: [], todo: [], done: [] };
+      var groups = { blocked: [], doing: [], todo: [], done: [], waiting: [] };
       (items || []).forEach(function (it) {
-        var bucket = groups[it.status] ? it.status : 'todo';
-        if (!groups[bucket]) bucket = 'todo';
+        var bucket = groups[it.status] !== undefined ? it.status : 'todo';
         groups[bucket].push(it);
       });
       return groups;
@@ -1451,7 +1464,11 @@
       if (s === 'done' || s === 'doing' || s === 'blocked' || s === 'todo') return s;
       // waiting_user means the task requires user action — surface as blocked.
       if (s === 'waiting_user') return 'blocked';
-      // Everything else (open, in_progress, waiting_dependency, assigned, etc.) is open/todo work.
+      // review_ready / in_progress are active agent work — treat as doing.
+      if (s === 'review_ready' || s === 'in_progress') return 'doing';
+      // waiting_dependency tasks are paused on internal deps, not open work.
+      if (s === 'waiting_dependency') return 'waiting';
+      // Everything else (open, assigned, etc.) is open/todo work.
       return 'todo';
     }
 

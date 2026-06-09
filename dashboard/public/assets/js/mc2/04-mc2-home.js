@@ -444,7 +444,7 @@
       var items = [];
       allItems.forEach(function (it) {
         var s = String(it.status || 'todo').toLowerCase();
-        if (s === 'doing' || s === 'done' || s === 'blocked') return;
+        if (s === 'doing' || s === 'done' || s === 'blocked' || s === 'waiting') return;
         items.push(it);
       });
       items.sort(function (a, b) { return (Number(a.updatedAt) || 0) - (Number(b.updatedAt) || 0); });

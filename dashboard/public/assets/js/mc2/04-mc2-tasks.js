@@ -40,6 +40,7 @@
       if (s === 'blocked') return 'blocked';
       if (s === 'doing') return 'in progress';
       if (s === 'done') return 'done';
+      if (s === 'waiting') return 'waiting';
       return 'open';
     }
 
