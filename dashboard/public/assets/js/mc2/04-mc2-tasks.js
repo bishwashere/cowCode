@@ -77,10 +77,18 @@
         var totalMs = completedAt && refStart ? completedAt - refStart : (waitMs + activeMs);
         label = 'Done in ' + mc2FormatDuration(totalMs);
       } else if (status === 'doing') {
-        waitMs = startedAt && createdAt ? startedAt - createdAt : 0;
-        activeMs = startedAt ? now - startedAt : 0;
-        label = (waitMs > 60000 ? 'Waited ' + mc2FormatDuration(waitMs) + ' · ' : '') +
-          'Active ' + mc2FormatDuration(activeMs);
+        if (startedAt && createdAt) {
+          waitMs = startedAt - createdAt;
+          activeMs = now - startedAt;
+          label = (waitMs > 60000 ? 'Waited ' + mc2FormatDuration(waitMs) + ' · ' : '') +
+            'Active ' + mc2FormatDuration(activeMs);
+        } else {
+          // No startedAt yet — show full bar as waiting since createdAt
+          var since = createdAt || waitingSince;
+          waitMs = since ? now - since : 0;
+          activeMs = 0;
+          label = 'Waiting ' + mc2FormatDuration(waitMs);
+        }
       } else {
         var since = waitingSince || createdAt;
         waitMs = since ? now - since : 0;

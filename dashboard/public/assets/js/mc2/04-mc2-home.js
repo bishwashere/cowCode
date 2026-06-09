@@ -139,6 +139,7 @@
         '<div class="mc-kanban-card-title">✓ ' + title + '</div>' +
         meta.map(function (line) { return '<div class="mc-kanban-card-meta">' + line + '</div>'; }).join('') +
         (when ? '<div class="mc-kanban-card-meta mc-kanban-card-when">' + escapeHtml(when) + '</div>' : '') +
+        (typeof mc2TaskTimingBarHtml === 'function' ? mc2TaskTimingBarHtml(Object.assign({ status: 'done' }, item)) : '') +
       '</div>';
     }
 
@@ -190,6 +191,7 @@
           ? '<div class="mc-kanban-card-meta mc-kanban-card-agent">' + mc2AvatarHtml(a) + '<span>' + escapeHtml(agentNameById(assigneeId)) + '</span></div>'
           : '') +
         (item.progress ? '<div class="mc-kanban-card-meta">' + escapeHtml(String(item.progress)) + '% complete</div>' : '') +
+        (typeof mc2TaskTimingBarHtml === 'function' ? mc2TaskTimingBarHtml(item) : '') +
       '</div>';
     }
 
@@ -208,6 +210,7 @@
           ? '<div class="mc-kanban-card-meta mc-kanban-card-agent">' + mc2AvatarHtml(a) + '<span>' + escapeHtml(agentNameById(assigneeId)) + '</span></div>'
           : '<div class="mc-kanban-card-meta">Not yet assigned</div>') +
         (item.missionTitle ? '<div class="mc-kanban-card-meta">' + escapeHtml(String(item.missionTitle)) + '</div>' : '') +
+        (typeof mc2TaskTimingBarHtml === 'function' ? mc2TaskTimingBarHtml(item) : '') +
       '</div>';
     }
 
@@ -406,6 +409,7 @@
         if (String(it.status || '').toLowerCase() !== 'done') return;
         items.push({
           kind: it.kind === 'turn' ? 'turn' : 'task',
+          status: 'done',
           title: it.title,
           missionId: it.missionId,
           taskId: it.taskId,
@@ -413,6 +417,9 @@
           agentId: it.agentId,
           delegatedFrom: it.delegatedFrom,
           ts: Number(it.updatedAt || it.completedAt || it.turnTs) || 0,
+          createdAt: Number(it.createdAt) || 0,
+          startedAt: Number(it.startedAt) || 0,
+          completedAt: Number(it.completedAt) || 0,
         });
       });
       items.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });

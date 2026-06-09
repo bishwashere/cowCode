@@ -594,3 +594,6 @@ button.mc-stat-card.mc-stat-card-action {
   flex: none;
   overflow: visible;
 }
+
+/* ── Task timing bar inside kanban cards ───────────────────────────────────── */
+.mc-kanban-card .mc-task-timing-bar { margin: 5px 0 0; }
