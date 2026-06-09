@@ -610,3 +610,11 @@ button.mc-stat-card.mc-stat-card-action {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* Agent context card — agent name leads, task title is secondary */
+.mc-kanban-card-title--sub {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted, #94a3b8);
+  margin-top: 2px;
+}

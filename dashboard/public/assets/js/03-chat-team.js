@@ -927,6 +927,7 @@
           });
         }(g.tasks));
 
+        var missionTitleNorm = missionTitle.trim().toLowerCase();
         function walk(tasks, pathParts) {
           (tasks || []).forEach(function (sg) {
             if (!sg || typeof sg !== 'object') return;
@@ -935,6 +936,8 @@
             // Skip the original task when a delegated version already tracks this work.
             if (taskId && delegatedFromIds[taskId]) return;
             var title = String(sg.title || '').trim() || 'Untitled task';
+            // Skip tasks whose title matches the mission title — they duplicate the mission itself.
+            if (title.toLowerCase() === missionTitleNorm) return;
             var parts = pathParts.concat(title);
             var status = effectiveTaskStatus(sg, g);
             items.push({

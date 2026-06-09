@@ -517,11 +517,11 @@
         : '';
       var waitingFor = String(ctx.waitingFor || '').trim();
       return '<div class="mc-kanban-card" data-mc-agent="' + escapeHtml(id) + '">' +
-        '<div class="mc-kanban-card-title">' + escapeHtml(taskTitle) + '</div>' +
         '<div class="mc-kanban-card-meta mc-kanban-card-agent">' +
           mc2AvatarHtml(a) +
           '<span>' + name + '</span>' +
         '</div>' +
+        '<div class="mc-kanban-card-title mc-kanban-card-title--sub">' + escapeHtml(taskTitle) + '</div>' +
         progressHtml +
         (state === 'waiting' && waitingFor
           ? '<div class="mc-kanban-card-meta">Next: ' + escapeHtml(agentNameById(waitingFor)) + ' approval</div>'

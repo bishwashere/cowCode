@@ -329,12 +329,14 @@
           var reason = typeof missionImplementationBlockedLabel === 'function'
             ? missionImplementationBlockedLabel(g)
             : '';
+          var missionLabel2 = String(g.title || g.objective || '').trim();
           mc2PushActionRequiredItem(items, {
             kind: 'warning',
             action: 'mission-input',
             missionId: missionId,
-            title: reason || String(g.title || g.objective || 'Mission needs input').trim().slice(0, 96),
-            subtitle: mc2MissionWaitSubtitle(g, ts),
+            isMission: true,
+            title: reason || 'Mission needs input',
+            subtitle: missionLabel2 + (missionLabel2 ? ' · waiting ' + mc2ShortWaitTime(ts) : ''),
             ts: ts,
           });
         }
