@@ -7,16 +7,20 @@
       var progressLabel = '— / — tasks completed';
       var etaLabel = '';
       if (activeMission) {
-        pct = Math.max(0, Math.min(100, Math.round(Number((activeMission.progress && activeMission.progress.pct) || 0))));
         var label = String(activeMission.title || activeMission.objective || '').trim();
-        progressLabel = (label ? label : 'Active mission') + ' — ' + pct + '%';
-        var totalSubs = 0, doneSubs = 0;
+        var totalSubs = 0, doneSubs = 0, progressSum = 0;
         (activeMission.tasks || []).forEach(function sg(s) {
           totalSubs++;
-          if (String(s.status || '').toLowerCase() === 'done') doneSubs++;
+          var st = String(s.status || '').toLowerCase();
+          if (st === 'done') { doneSubs++; progressSum += 100; }
+          else { progressSum += Math.max(0, Math.min(100, Number(s.progress) || 0)); }
           (s.tasks || []).forEach(sg);
         });
-        if (totalSubs > 0) progressLabel = doneSubs + ' / ' + totalSubs + ' tasks completed';
+        // Derive pct from actual task progress values — not the agent's self-reported estimate.
+        pct = totalSubs > 0 ? Math.max(0, Math.min(100, Math.round(progressSum / totalSubs))) : 0;
+        progressLabel = totalSubs > 0
+          ? doneSubs + ' / ' + totalSubs + ' tasks completed · ' + pct + '%'
+          : (label ? label : 'Active mission') + ' — ' + pct + '%';
       }
       var fill = mc2El('mc2-progress-bar-fill');
       if (fill) fill.style.width = pct + '%';
@@ -503,7 +507,7 @@
       });
     }
 
-    var MC2_KANBAN_DISPLAY_LIMIT = 5;
+    var MC2_KANBAN_DISPLAY_LIMIT = 3;
     var mc2KanbanColExpanded = {
       attention: false,
       completed: false,
