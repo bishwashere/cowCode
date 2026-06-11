@@ -1471,6 +1471,8 @@
       if (s === 'done' || s === 'doing' || s === 'blocked' || s === 'todo') return s;
       // waiting_user means the task requires user action — surface as blocked.
       if (s === 'waiting_user') return 'blocked';
+      // system errors are not user-actionable — treat as stalled, not blocked.
+      if (s === 'error') return 'error';
       // review_ready / in_progress are active agent work — treat as doing.
       if (s === 'review_ready' || s === 'in_progress') return 'doing';
       // waiting_dependency tasks are paused on internal deps, not open work.
