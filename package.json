@@ -86,6 +86,7 @@
     "test:state-migration": "node scripts/test/test-state-migration.js",
     "test:test-output-parse": "node scripts/test/test-test-output-parse.js",
     "test:test-page-ui": "node scripts/test/test-test-page-ui.js",
+    "test:system-pulse": "node scripts/test/test-system-pulse.js",
     "test:all": "pnpm run test:browser && pnpm run test:browser-e2e && pnpm run test:cron-e2e && pnpm run test:memory-e2e && pnpm run test:home-assistant-e2e && pnpm run test:write-e2e && pnpm run test:edit-e2e && pnpm run test:me-e2e && pnpm run test:intent-planner"
   },
   "dependencies": {

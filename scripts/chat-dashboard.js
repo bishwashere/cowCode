@@ -49,6 +49,7 @@ import {
 } from '../lib/work-durability.js';
 import { getGithubSourceIntentHint } from '../lib/github-context.js';
 import { formatUserFacingReply, logOutboundReplyDecorations } from '../lib/user-facing-reply.js';
+import { getPendingHealthFlags } from '../lib/system-pulse.js';
 
 // Match Telegram/WhatsApp default. Override via PASTURE_DASHBOARD_HISTORY env if needed.
 const DASHBOARD_HISTORY_EXCHANGES = resolveChatHistoryExchanges(process.env.PASTURE_DASHBOARD_HISTORY);
@@ -311,6 +312,8 @@ async function main() {
     if (skillsCalled.length) {
       process.stderr.write('[dashboard-skills] ' + skillsCalled.join(',') + '\n');
     }
+    const healthNote = getPendingHealthFlags();
+    if (healthNote && textToSend) textToSend = healthNote + '\n\n' + textToSend;
     const reply = formatDashboardReply(textToSend);
     const exchange = {
       user: message,

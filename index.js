@@ -63,6 +63,7 @@ import {
   beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from './lib/retrospective.js';
+import { startSystemPulse, getPendingHealthFlags } from './lib/system-pulse.js';
 import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, resolveChatHistoryExchanges } from './lib/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
@@ -1197,6 +1198,8 @@ async function main() {
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
     if (Array.isArray(called) && called.length) skillsCalled = called;
     let rawTextToSend = (textToSend || '').trim();
+    const healthNote = !isGroupJid ? getPendingHealthFlags() : '';
+    if (healthNote && rawTextToSend) rawTextToSend = healthNote + '\n\n' + rawTextToSend;
     const cleanedTextToSend = sanitizeOutboundText(rawTextToSend);
     logOutboundReplyDecorations(rawTextToSend, cleanedTextToSend, { channel: jid });
     const cleanedVoiceReplyText = sanitizeOutboundText(voiceReplyText || '');
@@ -1390,6 +1393,7 @@ async function main() {
       startCron({ storePath: getCronStorePath(), telegramBot: optsTelegramBot });
       startTide(sock, null);
       startRetrospective();
+      startSystemPulse();
       const lastSentByJid = new Map();
       const ourSentMessageIds = new Set();
       const telegramRepliedIds = new Set();
@@ -1453,6 +1457,7 @@ async function main() {
       console.log('[tide] Calling startTide (Telegram path)');
       startTide(telegramSock, null);
       startRetrospective();
+      startSystemPulse();
     }
 
     sock.ev.on('connection.update', (u) => {
@@ -1468,6 +1473,7 @@ async function main() {
         startCron({ sock, selfJid: sid, storePath: getCronStorePath(), telegramBot: telegramBot || undefined });
         startTide(sock, sid);
         startRetrospective();
+        startSystemPulse();
       }
       // Flush replies that failed to send while disconnected
       while (pendingReplies.length > 0) {
