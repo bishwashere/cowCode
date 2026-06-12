@@ -948,6 +948,7 @@
               missionId: missionId,
               missionObjective: String(g.objective || '').trim(),
               taskId: taskId,
+              slug: String(sg.slug || '').trim(),
               fromSuggestedTask: /^init-/.test(taskId),
               labels: Array.isArray(sg.labels) ? sg.labels.slice() : [],
               path: parts.join(' → '),
@@ -4414,12 +4415,26 @@
       var items = typeof flattenMissionWorkItems === 'function' ? flattenMissionWorkItems() : [];
       var missionId = String(opts.missionId || '').trim();
       var taskId = String(opts.taskId || '').trim();
+      var slug = String(opts.slug || '').trim();
       var agentId = String(opts.agentId || '').trim();
       var title = String(opts.title || '').trim().toLowerCase();
       var i;
       if (taskId) {
         for (i = 0; i < items.length; i++) {
           if (String(items[i].taskId || '') === taskId) {
+            if (!missionId || String(items[i].missionId || '') === missionId) return items[i];
+          }
+        }
+        // taskId didn't match any item's id — also try matching it against slug
+        for (i = 0; i < items.length; i++) {
+          if (String(items[i].slug || '') === taskId) {
+            if (!missionId || String(items[i].missionId || '') === missionId) return items[i];
+          }
+        }
+      }
+      if (slug) {
+        for (i = 0; i < items.length; i++) {
+          if (String(items[i].slug || '') === slug) {
             if (!missionId || String(items[i].missionId || '') === missionId) return items[i];
           }
         }
