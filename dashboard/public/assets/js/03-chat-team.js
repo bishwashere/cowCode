@@ -3481,6 +3481,26 @@
       }
     }
 
+    async function fetchLlmUsage() {
+      try {
+        var r = await fetch(API + '/api/llm/usage');
+        if (!r.ok) return;
+        var d = await r.json().catch(function () { return {}; });
+        var chip = document.getElementById('mc2-llm-usage');
+        var txt  = document.getElementById('mc2-llm-usage-text');
+        if (!chip || !txt) return;
+        var count = Number(d.count) || 0;
+        var limit = Number(d.limit) || 100;
+        var pct   = limit > 0 ? count / limit : 0;
+        txt.textContent = count + ' / ' + limit;
+        chip.classList.remove('is-warning', 'is-danger');
+        if (pct >= 1)        chip.classList.add('is-danger');
+        else if (pct >= 0.8) chip.classList.add('is-warning');
+        var hoursLeft = Math.ceil((Number(d.msUntilReset) || 0) / 3600000);
+        chip.title = count + ' of ' + limit + ' cloud LLM calls used today. Resets in ~' + hoursLeft + 'h (midnight UTC).';
+      } catch (_) {}
+    }
+
     async function fetchTeamMetricsFeed() {
       try {
         var q = '';
@@ -4810,6 +4830,7 @@
       fetchTeamMetricsFeed();
       fetchMissionsSnapshot();
       fetchSuggestedTasksSnapshot();
+      fetchLlmUsage();
       if (typeof fetchMc2PendingApprovals === 'function') fetchMc2PendingApprovals();
       teamActivityPollTimer = setInterval(function () {
         fetchTeamActivityFeed();
@@ -4817,6 +4838,7 @@
         fetchTeamMetricsFeed();
         fetchMissionsSnapshot();
         fetchSuggestedTasksSnapshot();
+        fetchLlmUsage();
         if (typeof fetchMc2PendingApprovals === 'function') fetchMc2PendingApprovals();
       }, TEAM_ACTIVITY_POLL_MS);
     }

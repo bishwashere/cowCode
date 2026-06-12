@@ -11,7 +11,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from 'fs';
-import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath } from '../lib/paths.js';
+import { getConfigPath, getCronStorePath, getStateDir, getWorkspaceDir, getEnvPath, getAgentWorkspaceDir, getAgentAvatarPath, getLlmUsagePath } from '../lib/paths.js';
 import { generateAndSaveAgentAvatar, hasAgentAvatar } from '../lib/agent-avatar.js';
 import { collectChatLogDateEntries, readChatLogDayExchanges, formatExchangesAsText } from '../lib/chat-log.js';
 import { readTeamActivity, pruneTeamActivityLogToToday, pruneTeamActivityForMission } from '../lib/team-activity.js';
@@ -1822,6 +1822,27 @@ app.patch('/api/projects/:id', (req, res) => {
     if (!p) { res.status(404).json({ error: 'Not found' }); return; }
     res.json(p);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/llm/usage', (_req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    let count = 0;
+    try {
+      const raw = readFileSync(getLlmUsagePath(), 'utf8');
+      const data = JSON.parse(raw);
+      if (data && data.date === today) count = Number(data.count) || 0;
+    } catch (_) {}
+    const config = (() => {
+      try { return JSON.parse(readFileSync(getConfigPath(), 'utf8')); } catch (_) { return {}; }
+    })();
+    const limit = Number(config?.llm?.dailyLimit) || 100;
+    const midnight = new Date();
+    midnight.setUTCHours(24, 0, 0, 0);
+    res.json({ date: today, count, limit, msUntilReset: midnight.getTime() - Date.now() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/connectors/status', (_req, res) => {
