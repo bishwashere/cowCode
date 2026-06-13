@@ -23,7 +23,7 @@
   <div id="agent-edit-modal" class="modal-overlay" aria-hidden="true">
     <div class="modal-card modal-card-agent-edit" role="dialog" aria-modal="true" aria-labelledby="agent-edit-modal-heading">
       <h2 id="agent-edit-modal-heading">Edit agent</h2>
-      <p class="skill-meta" style="margin:0;">Update title, identity files, skills, and team links.</p>
+      <p class="skill-meta" style="margin:0;">Update title, LLM priority, identity files, skills, and team links.</p>
       <div class="agent-edit-modal-scroll">
       <div class="agent-edit-basics">
         <div class="field">
@@ -33,6 +33,14 @@
         <div class="field">
           <label for="agent-edit-modal-title">Title <span class="skill-meta">(optional)</span></label>
           <input id="agent-edit-modal-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="agent-edit-modal-llm-priority">LLM priority</label>
+          <select id="agent-edit-modal-llm-priority">
+            <option value="system">System (use project default)</option>
+            <option value="custom">Custom (use this agent's model order)</option>
+          </select>
+          <p id="agent-edit-modal-llm-priority-hint" class="field-hint" style="margin:0.35rem 0 0;"></p>
         </div>
       </div>
       <div class="field agent-edit-section">

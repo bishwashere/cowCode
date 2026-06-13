@@ -14,6 +14,14 @@
           <label for="team-agent-title">Title <span class="skill-meta">(optional)</span></label>
           <input id="team-agent-title" type="text" placeholder="e.g. Project Manager" autocomplete="off">
         </div>
+        <div class="field">
+          <label for="team-agent-llm-priority">LLM priority</label>
+          <select id="team-agent-llm-priority">
+            <option value="system">System (use project default)</option>
+            <option value="custom">Custom (use this agent's model order)</option>
+          </select>
+          <p id="team-agent-llm-priority-hint" class="field-hint" style="margin:0.35rem 0 0;"></p>
+        </div>
       </div>
       <div class="field agent-edit-section">
         <label>Identity files</label>

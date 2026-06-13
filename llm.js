@@ -106,6 +106,11 @@ export function isDailyLimitError(err) {
   );
 }
 
+/** When a cloud model hits the daily cap, fall through to the next model (usually local). */
+function isDailyLimitFallbackError(err) {
+  return err?.code === 'LLM_DAILY_LIMIT';
+}
+
 // ---------------------------------------------------------------------------
 
 /** If config value is an env var name (e.g. "LLM_API_KEY"), return process.env[value]; else return value. */
@@ -130,6 +135,57 @@ const PRESETS = {
 
 /** Only local providers can have baseUrl in config.json; others use preset only. */
 const LOCAL_PROVIDERS = new Set(['lmstudio', 'ollama']);
+
+/** Agent LLM priority: inherit project order, or use per-agent model flags. */
+export const LLM_PRIORITY_SYSTEM = 'system';
+export const LLM_PRIORITY_CUSTOM = 'custom';
+export const DEFAULT_LLM_PRIORITY_MODE = LLM_PRIORITY_SYSTEM;
+
+function entryHasPriority(entry) {
+  return entry?.priority === true || entry?.priority === 1 ||
+    String(entry?.priority).toLowerCase() === 'true' || entry?.priority === '1';
+}
+
+function normalizePriorityMode(mode) {
+  const raw = String(mode || DEFAULT_LLM_PRIORITY_MODE).trim().toLowerCase();
+  return raw === LLM_PRIORITY_CUSTOM ? LLM_PRIORITY_CUSTOM : LLM_PRIORITY_SYSTEM;
+}
+
+function readRootConfigRaw() {
+  try {
+    const raw = readFileSync(getConfigPath(), 'utf8');
+    if (raw && raw.trim()) return JSON.parse(raw);
+  } catch (_) {}
+  return {};
+}
+
+function providerOrderFromEntries(entries) {
+  const ordered = [...entries];
+  const priorityIndex = ordered.findIndex((entry) => entryHasPriority(entry));
+  if (priorityIndex >= 0) {
+    const [priorityEntry] = ordered.splice(priorityIndex, 1);
+    ordered.unshift(priorityEntry);
+  }
+  const providers = [];
+  for (const entry of ordered) {
+    const provider = String(entry?.provider || '').trim().toLowerCase();
+    if (provider && !providers.includes(provider)) providers.push(provider);
+  }
+  return providers;
+}
+
+/** Reorder agent model entries to match the project config's provider priority. */
+function reorderEntriesBySystemPriority(agentEntries, systemEntries) {
+  const providerOrder = providerOrderFromEntries(systemEntries);
+  if (!providerOrder.length) return agentEntries;
+  return [...agentEntries].sort((a, b) => {
+    const pa = String(a?.provider || '').trim().toLowerCase();
+    const pb = String(b?.provider || '').trim().toLowerCase();
+    const ia = providerOrder.indexOf(pa);
+    const ib = providerOrder.indexOf(pb);
+    return (ia >= 0 ? ia : 999) - (ib >= 0 ? ib : 999);
+  });
+}
 
 /** Env var name for cloud model (e.g. openai -> OPENAI_MODEL). Used when model is omitted in config. */
 function cloudModelEnv(provider) {
@@ -173,6 +229,10 @@ function resolveConfigPath(agentId) {
 }
 
 function loadConfig(options = {}) {
+  const agentId = typeof options?.agentId === 'string' && options.agentId.trim()
+    ? options.agentId.trim()
+    : '';
+  const isPerAgentConfig = agentId && agentId !== DEFAULT_AGENT_ID;
   const configPath = resolveConfigPath(options?.agentId);
   let raw = '';
   try {
@@ -189,10 +249,20 @@ function loadConfig(options = {}) {
     }
   }
   const llm = config.llm || {};
+  const priorityMode = isPerAgentConfig
+    ? normalizePriorityMode(llm.priorityMode)
+    : LLM_PRIORITY_CUSTOM;
   const defaultMaxTokens = Number(fromEnv(llm.maxTokens)) || 100;
 
   if (Array.isArray(llm.models) && llm.models.length > 0) {
-    let models = llm.models.map((entry, i) => {
+    let modelEntries = llm.models.slice();
+    if (isPerAgentConfig && priorityMode === LLM_PRIORITY_SYSTEM) {
+      const systemEntries = readRootConfigRaw()?.llm?.models;
+      if (Array.isArray(systemEntries) && systemEntries.length > 0) {
+        modelEntries = reorderEntriesBySystemPriority(modelEntries, systemEntries);
+      }
+    }
+    let models = modelEntries.map((entry, i) => {
       const provider = entry.provider && String(entry.provider).toLowerCase();
       const isLocal = provider && LOCAL_PROVIDERS.has(provider);
       const baseUrl = isLocal
@@ -211,8 +281,7 @@ function loadConfig(options = {}) {
         model = DEFAULT_CLOUD_MODELS[provider] || model;
       }
       const maxTokens = Number(fromEnv(entry.maxTokens)) || defaultMaxTokens;
-      const priority = entry.priority === true || entry.priority === 1 ||
-        String(entry.priority).toLowerCase() === 'true' || entry.priority === '1';
+      const priority = priorityMode === LLM_PRIORITY_CUSTOM && entryHasPriority(entry);
       return {
         baseUrl: baseUrl || PRESETS.lmstudio,
         apiKey: apiKey ?? 'not-needed',
@@ -359,7 +428,11 @@ export async function chat(messages, options = {}) {
       console.log('[LLM] used:', label);
       return content.trim();
     } catch (err) {
-      if (err.code === 'LLM_DAILY_LIMIT') throw err;
+      if (isDailyLimitFallbackError(err)) {
+        console.log('[LLM] cloud daily limit reached, trying next model:', label);
+        lastError = err;
+        continue;
+      }
       console.log('[LLM] try failed:', label, err.message);
       lastError = err;
     }
@@ -399,7 +472,11 @@ export async function chatWithTools(messages, tools, options = {}) {
       console.log('[LLM] used:', label, toolCalls.length ? '(with tools)' : '');
       return { content, toolCalls };
     } catch (err) {
-      if (err.code === 'LLM_DAILY_LIMIT') throw err;
+      if (isDailyLimitFallbackError(err)) {
+        console.log('[LLM] cloud daily limit reached, trying next model:', label);
+        lastError = err;
+        continue;
+      }
       console.log('[LLM] try failed:', label, err.message);
       lastError = err;
     }
@@ -458,7 +535,11 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
       }
       return intent;
     } catch (err) {
-      if (err.code === 'LLM_DAILY_LIMIT') throw err;
+      if (isDailyLimitFallbackError(err)) {
+        console.log('[LLM] cloud daily limit reached, trying next model:', label);
+        lastError = err;
+        continue;
+      }
       console.log('[LLM] intent try failed:', label, err.message);
       lastError = err;
     }
@@ -551,7 +632,11 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
       }
       throw new Error('No content in vision response');
     } catch (err) {
-      if (err.code === 'LLM_DAILY_LIMIT') throw err;
+      if (isDailyLimitFallbackError(err)) {
+        console.log('[LLM] cloud daily limit reached, trying next model:', label);
+        lastError = err;
+        continue;
+      }
       const msg = (err && err.message) || '';
       const looksLikeTextOnly = /invalid.*content|does not support|400|image|vision|multimodal/i.test(msg);
       console.log('[LLM] vision try failed:', label, err.message);

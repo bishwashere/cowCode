@@ -31,6 +31,8 @@
     "test:agent-config": "node scripts/test/test-agent-config.js",
     "test:agent-delegation-router": "node scripts/test/test-agent-delegation-router.js",
     "test:delegation-llm-router": "node scripts/test/test-delegation-llm-router.js",
+    "test:llm-daily-limit": "node scripts/test/test-llm-daily-limit.js",
+    "test:llm-priority-mode": "node scripts/test/test-llm-priority-mode.js",
     "test:evaluate-team-capability": "node scripts/test/test-evaluate-team-capability.js",
     "test:agent-map-ui": "node scripts/test/test-agent-map-ui.js",
     "test:dashboard-boot": "node scripts/test/test-dashboard-boot.js",

@@ -772,7 +772,17 @@ app.patch('/api/agents/:id/config', (req, res) => {
     if (rejectInternalAgent(id, res)) return;
     const patch = req.body || {};
     const config = loadAgentConfig(id);
-    if (patch.llm !== undefined) config.llm = patch.llm;
+    if (patch.llm !== undefined) config.llm = { ...(config.llm || {}), ...patch.llm };
+    if (config.llm && config.llm.priorityMode !== 'custom') {
+      config.llm.priorityMode = config.llm.priorityMode || 'system';
+      if (Array.isArray(config.llm.models)) {
+        config.llm.models = config.llm.models.map((entry) => {
+          if (!entry || typeof entry !== 'object') return entry;
+          const { priority, ...rest } = entry;
+          return rest;
+        });
+      }
+    }
     if (patch.skills !== undefined) config.skills = patch.skills;
     if (patch.title !== undefined) {
       const previousTitle = getAgentTitle(id);

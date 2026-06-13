@@ -575,7 +575,7 @@
     }
 
     var TEAM_TOP_TAB_DESC = {
-      roster: 'Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ✎ to edit, or switch to Tree for hierarchy.',
+      roster: 'Browse your agent team — click a card for Active Context, Inbox, Outbox, or Stats; use ⋮ on a card to edit, or switch to Tree for hierarchy.',
       missions: 'Long-running missions your agents work on autonomously — create missions, track tasks, and run or pause work.',
     };
 
@@ -2269,19 +2269,13 @@
         var activeCount = agentCardActiveCount(ctx, metrics);
         var sel = id === selectedTeamInboxAgentId ? ' selected' : '';
         return '<div class="team-agent-card' + sel + '" data-agent-id="' + escapeHtml(id) + '" role="button" tabindex="0" title="Open ' + shortName + '">' +
-          '<button type="button" class="team-agent-card-edit" data-agent-id="' + escapeHtml(id) + '" aria-label="Edit ' + escapeHtml(id) + '" title="Edit agent">✎</button>' +
+          renderAgentCardMenuButton(id) +
           '<div class="team-agent-card-head">' + shortName + ' ' + emoji + '</div>' +
           '<div class="team-agent-card-state">' + escapeHtml(stateLabel) + '</div>' +
           '<div class="team-agent-card-active">' + escapeHtml(String(activeCount)) + ' active</div>' +
         '</div>';
       }).join('');
-      row.querySelectorAll('.team-agent-card-edit').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var aid = btn.getAttribute('data-agent-id');
-          if (aid) openAgentEditModal(aid);
-        });
-      });
+      wireAgentCardMenus(row);
       row.querySelectorAll('.team-agent-card').forEach(function (card) {
         function pick() {
           var id = card.getAttribute('data-agent-id');

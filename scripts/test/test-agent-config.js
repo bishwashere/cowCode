@@ -118,6 +118,32 @@ async function main() {
       },
     },
     {
+      name: 'new agents inherit system LLM priority mode',
+      input: 'Setup: main has openai priority; create alex — expect priorityMode=system and no copied priority flags',
+      expectMode: 'behavior',
+      run: async () => {
+        createStateDir();
+        const ac = await loadAgentConfigModule();
+        ac.ensureMainAgentInitialized();
+        ac.saveAgentConfig('main', {
+          llm: {
+            models: [
+              { provider: 'lmstudio', model: 'local', apiKey: 'not-needed', baseUrl: 'http://127.0.0.1:1234/v1' },
+              { provider: 'openai', model: 'gpt-5.2', apiKey: 'LLM_1_API_KEY', priority: true },
+            ],
+          },
+        });
+        ac.createAgent('alex', { fromAgentId: 'main', title: 'Alex' });
+        const cfg = ac.loadAgentConfig('alex');
+        const mode = cfg.llm && cfg.llm.priorityMode;
+        const hasPriority = Array.isArray(cfg.llm?.models) && cfg.llm.models.some((m) => m && m.priority);
+        if (mode !== 'system' || hasPriority) {
+          throw new Error(`Expected system mode without copied priority; got mode=${mode}, hasPriority=${hasPriority}`);
+        }
+        return { reply: `priorityMode=${mode}, copiedPriority=${hasPriority}` };
+      },
+    },
+    {
       name: 'rename marketer → Chloe keeps id + aliases',
       input: 'Setup: PATCH marketer title to Chloe, then resolve Marketer / chloe / Chloe',
       expectMode: 'behavior',

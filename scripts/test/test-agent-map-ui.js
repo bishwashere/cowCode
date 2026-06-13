@@ -415,6 +415,18 @@ const checks = [
       !/return \{ name: 'team-agent'/.test(html),
   },
   {
+    name: 'Team agent cards have edit menu',
+    ok: html.includes('renderAgentCardMenuButton') &&
+      html.includes('wireAgentCardMenus') &&
+      html.includes('agent-card-menu-item') &&
+      html.includes('Edit agent'),
+  },
+  {
+    name: 'Agent edit modal includes LLM priority mode',
+    ok: html.includes('agent-edit-modal-llm-priority') &&
+      html.includes('System (use project default)'),
+  },
+  {
     name: 'Team map edit button opens modal not separate page',
     ok: html.includes('openAgentEditModal(aid)') &&
       !html.includes("location.hash = '#team/'"),

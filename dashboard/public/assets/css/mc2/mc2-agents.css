@@ -177,6 +177,7 @@
   padding: 0.5rem 0.55rem;
   font-size: 0.64rem;
   cursor: pointer;
+  position: relative;
 }
 .mc-agent-overview-card:hover    { border-color: var(--muted);  }
 .mc-agent-overview-card.selected { border-color: var(--accent); }

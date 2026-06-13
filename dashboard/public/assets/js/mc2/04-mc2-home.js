@@ -709,6 +709,7 @@
           var waitingCount = s === 'waiting' ? 1 : 0;
           var selected = mc2InboxAgentFilter && id === mc2InboxAgentFilter ? ' selected' : '';
           return '<div class="mc-agent-overview-card' + selected + '" data-mc-agent="' + escapeHtml(id) + '">' +
+            renderAgentCardMenuButton(id) +
             '<div class="mc-kanban-card-head">' +
               mc2AvatarHtml(a, { large: true }) +
               '<span class="mc-agent-role">' + name + '</span>' +
@@ -725,6 +726,7 @@
             '</div>' +
           '</div>';
         }).join('');
+        wireAgentCardMenus(el);
         el.querySelectorAll('.mc-agent-overview-card[data-mc-agent]').forEach(function (card) {
           card.addEventListener('click', function () {
             var aid = card.getAttribute('data-mc-agent');

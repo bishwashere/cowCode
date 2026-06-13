@@ -355,12 +355,87 @@ async function fetchCrons() {
       page: { agentId: '', mdFile: '', mdDirty: false },
     };
 
+    function describeProjectLlmPriority(models) {
+      if (!Array.isArray(models) || !models.length) return 'No project models configured.';
+      var priorityEntry = models.find(function (m) {
+        return m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true';
+      }) || models[0];
+      var label = priorityEntry.model || priorityEntry.provider || 'default';
+      if (priorityEntry.provider && priorityEntry.model && priorityEntry.model !== priorityEntry.provider) {
+        label = priorityEntry.provider + ' / ' + priorityEntry.model;
+      }
+      return 'Project priority: ' + label + '.';
+    }
+
+    function syncAgentEditorLlmPriorityHint(scope) {
+      var dom = agentEditorDom(scope);
+      if (!dom.llmPriorityHint) return;
+      var mode = dom.llmPriority ? String(dom.llmPriority.value || 'system') : 'system';
+      if (mode === 'custom') {
+        dom.llmPriorityHint.textContent = 'Uses this agent\'s model list and per-model priority flags from config.';
+        return;
+      }
+      fetch(API + '/api/config').then(function (r) { return r.json(); }).then(function (d) {
+        dom.llmPriorityHint.textContent = describeProjectLlmPriority((d && d.llm && d.llm.models) || []);
+      }).catch(function () {
+        dom.llmPriorityHint.textContent = 'Inherits model priority from the project LLM settings.';
+      });
+    }
+
+    function renderAgentCardMenuButton(agentId) {
+      var id = escapeHtml(agentId);
+      return '<div class="agent-card-menu">' +
+        '<button type="button" class="agent-card-menu-btn" data-agent-menu="' + id + '" aria-label="Agent options" aria-haspopup="true" title="Options">⋮</button>' +
+        '<div class="agent-card-menu-popover" role="menu" hidden>' +
+          '<button type="button" class="agent-card-menu-item" data-agent-edit="' + id + '" role="menuitem">Edit agent</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function closeAllAgentCardMenus() {
+      document.querySelectorAll('.agent-card-menu-popover').forEach(function (el) {
+        el.hidden = true;
+      });
+    }
+
+    function wireAgentCardMenus(root) {
+      if (!root) return;
+      root.querySelectorAll('.agent-card-menu-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          e.preventDefault();
+          var wrap = btn.closest('.agent-card-menu');
+          var pop = wrap && wrap.querySelector('.agent-card-menu-popover');
+          if (!pop) return;
+          var willOpen = pop.hidden;
+          closeAllAgentCardMenus();
+          pop.hidden = !willOpen;
+        });
+      });
+      root.querySelectorAll('.agent-card-menu-item[data-agent-edit]').forEach(function (item) {
+        item.addEventListener('click', function (e) {
+          e.stopPropagation();
+          e.preventDefault();
+          closeAllAgentCardMenus();
+          var aid = item.getAttribute('data-agent-edit');
+          if (aid) openAgentEditModal(aid);
+        });
+      });
+    }
+
+    if (!window._agentCardMenuDocBound) {
+      window._agentCardMenuDocBound = true;
+      document.addEventListener('click', function () { closeAllAgentCardMenus(); });
+    }
+
     function agentEditorDom(scope) {
       var p = scope === 'page' ? 'team-agent' : 'agent-edit-modal';
       return {
         title: document.getElementById(p + '-title'),
         id: document.getElementById(p + '-id'),
         heading: document.getElementById(p + '-heading'),
+        llmPriority: document.getElementById(p + '-llm-priority'),
+        llmPriorityHint: document.getElementById(p + '-llm-priority-hint'),
         mdFiles: document.getElementById(p + '-md-files'),
         mdEditor: document.getElementById(p + '-md-editor'),
         mdLabel: document.getElementById(p + '-md-label'),
@@ -501,6 +576,12 @@ async function fetchCrons() {
       var agentsResp = await fetch(API + '/api/agents').then(function (r) { return r.json(); });
       if (dom.id) dom.id.value = agentId;
       if (dom.title) dom.title.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
+      if (dom.llmPriority) {
+        var priorityMode = (cfg.llm && cfg.llm.priorityMode === 'custom') ? 'custom' : 'system';
+        dom.llmPriority.value = priorityMode;
+        dom.llmPriority.onchange = function () { syncAgentEditorLlmPriorityHint(scope); };
+      }
+      syncAgentEditorLlmPriorityHint(scope);
       if (dom.heading) dom.heading.textContent = (scope === 'page' ? 'Team agent: ' : 'Edit agent: ') + agentId;
       await loadAgentEditorMdFiles(agentId, scope);
       var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled.slice() : (skillsResp.enabled || []).slice();
@@ -562,6 +643,9 @@ async function fetchCrons() {
         skills: { enabled: enabled },
         agentMessaging: { allow: allow },
       };
+      if (dom.llmPriority) {
+        patch.llm = { priorityMode: dom.llmPriority.value === 'custom' ? 'custom' : 'system' };
+      }
       if (submitBtn) submitBtn.disabled = true;
       showAgentEditorError('', scope);
       try {
