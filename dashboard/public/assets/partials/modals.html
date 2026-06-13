@@ -38,9 +38,13 @@
           <label for="agent-edit-modal-llm-priority">LLM priority</label>
           <select id="agent-edit-modal-llm-priority">
             <option value="system">System (use project default)</option>
-            <option value="custom">Custom (use this agent's model order)</option>
+            <option value="custom">Custom (pick model for this agent)</option>
           </select>
           <p id="agent-edit-modal-llm-priority-hint" class="field-hint" style="margin:0.35rem 0 0;"></p>
+          <div id="agent-edit-modal-llm-custom-wrap" class="agent-edit-llm-custom-wrap" hidden>
+            <p class="field-hint" style="margin:0.5rem 0 0.35rem;">Priority model for this agent:</p>
+            <div id="agent-edit-modal-llm-models" class="agent-edit-llm-models"></div>
+          </div>
         </div>
       </div>
       <div class="field agent-edit-section">

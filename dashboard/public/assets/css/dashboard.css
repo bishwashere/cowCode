@@ -2212,6 +2212,19 @@
       color: transparent;
       line-height: 1;
     }
+    .agent-edit-llm-check {
+      border-radius: 999px;
+      font-size: 0.48rem;
+    }
+    .agent-edit-llm-models {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+      gap: 0.55rem;
+      margin-top: 0.15rem;
+    }
+    .agent-edit-llm-custom-wrap[hidden] {
+      display: none !important;
+    }
     .agent-edit-tile:has(input:checked) .agent-edit-tile-check {
       border-color: var(--accent);
       background: var(--accent);

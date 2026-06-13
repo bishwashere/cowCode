@@ -782,6 +782,16 @@ app.patch('/api/agents/:id/config', (req, res) => {
           return rest;
         });
       }
+    } else if (config.llm && config.llm.priorityMode === 'custom' && Array.isArray(config.llm.models)) {
+      let priorityIndex = config.llm.models.findIndex((entry) =>
+        entry && (entry.priority === true || entry.priority === 1 || String(entry.priority).toLowerCase() === 'true'));
+      if (priorityIndex < 0) priorityIndex = 0;
+      config.llm.models = config.llm.models.map((entry, i) => {
+        if (!entry || typeof entry !== 'object') return entry;
+        if (i === priorityIndex) return { ...entry, priority: true };
+        const { priority, ...rest } = entry;
+        return rest;
+      });
     }
     if (patch.skills !== undefined) config.skills = patch.skills;
     if (patch.title !== undefined) {

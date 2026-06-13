@@ -424,7 +424,9 @@ const checks = [
   {
     name: 'Agent edit modal includes LLM priority mode',
     ok: html.includes('agent-edit-modal-llm-priority') &&
-      html.includes('System (use project default)'),
+      html.includes('System (use project default)') &&
+      html.includes('agent-edit-modal-llm-models') &&
+      html.includes('renderAgentEditorLlmModelPicker'),
   },
   {
     name: 'Team map edit button opens modal not separate page',

@@ -351,9 +351,79 @@ async function fetchCrons() {
 
     var agentEditModalOpen = false;
     var agentEditorState = {
-      modal: { agentId: '', mdFile: '', mdDirty: false },
-      page: { agentId: '', mdFile: '', mdDirty: false },
+      modal: { agentId: '', mdFile: '', mdDirty: false, llmModels: [] },
+      page: { agentId: '', mdFile: '', mdDirty: false, llmModels: [] },
     };
+
+    function formatLlmModelLabel(model, index) {
+      var provider = String((model && model.provider) || ('Model ' + (index + 1))).trim();
+      var modelName = String((model && model.model) || '').trim();
+      if (modelName && modelName.toLowerCase() !== provider.toLowerCase()) return provider + ' · ' + modelName;
+      return provider;
+    }
+
+    function findLlmPriorityModelIndex(models) {
+      if (!Array.isArray(models) || !models.length) return 0;
+      var idx = models.findIndex(function (m) {
+        return m && (m.priority === true || m.priority === 1 || String(m.priority).toLowerCase() === 'true');
+      });
+      return idx >= 0 ? idx : 0;
+    }
+
+    function renderAgentEditorLlmModelPicker(scope, models, selectedIndex) {
+      var dom = agentEditorDom(scope);
+      if (!dom.llmModelsWrap || !dom.llmModels) return;
+      var mode = dom.llmPriority ? dom.llmPriority.value : 'system';
+      if (mode !== 'custom') {
+        dom.llmModelsWrap.hidden = true;
+        return;
+      }
+      if (!models.length) {
+        dom.llmModelsWrap.hidden = true;
+        if (dom.llmPriorityHint) {
+          dom.llmPriorityHint.textContent = 'No models configured. Set up project LLM models first (#llm).';
+        }
+        return;
+      }
+      dom.llmModelsWrap.hidden = false;
+      var radioName = scope === 'page' ? 'team-agent-llm-priority-model' : 'agent-edit-modal-llm-priority-model';
+      dom.llmModels.innerHTML = models.map(function (m, i) {
+        var checked = i === selectedIndex ? ' checked' : '';
+        var title = escapeHtml(formatLlmModelLabel(m, i));
+        var modelName = String((m && m.model) || '').trim();
+        var provider = String((m && m.provider) || '').trim();
+        var desc = modelName && modelName.toLowerCase() !== provider.toLowerCase()
+          ? modelName
+          : (provider === 'lmstudio' || provider === 'ollama' ? 'Local model' : (provider || 'Model'));
+        return '<label class="agent-edit-tile agent-edit-llm-tile">' +
+          '<input type="radio" class="agent-edit-tile-input" name="' + radioName + '" value="' + i + '"' + checked + '>' +
+          '<span class="agent-edit-tile-check agent-edit-llm-check" aria-hidden="true">●</span>' +
+          '<span class="agent-edit-tile-title">' + title + '</span>' +
+          '<span class="agent-edit-tile-desc">' + escapeHtml(desc) + '</span>' +
+          '</label>';
+      }).join('');
+    }
+
+    function syncAgentEditorLlmPriorityUi(scope) {
+      var dom = agentEditorDom(scope);
+      var state = agentEditorState[scope];
+      var mode = dom.llmPriority ? String(dom.llmPriority.value || 'system') : 'system';
+      if (mode === 'custom') {
+        var selected = findLlmPriorityModelIndex(state.llmModels);
+        renderAgentEditorLlmModelPicker(scope, state.llmModels, selected);
+        if (dom.llmPriorityHint && state.llmModels.length) {
+          dom.llmPriorityHint.textContent = 'Pick which model this agent tries first. Other models remain as fallbacks.';
+        }
+        return;
+      }
+      if (dom.llmModelsWrap) dom.llmModelsWrap.hidden = true;
+      if (!dom.llmPriorityHint) return;
+      fetch(API + '/api/config').then(function (r) { return r.json(); }).then(function (d) {
+        dom.llmPriorityHint.textContent = describeProjectLlmPriority((d && d.llm && d.llm.models) || []);
+      }).catch(function () {
+        dom.llmPriorityHint.textContent = 'Inherits model priority from the project LLM settings.';
+      });
+    }
 
     function describeProjectLlmPriority(models) {
       if (!Array.isArray(models) || !models.length) return 'No project models configured.';
@@ -368,18 +438,7 @@ async function fetchCrons() {
     }
 
     function syncAgentEditorLlmPriorityHint(scope) {
-      var dom = agentEditorDom(scope);
-      if (!dom.llmPriorityHint) return;
-      var mode = dom.llmPriority ? String(dom.llmPriority.value || 'system') : 'system';
-      if (mode === 'custom') {
-        dom.llmPriorityHint.textContent = 'Uses this agent\'s model list and per-model priority flags from config.';
-        return;
-      }
-      fetch(API + '/api/config').then(function (r) { return r.json(); }).then(function (d) {
-        dom.llmPriorityHint.textContent = describeProjectLlmPriority((d && d.llm && d.llm.models) || []);
-      }).catch(function () {
-        dom.llmPriorityHint.textContent = 'Inherits model priority from the project LLM settings.';
-      });
+      syncAgentEditorLlmPriorityUi(scope);
     }
 
     function renderAgentCardMenuButton(agentId) {
@@ -436,6 +495,8 @@ async function fetchCrons() {
         heading: document.getElementById(p + '-heading'),
         llmPriority: document.getElementById(p + '-llm-priority'),
         llmPriorityHint: document.getElementById(p + '-llm-priority-hint'),
+        llmModelsWrap: document.getElementById(p + '-llm-custom-wrap'),
+        llmModels: document.getElementById(p + '-llm-models'),
         mdFiles: document.getElementById(p + '-md-files'),
         mdEditor: document.getElementById(p + '-md-editor'),
         mdLabel: document.getElementById(p + '-md-label'),
@@ -572,16 +633,20 @@ async function fetchCrons() {
       state.agentId = agentId || 'main';
       showAgentEditorError('', scope);
       var cfg = await fetch(API + '/api/agents/' + encodeURIComponent(agentId) + '/config').then(function (r) { return r.json(); });
+      var projectCfg = await fetch(API + '/api/config').then(function (r) { return r.json(); });
       var skillsResp = await fetch(API + '/api/skills').then(function (r) { return r.json(); });
       var agentsResp = await fetch(API + '/api/agents').then(function (r) { return r.json(); });
+      state.llmModels = (Array.isArray(cfg.llm && cfg.llm.models) && cfg.llm.models.length)
+        ? cfg.llm.models.slice()
+        : (Array.isArray(projectCfg.llm && projectCfg.llm.models) ? projectCfg.llm.models.slice() : []);
       if (dom.id) dom.id.value = agentId;
       if (dom.title) dom.title.value = (cfg.title && String(cfg.title).trim()) ? String(cfg.title).trim() : '';
       if (dom.llmPriority) {
         var priorityMode = (cfg.llm && cfg.llm.priorityMode === 'custom') ? 'custom' : 'system';
         dom.llmPriority.value = priorityMode;
-        dom.llmPriority.onchange = function () { syncAgentEditorLlmPriorityHint(scope); };
+        dom.llmPriority.onchange = function () { syncAgentEditorLlmPriorityUi(scope); };
       }
-      syncAgentEditorLlmPriorityHint(scope);
+      syncAgentEditorLlmPriorityUi(scope);
       if (dom.heading) dom.heading.textContent = (scope === 'page' ? 'Team agent: ' : 'Edit agent: ') + agentId;
       await loadAgentEditorMdFiles(agentId, scope);
       var enabled = (cfg.skills && Array.isArray(cfg.skills.enabled)) ? cfg.skills.enabled.slice() : (skillsResp.enabled || []).slice();
@@ -644,7 +709,24 @@ async function fetchCrons() {
         agentMessaging: { allow: allow },
       };
       if (dom.llmPriority) {
-        patch.llm = { priorityMode: dom.llmPriority.value === 'custom' ? 'custom' : 'system' };
+        var mode = dom.llmPriority.value === 'custom' ? 'custom' : 'system';
+        patch.llm = { priorityMode: mode };
+        if (mode === 'custom') {
+          var baseModels = (agentEditorState[scope].llmModels || []).map(function (m) {
+            return Object.assign({}, m);
+          });
+          var selected = findLlmPriorityModelIndex(baseModels);
+          if (dom.llmModels) {
+            var picked = dom.llmModels.querySelector('input[type="radio"]:checked');
+            if (picked) selected = Number(picked.value) || 0;
+          }
+          patch.llm.models = baseModels.map(function (m, i) {
+            var copy = Object.assign({}, m);
+            if (i === selected) copy.priority = true;
+            else delete copy.priority;
+            return copy;
+          });
+        }
       }
       if (submitBtn) submitBtn.disabled = true;
       showAgentEditorError('', scope);
