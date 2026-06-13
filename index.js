@@ -34,6 +34,13 @@ import { buildDelegationContext } from './lib/agent-delegation-router.js';
 import { buildDelegationDecisionDetails } from './lib/delegation-routing-details.js';
 import { executeSkill } from './skills/executor.js';
 import { logTeamActivity } from './lib/team-activity.js';
+import {
+  startRequestTrace,
+  runWithRequestTrace,
+  logRequestStart,
+  logRequestEnd,
+  traceAsyncStep,
+} from './lib/request-timing.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
@@ -906,6 +913,27 @@ async function main() {
   }
 
   async function runAgentWithSkills(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts = {}) {
+    const isGroupJidForTrace = isTelegramGroupJid(jid) || isWhatsAppGroupJid(jid);
+    const trace = startRequestTrace({
+      jid: isGroupJidForTrace ? jid : toLogJid(jid),
+      channel: bioOpts.timingChannel || 'chat',
+      receivedAtMs: bioOpts.receivedAtMs,
+      userPreview: text,
+      agentId: (bioOpts.agentIdOverride && String(bioOpts.agentIdOverride).trim()) || DEFAULT_AGENT_ID,
+      source: bioOpts.timingSource || 'user_message',
+    });
+    return runWithRequestTrace(trace, async () => {
+      logRequestStart(trace);
+      try {
+        return await runAgentWithSkillsBody(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts, trace);
+      } catch (err) {
+        logRequestEnd(trace, 'error', { error: getErrorMessageForLog(err) });
+        throw err;
+      }
+    });
+  }
+
+  async function runAgentWithSkillsBody(sock, jid, text, lastSentByJidMap, selfJidForCron, ourSentIdsRef, bioOpts = {}, trace = null) {
     let skillsCalled = [];
     console.log('[agent] handling:', text.slice(0, 50) + (text.length > 50 ? '…' : ''));
     try {
@@ -950,10 +978,11 @@ async function main() {
         else addPendingTelegram(jid, replyText);
         console.log('[replied] new session ack queued (send failed):', getErrorMessageForLog(sendErr));
       }
+      if (trace) logRequestEnd(trace, 'ok', { skillsCalled: [], note: 'new_session_ack' });
       return { skillsCalled: [] };
     }
     if (!isGroupJid) {
-      await beforeUserMessage(getWorkspaceDir(), logJid, sessionId, text);
+      await traceAsyncStep('session_bootstrap', () => beforeUserMessage(getWorkspaceDir(), logJid, sessionId, text));
     }
     const workspaceDirForBootstrap = getWorkspaceDir();
     const sessionBootstrap =
@@ -994,7 +1023,7 @@ async function main() {
     // Step 2: decide work durability before delegation. Persistence must be
     // attached to the turn before agent-send chooses who should do the work.
     const durabilityDecision = !isGroupJid
-      ? await prepareWorkDurabilityWithAi({ userText: text, historyMessages, agentId })
+      ? await traceAsyncStep('work_durability', () => prepareWorkDurabilityWithAi({ userText: text, historyMessages, agentId }))
       : null;
     if (durabilityDecision?.missionId) ctx.missionId = durabilityDecision.missionId;
     if (durabilityDecision) {
@@ -1014,11 +1043,11 @@ async function main() {
         })
       : null;
     const delegationContext = durableDelegationContext || (!isGroupJid
-      ? await buildDelegationContext({
+      ? await traceAsyncStep('delegation_context', () => buildDelegationContext({
           agentId,
           userText: delegationRoutingTextFromDurability(durabilityDecision, text),
           availableSkillIds: enabledSkillIds,
-        })
+        }))
       : null);
     const delegatedTarget = delegationContext?.recommendation?.action === 'delegate'
       ? (delegationContext?.recommendation?.targetAgentId || '')
@@ -1082,7 +1111,7 @@ async function main() {
       ? getGithubSourceIntentHint(text, enabledSkillIds)
       : null;
     const intentPlan = presetDelegationPlan || casualIntentPlan || missionsIntentHint || githubIntentHint || (enabledSkillIds.length > 0
-      ? await planIntent({
+      ? await traceAsyncStep('intent_planner', () => planIntent({
           userText: text,
           historyMessages,
           availableSkillIds: enabledSkillIds,
@@ -1090,7 +1119,7 @@ async function main() {
           agentId,
           delegationContext,
           workDurability: durabilityDecision,
-        })
+        }))
       : null);
     if (intentPlan) console.log('[intent-planner]', JSON.stringify(intentPlan));
     // Step 5: load tool schemas based on what the planner returned.
@@ -1155,11 +1184,11 @@ async function main() {
         onAgentTurnStart({ agentId, userText: text, ctx });
         console.log('[agent-router] forcing agent-send to', delegatedTarget);
         if (delegationDecision) ctx.delegationRouting = delegationDecision;
-        const forcedRaw = await executeSkill('agent-send', ctx, {
+        const forcedRaw = await traceAsyncStep('forced_delegation', () => executeSkill('agent-send', ctx, {
           agent: delegatedTarget,
           message: enrichMessageWithProjectContext(text, historyMessages),
           ...delegationArgsFromDurability(durabilityDecision, text),
-        });
+        }), { targetAgentId: delegatedTarget });
         const forced = JSON.parse(forcedRaw || '{}');
         if (forced && typeof forced.reply === 'string' && forced.reply.trim()) {
           turnResult = {
@@ -1190,7 +1219,7 @@ async function main() {
       }
     }
     if (!turnResult) {
-      turnResult = await runAgentTurn({
+      turnResult = await traceAsyncStep('agent_turn', () => runAgentTurn({
         userText: text,
         ctx,
         systemPrompt: systemPromptWithPlan,
@@ -1198,7 +1227,7 @@ async function main() {
         historyMessages,
         getFullSkillDoc: skillContext?.getFullSkillDoc ?? (() => ''),
         resolveToolName: skillContext?.resolveToolName ?? (() => null),
-      });
+      }), { agentId, toolsCount: toolsForRequest.length });
     }
     const { textToSend, voiceReplyText, imageReplyPath, imageReplyCaption, skillsCalled: called } = turnResult || {};
     let skillsCalledFromTurn = Array.isArray(called) && called.length ? called : [];
@@ -1239,6 +1268,7 @@ async function main() {
       }
       const replyText = (cleanedVoiceReplyText && cleanedVoiceReplyText.trim()) ? cleanedVoiceReplyText.trim() : textForSend;
       const captionForImage = (replyText && replyText.trim()) ? replyText.trim() : (imageReplyCaption || '');
+      await traceAsyncStep('outbound_send', async () => {
       try {
         let sent;
         if (voiceBuffer) {
@@ -1322,7 +1352,9 @@ async function main() {
         }
         if (!isGroupJid || isTelegramGroupJid(jid)) scheduleTideFollowUp(jid);
       }
+      });
     }
+    if (trace) logRequestEnd(trace, 'ok', { skillsCalled: skillsCalled || [] });
   return { skillsCalled: skillsCalled || [] };
   }
 

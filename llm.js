@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { getConfigPath, getUploadsDir, getAgentConfigPath, getLlmUsagePath } from './lib/paths.js';
 import { DEFAULT_AGENT_ID } from './lib/agent-config.js';
+import { beginLlmCall, endLlmCall } from './lib/request-timing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -413,9 +414,11 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, 
  */
 export async function chat(messages, options = {}) {
   const { models, dailyLimit } = loadConfig(options);
+  const purpose = options.purpose || 'chat';
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
+    const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
       const res = await callOne(messages, opts, null, dailyLimit);
       if (!res.ok) {
@@ -426,8 +429,10 @@ export async function chat(messages, options = {}) {
       const content = data.choices?.[0]?.message?.content;
       if (content == null) throw new Error('No content in LLM response');
       console.log('[LLM] used:', label);
+      endLlmCall(llmCtx, { model: label, status: 'ok' });
       return content.trim();
     } catch (err) {
+      endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
       if (isDailyLimitFallbackError(err)) {
         console.log('[LLM] cloud daily limit reached, trying next model:', label);
         lastError = err;
@@ -450,9 +455,12 @@ export async function chat(messages, options = {}) {
  */
 export async function chatWithTools(messages, tools, options = {}) {
   const { models, dailyLimit } = loadConfig(options);
+  const purpose = options.purpose || 'chat_with_tools';
+  const toolCount = Array.isArray(tools) ? tools.length : 0;
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
+    const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId, toolCount });
     try {
       const res = await callOne(messages, opts, tools, dailyLimit);
       if (!res.ok) {
@@ -470,8 +478,15 @@ export async function chatWithTools(messages, tools, options = {}) {
         arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function?.arguments || {}),
       }));
       console.log('[LLM] used:', label, toolCalls.length ? '(with tools)' : '');
+      endLlmCall(llmCtx, {
+        model: label,
+        status: 'ok',
+        toolCount,
+        detail: { returnedToolCalls: toolCalls.length },
+      });
       return { content, toolCalls };
     } catch (err) {
+      endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err), toolCount });
       if (isDailyLimitFallbackError(err)) {
         console.log('[LLM] cloud daily limit reached, trying next model:', label);
         lastError = err;
@@ -509,9 +524,11 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
     { role: 'user', content: (userMessage || '').trim() || 'Hi' },
   ];
   const { models, dailyLimit } = loadConfig(options);
+  const purpose = options.purpose || 'classify_intent';
   let lastError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
+    const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
       const res = await Promise.race([
         callOne(messages, { ...opts, maxTokens: 25 }, null, dailyLimit),
@@ -533,8 +550,10 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
       if (intent === 'CHAT' && (/\bweather\b/.test(lower) || /\b(current )?time\b/.test(lower) || /\b(latest|recent|today'?s?) (news|headlines)\b/.test(lower))) {
         intent = 'SEARCH';
       }
+      endLlmCall(llmCtx, { model: label, status: 'ok', detail: { intent } });
       return intent;
     } catch (err) {
+      endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
       if (isDailyLimitFallbackError(err)) {
         console.log('[LLM] cloud daily limit reached, trying next model:', label);
         lastError = err;
@@ -588,6 +607,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
 
   const messages = [{ role: 'user', content: userContentOpenAI }];
   const { models, visionFallback, dailyLimit } = loadConfig(options);
+  const purpose = options.purpose || 'describe_image';
   const candidates = visionFallback ? [...models, visionFallback] : [...models];
   let lastError;
   for (const opts of candidates) {
@@ -595,6 +615,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
     const isAnthropic = (opts.baseUrl || '').includes('anthropic.com');
     if (isAnthropic && (!opts.apiKey || opts.apiKey === 'not-needed' || String(opts.apiKey || '').trim() === '')) continue;
     const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
+    const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
       let res;
       if (isAnthropic && userContentAnthropic) {
@@ -628,10 +649,12 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
       const text = data.content?.[0]?.text ?? data.choices?.[0]?.message?.content ?? '';
       if (text) {
         console.log('[LLM] vision used:', label);
+        endLlmCall(llmCtx, { model: label, status: 'ok' });
         return String(text).trim();
       }
       throw new Error('No content in vision response');
     } catch (err) {
+      endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
       if (isDailyLimitFallbackError(err)) {
         console.log('[LLM] cloud daily limit reached, trying next model:', label);
         lastError = err;
