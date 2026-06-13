@@ -31,7 +31,6 @@ import { getMemoryConfig } from '../lib/memory-config.js';
 import { indexChatExchange } from '../lib/memory-index.js';
 import {
   afterExchangeLogged,
-  beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from '../lib/retrospective.js';
 import {
@@ -124,7 +123,6 @@ async function main() {
     writeNdjsonLine({ type: 'done', reply });
     return;
   }
-  await beforeUserMessage(workspaceDir, dashboardJid, sessionId, message);
   // Server-managed history, same pattern as Telegram private chats. Any `payload.history`
   // sent by the client is intentionally ignored — context lives on disk on the server.
   const historyMessages = readLastPrivateExchanges(workspaceDir, dashboardJid, DASHBOARD_HISTORY_EXCHANGES, sessionId);

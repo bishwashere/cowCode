@@ -67,7 +67,6 @@ import {
   migrateRetrospectiveConfig,
   startRetrospective,
   afterExchangeLogged,
-  beforeUserMessage,
   buildRetrospectiveContextBlock,
 } from './lib/retrospective.js';
 import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/system-pulse.js';
@@ -980,9 +979,6 @@ async function main() {
       }
       if (trace) logRequestEnd(trace, 'ok', { skillsCalled: [], note: 'new_session_ack' });
       return { skillsCalled: [] };
-    }
-    if (!isGroupJid) {
-      await traceAsyncStep('session_bootstrap', () => beforeUserMessage(getWorkspaceDir(), logJid, sessionId, text));
     }
     const workspaceDirForBootstrap = getWorkspaceDir();
     const sessionBootstrap =
