@@ -47,7 +47,11 @@
       var pp = mc2El('mc2-progress-percent');
       if (pp) pp.textContent = pct + '%';
       var eta = mc2El('mc2-eta-label');
-      if (eta) eta.textContent = etaLabel || (activeMission ? 'ETA: tracking live work' : 'ETA: no active mission');
+      var runningMissions = missions.filter(function (g) { return !!g.running; });
+      var runningLabel = runningMissions.length > 0
+        ? '⏳ Agent working… (' + runningMissions.length + ' mission' + (runningMissions.length === 1 ? '' : 's') + ')'
+        : (etaLabel || (activeMission ? 'ETA: tracking live work' : 'ETA: no active mission'));
+      if (eta) eta.textContent = runningLabel;
       var statActive = mc2El('mc2-stat-active'); if (statActive) statActive.textContent = summary.active;
       var statWaiting = mc2El('mc2-stat-waiting'); if (statWaiting) statWaiting.textContent = summary.waiting;
       var statBlocked = mc2El('mc2-stat-blocked'); if (statBlocked) statBlocked.textContent = summary.blocked;

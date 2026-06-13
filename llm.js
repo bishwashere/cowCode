@@ -334,7 +334,7 @@ function loadConfig(options = {}) {
 }
 
 /** Call Anthropic Messages API and return a Response-like with OpenAI-shaped JSON. */
-async function callAnthropic(messages, { apiKey, model, maxTokens }, tools) {
+async function callAnthropic(messages, { apiKey, model, maxTokens }, tools, purpose) {
   if (!apiKey || apiKey === 'not-needed' || String(apiKey).trim() === '') {
     return { ok: false, status: 401, text: () => Promise.resolve(JSON.stringify({ error: { message: 'Anthropic API key not set (set LLM_3_API_KEY in ~/.pasture/.env)' } })) };
   }
@@ -357,6 +357,8 @@ async function callAnthropic(messages, { apiKey, model, maxTokens }, tools) {
     max_tokens: maxTokens,
     ...(system ? { system } : {}),
     messages: anthropicMessages,
+    // Passed through for provider-side observability only; not visible to the model.
+    ...(purpose ? { metadata: { user_id: purpose } } : {}),
   };
   const headers = {
     'Content-Type': 'application/json',
@@ -383,16 +385,17 @@ function openaiUsesMaxCompletionTokens(model) {
   return typeof model === 'string' && /^gpt-5/.test(model);
 }
 
-function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT) {
+function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT, purpose = '') {
   const isLocal = /127\.0\.0\.1|localhost/i.test(baseUrl || '');
   if (!isLocal) checkAndTrackCloudLimit(dailyLimit);
 
   const isAnthropic = (baseUrl || '').includes('anthropic.com');
   if (isAnthropic) {
-    return callAnthropic(messages, { apiKey, model, maxTokens }, tools);
+    return callAnthropic(messages, { apiKey, model, maxTokens }, tools, purpose);
   }
   const url = (baseUrl || '').replace(/\/$/, '') + '/chat/completions';
   const isOpenAINew = (baseUrl || '').includes('openai.com') && openaiUsesMaxCompletionTokens(model);
+  const isOpenAI = (baseUrl || '').includes('openai.com');
   const body = {
     model,
     messages,
@@ -400,6 +403,9 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, 
     ...(isOpenAINew ? { reasoning_effort: 'none' } : {}),
     stream: false,
     ...(tools && tools.length > 0 ? { tools } : {}),
+    // Passed through for provider-side observability only; not visible to the model.
+    // OpenAI: `user` field. Local models silently ignore unknown top-level keys.
+    ...(purpose && (isOpenAI || isLocal) ? { user: purpose } : {}),
   };
   const headers = {
     'Content-Type': 'application/json',
@@ -416,11 +422,13 @@ export async function chat(messages, options = {}) {
   const { models, dailyLimit } = loadConfig(options);
   const purpose = options.purpose || 'chat';
   let lastError;
+  let localError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
+    const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
-      const res = await callOne(messages, opts, null, dailyLimit);
+      const res = await callOne(messages, opts, null, dailyLimit, purpose);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`LLM request failed ${res.status}: ${text}`);
@@ -434,15 +442,21 @@ export async function chat(messages, options = {}) {
     } catch (err) {
       endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
       if (isDailyLimitFallbackError(err)) {
-        console.log('[LLM] cloud daily limit reached, trying next model:', label);
+        console.log('[LLM] cloud daily limit reached, skipping:', label);
         lastError = err;
         continue;
       }
-      console.log('[LLM] try failed:', label, err.message);
+      if (isLocal) {
+        console.log('[LLM] local model unreachable, trying cloud fallback:', err.message);
+        localError = err;
+      } else {
+        console.log('[LLM] try failed:', label, err.message);
+      }
       lastError = err;
     }
   }
-  throw lastError || new Error('No LLM configured');
+  // Surface the root cause: when local went down and cloud also failed, report the local failure
+  throw localError || lastError || new Error('No LLM configured');
 }
 
 /**
@@ -458,11 +472,13 @@ export async function chatWithTools(messages, tools, options = {}) {
   const purpose = options.purpose || 'chat_with_tools';
   const toolCount = Array.isArray(tools) ? tools.length : 0;
   let lastError;
+  let localError;
   for (const opts of models) {
     const label = opts.model || opts.baseUrl?.replace(/^https?:\/\//, '').slice(0, 20) || 'unknown';
+    const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId, toolCount });
     try {
-      const res = await callOne(messages, opts, tools, dailyLimit);
+      const res = await callOne(messages, opts, tools, dailyLimit, purpose);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`LLM request failed ${res.status}: ${text}`);
@@ -488,15 +504,21 @@ export async function chatWithTools(messages, tools, options = {}) {
     } catch (err) {
       endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err), toolCount });
       if (isDailyLimitFallbackError(err)) {
-        console.log('[LLM] cloud daily limit reached, trying next model:', label);
+        console.log('[LLM] cloud daily limit reached, skipping:', label);
         lastError = err;
         continue;
       }
-      console.log('[LLM] try failed:', label, err.message);
+      if (isLocal) {
+        console.log('[LLM] local model unreachable, trying cloud fallback:', err.message);
+        localError = err;
+      } else {
+        console.log('[LLM] try failed:', label, err.message);
+      }
       lastError = err;
     }
   }
-  throw lastError || new Error('No LLM configured');
+  // Surface the root cause: when local went down and cloud also failed, report the local failure
+  throw localError || lastError || new Error('No LLM configured');
 }
 
 /**
@@ -531,7 +553,7 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
       const res = await Promise.race([
-        callOne(messages, { ...opts, maxTokens: 25 }, null, dailyLimit),
+        callOne(messages, { ...opts, maxTokens: 25 }, null, dailyLimit, purpose),
         new Promise((_, reject) => setTimeout(() => reject(new Error('intent timeout')), INTENT_TIMEOUT_MS)),
       ]);
       if (!res.ok) {
@@ -625,6 +647,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
           max_tokens: opts.maxTokens || 1024,
           system: systemPrompt,
           messages: [{ role: 'user', content: userContentAnthropic }],
+          ...(purpose ? { metadata: { user_id: purpose } } : {}),
         };
         res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -637,7 +660,7 @@ export async function describeImage(imageUrlOrDataUri, prompt, systemPrompt = 'Y
         });
       } else if (!isAnthropic) {
         const fullMessages = systemPrompt ? [{ role: 'system', content: systemPrompt }, ...messages] : messages;
-        res = await callOne(fullMessages, opts, null, dailyLimit);
+        res = await callOne(fullMessages, opts, null, dailyLimit, purpose);
       } else {
         continue;
       }
