@@ -21,6 +21,78 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const DEFAULT_DAILY_LIMIT = 100;
 
+// ---------------------------------------------------------------------------
+// Local LLM per-minute rate limiter
+// Limits how many requests per minute are sent to local models (ollama/lmstudio).
+// Default: 1 request per minute. If a second request arrives before the window
+// expires, it is rejected immediately (not queued).
+// Override via config.json: { "llm": { "localRpm": 5 } }
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_LOCAL_RPM = 1;
+
+/** Timestamp (ms) of the most recent local LLM call for each baseUrl. */
+const _localLastCallMs = new Map();
+/** How many calls have been made in the current window for each baseUrl. */
+const _localWindowCount = new Map();
+/** Start of the current 60-second window for each baseUrl. */
+const _localWindowStart = new Map();
+
+/**
+ * Check local RPM limit for a given baseUrl.
+ * Throws with code 'LLM_LOCAL_RATE_LIMIT' if the limit is exceeded.
+ * @param {string} baseUrl
+ * @param {number} rpm  Requests per minute allowed (0 = unlimited)
+ */
+export function checkLocalRateLimit(baseUrl, rpm) {
+  const limit = Number(rpm);
+  if (!limit || limit <= 0) return; // 0 = unlimited
+
+  const key = String(baseUrl || '').toLowerCase();
+  const now = Date.now();
+  const windowStart = _localWindowStart.get(key) || 0;
+  const windowAge = now - windowStart;
+
+  if (windowAge >= 60_000) {
+    // New window
+    _localWindowStart.set(key, now);
+    _localWindowCount.set(key, 1);
+    _localLastCallMs.set(key, now);
+    return;
+  }
+
+  const count = (_localWindowCount.get(key) || 0) + 1;
+  if (count > limit) {
+    const msLeft = 60_000 - windowAge;
+    const err = new Error(
+      `Local LLM rate limit reached (${limit} req/min). Try again in ${Math.ceil(msLeft / 1000)}s.`,
+    );
+    err.code = 'LLM_LOCAL_RATE_LIMIT';
+    err.msUntilReset = msLeft;
+    throw err;
+  }
+
+  _localWindowCount.set(key, count);
+  _localLastCallMs.set(key, now);
+}
+
+/** True when the error is a local RPM limit hit. */
+export function isLocalRateLimitError(err) {
+  return (
+    err?.code === 'LLM_LOCAL_RATE_LIMIT' ||
+    /Local LLM rate limit reached/i.test(err?.message || '')
+  );
+}
+
+/** Milliseconds remaining in the current local RPM window for a given baseUrl, or 0 if no active window. */
+export function localRpmMsUntilReset(baseUrl) {
+  const key = String(baseUrl || '').toLowerCase();
+  const windowStart = _localWindowStart.get(key) || 0;
+  if (!windowStart) return 0;
+  const age = Date.now() - windowStart;
+  return age >= 60_000 ? 0 : 60_000 - age;
+}
+
 function todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -309,7 +381,8 @@ function loadConfig(options = {}) {
     models = models.map(({ priority: _p, ...m }) => m);
     const visionFallback = parseVisionFallback(config);
     const dailyLimit = Number(fromEnv(llm.dailyLimit)) || DEFAULT_DAILY_LIMIT;
-    return { models, maxTokens: defaultMaxTokens, visionFallback, dailyLimit };
+    const localRpm = Number(fromEnv(llm.localRpm)) >= 0 ? Number(fromEnv(llm.localRpm)) : DEFAULT_LOCAL_RPM;
+    return { models, maxTokens: defaultMaxTokens, visionFallback, dailyLimit, localRpm };
   }
 
   const baseUrl = fromEnv('LLM_BASE_URL') || fromEnv(llm.baseUrl);
@@ -318,6 +391,7 @@ function loadConfig(options = {}) {
   const maxTokens = Number(fromEnv(llm.maxTokens)) || 2048;
   const visionFallback = parseVisionFallback(config);
   const dailyLimit = Number(fromEnv(llm.dailyLimit)) || DEFAULT_DAILY_LIMIT;
+  const localRpm = Number(fromEnv(llm.localRpm)) >= 0 ? Number(fromEnv(llm.localRpm)) : DEFAULT_LOCAL_RPM;
   return {
     models: [
       {
@@ -330,6 +404,7 @@ function loadConfig(options = {}) {
     maxTokens,
     visionFallback,
     dailyLimit,
+    localRpm,
   };
 }
 
@@ -385,9 +460,13 @@ function openaiUsesMaxCompletionTokens(model) {
   return typeof model === 'string' && /^gpt-5/.test(model);
 }
 
-function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT, purpose = '') {
+function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, dailyLimit = DEFAULT_DAILY_LIMIT, purpose = '', localRpm = DEFAULT_LOCAL_RPM) {
   const isLocal = /127\.0\.0\.1|localhost/i.test(baseUrl || '');
-  if (!isLocal) checkAndTrackCloudLimit(dailyLimit);
+  if (!isLocal) {
+    checkAndTrackCloudLimit(dailyLimit);
+  } else {
+    checkLocalRateLimit(baseUrl, localRpm);
+  }
 
   const isAnthropic = (baseUrl || '').includes('anthropic.com');
   if (isAnthropic) {
@@ -419,7 +498,7 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, 
  * @returns {Promise<string>}
  */
 export async function chat(messages, options = {}) {
-  const { models, dailyLimit } = loadConfig(options);
+  const { models, dailyLimit, localRpm } = loadConfig(options);
   const purpose = options.purpose || 'chat';
   let lastError;
   let localError;
@@ -428,7 +507,7 @@ export async function chat(messages, options = {}) {
     const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
-      const res = await callOne(messages, opts, null, dailyLimit, purpose);
+      const res = await callOne(messages, opts, null, dailyLimit, purpose, localRpm);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`LLM request failed ${res.status}: ${text}`);
@@ -441,6 +520,10 @@ export async function chat(messages, options = {}) {
       return content.trim();
     } catch (err) {
       endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
+      if (isLocalRateLimitError(err)) {
+        console.log('[LLM] local rate limit reached, rejecting request:', err.message);
+        throw err;
+      }
       if (isDailyLimitFallbackError(err)) {
         console.log('[LLM] cloud daily limit reached, skipping:', label);
         lastError = err;
@@ -468,7 +551,7 @@ export async function chat(messages, options = {}) {
  * @returns {Promise<{ content: string, toolCalls: Array<{ id: string, name: string, arguments: string }> }>}
  */
 export async function chatWithTools(messages, tools, options = {}) {
-  const { models, dailyLimit } = loadConfig(options);
+  const { models, dailyLimit, localRpm } = loadConfig(options);
   const purpose = options.purpose || 'chat_with_tools';
   const toolCount = Array.isArray(tools) ? tools.length : 0;
   let lastError;
@@ -478,7 +561,7 @@ export async function chatWithTools(messages, tools, options = {}) {
     const isLocal = /127\.0\.0\.1|localhost/i.test(opts.baseUrl || '');
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId, toolCount });
     try {
-      const res = await callOne(messages, opts, tools, dailyLimit, purpose);
+      const res = await callOne(messages, opts, tools, dailyLimit, purpose, localRpm);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`LLM request failed ${res.status}: ${text}`);
@@ -503,6 +586,10 @@ export async function chatWithTools(messages, tools, options = {}) {
       return { content, toolCalls };
     } catch (err) {
       endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err), toolCount });
+      if (isLocalRateLimitError(err)) {
+        console.log('[LLM] local rate limit reached, rejecting request:', err.message);
+        throw err;
+      }
       if (isDailyLimitFallbackError(err)) {
         console.log('[LLM] cloud daily limit reached, skipping:', label);
         lastError = err;
@@ -545,7 +632,7 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
     },
     { role: 'user', content: (userMessage || '').trim() || 'Hi' },
   ];
-  const { models, dailyLimit } = loadConfig(options);
+  const { models, dailyLimit, localRpm } = loadConfig(options);
   const purpose = options.purpose || 'classify_intent';
   let lastError;
   for (const opts of models) {
@@ -553,7 +640,7 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
     const llmCtx = beginLlmCall({ purpose, model: label, agentId: options.agentId });
     try {
       const res = await Promise.race([
-        callOne(messages, { ...opts, maxTokens: 25 }, null, dailyLimit, purpose),
+        callOne(messages, { ...opts, maxTokens: 25 }, null, dailyLimit, purpose, localRpm),
         new Promise((_, reject) => setTimeout(() => reject(new Error('intent timeout')), INTENT_TIMEOUT_MS)),
       ]);
       if (!res.ok) {
@@ -576,6 +663,10 @@ CHAT = greetings, general knowledge questions (that don't need current data), or
       return intent;
     } catch (err) {
       endLlmCall(llmCtx, { model: label, status: 'error', message: err?.message || String(err) });
+      if (isLocalRateLimitError(err)) {
+        console.log('[LLM] local rate limit reached, rejecting intent request:', err.message);
+        throw err;
+      }
       if (isDailyLimitFallbackError(err)) {
         console.log('[LLM] cloud daily limit reached, trying next model:', label);
         lastError = err;
@@ -768,11 +859,11 @@ export async function generateImage(prompt, opts = {}) {
   return { path, caption };
 }
 
-/** Return today's cloud LLM usage: { date, count, limit }. */
+/** Return today's cloud LLM usage: { date, count, limit, localRpm }. */
 export function getLlmUsageToday(options = {}) {
-  const { dailyLimit } = loadConfig(options);
+  const { dailyLimit, localRpm } = loadConfig(options);
   const usage = readUsage();
-  return { date: usage.date, count: usage.count, limit: dailyLimit };
+  return { date: usage.date, count: usage.count, limit: dailyLimit, localRpm };
 }
 
 export { loadConfig, PRESETS };

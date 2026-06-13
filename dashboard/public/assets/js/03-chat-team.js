@@ -3530,18 +3530,58 @@
         var d = await r.json().catch(function () { return {}; });
         var chip = document.getElementById('mc2-llm-usage');
         var txt  = document.getElementById('mc2-llm-usage-text');
-        if (!chip || !txt) return;
-        var count = Number(d.count) || 0;
-        var limit = Number(d.limit) || 100;
-        var pct   = limit > 0 ? count / limit : 0;
-        txt.textContent = count + ' / ' + limit;
-        chip.classList.remove('is-warning', 'is-danger');
-        if (pct >= 1)        chip.classList.add('is-danger');
-        else if (pct >= 0.8) chip.classList.add('is-warning');
-        var hoursLeft = Math.ceil((Number(d.msUntilReset) || 0) / 3600000);
-        chip.title = count + ' of ' + limit + ' cloud LLM calls used today. Resets in ~' + hoursLeft + 'h (midnight UTC).';
+        if (chip && txt) {
+          var count = Number(d.count) || 0;
+          var limit = Number(d.limit) || 100;
+          var pct   = limit > 0 ? count / limit : 0;
+          txt.textContent = count + ' / ' + limit;
+          chip.classList.remove('is-warning', 'is-danger');
+          if (pct >= 1)        chip.classList.add('is-danger');
+          else if (pct >= 0.8) chip.classList.add('is-warning');
+          var hoursLeft = Math.ceil((Number(d.msUntilReset) || 0) / 3600000);
+          chip.title = count + ' of ' + limit + ' cloud LLM calls used today. Resets in ~' + hoursLeft + 'h (midnight UTC).';
+        }
+        var localRpm = d.localRpm !== undefined ? Number(d.localRpm) : 1;
+        var rpmTxt = document.getElementById('mc2-local-rpm-text');
+        var rpmBtn = document.getElementById('mc2-local-rpm-btn');
+        if (rpmTxt) {
+          rpmTxt.textContent = localRpm === 0 ? 'local: unlimited' : 'local: ' + localRpm + '/min';
+        }
+        if (rpmBtn) {
+          rpmBtn.title = 'Local LLM rate limit: ' + (localRpm === 0 ? 'unlimited' : localRpm + ' req/min') + '. Click to change.';
+        }
       } catch (_) {}
     }
+
+    (function setupLocalRpmBtn() {
+      var btn = document.getElementById('mc2-local-rpm-btn');
+      if (!btn) return;
+      btn.addEventListener('click', async function () {
+        var currentTxt = document.getElementById('mc2-local-rpm-text');
+        var currentRpm = 1;
+        if (currentTxt) {
+          var m = currentTxt.textContent.match(/(\d+)/);
+          currentRpm = m ? Number(m[1]) : 1;
+          if (currentTxt.textContent.includes('unlimited')) currentRpm = 0;
+        }
+        var input = window.prompt(
+          'Local LLM requests per minute (1 = default, 0 = unlimited):',
+          String(currentRpm)
+        );
+        if (input === null) return;
+        var val = Number(input);
+        if (isNaN(val) || val < 0) { alert('Invalid value. Enter a number ≥ 0.'); return; }
+        try {
+          var r = await fetch(API + '/api/llm/local-rpm', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ localRpm: val }),
+          });
+          if (!r.ok) { var e = await r.json().catch(function () { return {}; }); alert('Failed: ' + (e.error || r.status)); return; }
+          fetchLlmUsage();
+        } catch (ex) { alert('Error saving: ' + ex.message); }
+      });
+    })();
 
     async function fetchTeamMetricsFeed() {
       try {

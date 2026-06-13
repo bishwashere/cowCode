@@ -1857,9 +1857,28 @@ app.get('/api/llm/usage', (_req, res) => {
       try { return JSON.parse(readFileSync(getConfigPath(), 'utf8')); } catch (_) { return {}; }
     })();
     const limit = Number(config?.llm?.dailyLimit) || 100;
+    const localRpm = config?.llm?.localRpm !== undefined ? Number(config.llm.localRpm) : 1;
     const midnight = new Date();
     midnight.setUTCHours(24, 0, 0, 0);
-    res.json({ date: today, count, limit, msUntilReset: midnight.getTime() - Date.now() });
+    res.json({ date: today, count, limit, localRpm, msUntilReset: midnight.getTime() - Date.now() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/llm/local-rpm', (req, res) => {
+  try {
+    const rpm = Number(req.body?.localRpm);
+    if (isNaN(rpm) || rpm < 0) {
+      res.status(400).json({ error: 'localRpm must be a non-negative number (0 = unlimited)' });
+      return;
+    }
+    const config = (() => {
+      try { return JSON.parse(readFileSync(getConfigPath(), 'utf8')); } catch (_) { return {}; }
+    })();
+    config.llm = { ...(config.llm || {}), localRpm: rpm };
+    saveConfig(config);
+    res.json({ ok: true, localRpm: rpm });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
