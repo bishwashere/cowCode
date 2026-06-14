@@ -3703,10 +3703,22 @@
       return result;
     }
 
+    function isOrphanedLetterPrompt(text) {
+      var raw = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!raw) return false;
+      var asksForLetter = /\breply with (one )?(character|letter)\b/i.test(raw)
+        || (/\b(recommended|pick|choose):\s*[A-E]\b/i.test(raw) && /\b[A-E]\s*,\s*[A-E]\b/.test(raw));
+      if (!asksForLetter) return false;
+      var hasOptionDefs = /\b[A-E]\s*=\s*\S/.test(raw)
+        || /\b[A-E]\)\s+[A-Za-z0-9"']/.test(raw);
+      var truncatedGlossary = /\b[A-E]\s*=/.test(raw) && raw.endsWith('...');
+      return !hasOptionDefs || truncatedGlossary;
+    }
+
     function missionAttentionPrompt(mission) {
       if (!mission) return '';
       var ask = String(mission.needsUserInput || '').trim();
-      if (ask) return ask;
+      if (ask && !isOrphanedLetterPrompt(ask)) return ask;
       var blockedTasks = collectBlockedTasksForMission(mission);
       if (blockedTasks.length > 0) {
         var first = blockedTasks[0];
@@ -3741,7 +3753,8 @@
     function missionNeedsAttention(mission) {
       if (!mission) return false;
       // User was explicitly asked something.
-      if (String(mission.needsUserInput || '').trim()) return true;
+      var ask = String(mission.needsUserInput || '').trim();
+      if (ask && !isOrphanedLetterPrompt(ask)) return true;
       // There are tasks that need user input or have hard errors.
       if (countBlockedTasksForMission(mission) > 0) return true;
       // Mission itself errored or is hard-blocked.

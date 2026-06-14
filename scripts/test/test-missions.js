@@ -28,6 +28,7 @@ async function main() {
       partitionTasksByWait,
       taskBlockedByWait,
       normalizeWaitAppliesTo,
+      normalizeNeedsUserInput,
     } = await import('../../lib/missions.js');
     const { logTeamActivity } = await import('../../lib/team-activity.js');
 
@@ -324,6 +325,13 @@ async function main() {
     assert(listDueMissions().some((g) => g.id === created.id), 'mission is due again after user response');
     const memoryAfterRespond = readMissionMemory(created.id, { maxChars: 5000 });
     assert(/User input received:/.test(memoryAfterRespond), 'memory stores user input response');
+
+    const orphaned = 'Reply with ONE character: A, B, C, D, or E. (Recommended: A). Optional: reply "auto-default".';
+    assert(!normalizeNeedsUserInput(orphaned), 'orphaned letter prompt rejected');
+    const withOptions = normalizeNeedsUserInput(
+      'Pick analytics stack. Recommend PostHog. Options: 1) GA4 2) Mixpanel. Reply "use default".',
+    );
+    assert(withOptions.includes('GA4'), 'prompt with inline options preserved');
 
     // deleteMission
     const toDelete = createMission({ title: 'Temp mission', objective: 'Delete me', ownerAgentId: 'main' });
