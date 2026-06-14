@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { getConfigPath, getUploadsDir, getAgentConfigPath, getLlmUsagePath } from './lib/paths.js';
 import { DEFAULT_AGENT_ID } from './lib/agent-config.js';
-import { beginLlmCall, endLlmCall } from './lib/request-timing.js';
+import { beginLlmCall, endLlmCall, getActiveTrace } from './lib/request-timing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -33,18 +33,28 @@ export const DEFAULT_LOCAL_RPM = 1;
 
 /** Timestamp (ms) of the most recent local LLM call for each baseUrl. */
 const _localLastCallMs = new Map();
-/** How many calls have been made in the current window for each baseUrl. */
+/** How many distinct messages have been admitted in the current window for each baseUrl. */
 const _localWindowCount = new Map();
 /** Start of the current 60-second window for each baseUrl. */
 const _localWindowStart = new Map();
+/**
+ * The trace ID (message/request) that was admitted into the current window for each baseUrl.
+ * All LLM calls sharing this trace ID are free — only a second *distinct* message is rate-limited.
+ */
+const _localAdmittedTraceId = new Map();
 
 /**
  * Check local RPM limit for a given baseUrl.
+ * The limit is per *message* (request trace), not per individual LLM call.
+ * All LLM calls that belong to the same top-level message are allowed freely once
+ * that message has been admitted. Only a second distinct message within the same
+ * 60-second window is rejected.
  * Throws with code 'LLM_LOCAL_RATE_LIMIT' if the limit is exceeded.
  * @param {string} baseUrl
- * @param {number} rpm  Requests per minute allowed (0 = unlimited)
+ * @param {number} rpm  Messages per minute allowed (0 = unlimited)
+ * @param {string|null} traceId  Active request trace ID (from getActiveTrace)
  */
-export function checkLocalRateLimit(baseUrl, rpm) {
+export function checkLocalRateLimit(baseUrl, rpm, traceId = null) {
   const limit = Number(rpm);
   if (!limit || limit <= 0) return; // 0 = unlimited
 
@@ -54,13 +64,22 @@ export function checkLocalRateLimit(baseUrl, rpm) {
   const windowAge = now - windowStart;
 
   if (windowAge >= 60_000) {
-    // New window
+    // New window — admit this message
     _localWindowStart.set(key, now);
     _localWindowCount.set(key, 1);
+    _localLastCallMs.set(key, now);
+    if (traceId) _localAdmittedTraceId.set(key, traceId);
+    return;
+  }
+
+  // If this call belongs to the already-admitted message, let it through for free
+  const admittedTrace = _localAdmittedTraceId.get(key);
+  if (traceId && admittedTrace && traceId === admittedTrace) {
     _localLastCallMs.set(key, now);
     return;
   }
 
+  // New message arriving within the same window — check against the limit
   const count = (_localWindowCount.get(key) || 0) + 1;
   if (count > limit) {
     const msLeft = 60_000 - windowAge;
@@ -74,6 +93,7 @@ export function checkLocalRateLimit(baseUrl, rpm) {
 
   _localWindowCount.set(key, count);
   _localLastCallMs.set(key, now);
+  if (traceId) _localAdmittedTraceId.set(key, traceId);
 }
 
 /** True when the error is a local RPM limit hit. */
@@ -465,7 +485,7 @@ function callOne(messages, { baseUrl, apiKey, model, maxTokens }, tools = null, 
   if (!isLocal) {
     checkAndTrackCloudLimit(dailyLimit);
   } else {
-    checkLocalRateLimit(baseUrl, localRpm);
+    checkLocalRateLimit(baseUrl, localRpm, getActiveTrace()?.id ?? null);
   }
 
   const isAnthropic = (baseUrl || '').includes('anthropic.com');

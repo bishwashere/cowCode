@@ -160,8 +160,44 @@ async function runLocalDownCloudLimited() {
   }
 }
 
+/**
+ * Local RPM limit is per-message (trace), not per individual LLM call.
+ * Multiple calls within the same trace must all pass. A second distinct
+ * trace within the same 60-second window must be rejected.
+ */
+async function runLocalRpmPerMessage() {
+  const { checkLocalRateLimit } = await import('../../llm.js?rpm-per-message-test');
+
+  const BASE = 'http://127.0.0.1:9999/v1';
+
+  // --- First call of trace-A opens the window and is admitted ---
+  checkLocalRateLimit(BASE, 1, 'trace-A');
+
+  // --- Second and third calls of the same trace must not throw ---
+  let threw = false;
+  try {
+    checkLocalRateLimit(BASE, 1, 'trace-A');
+    checkLocalRateLimit(BASE, 1, 'trace-A');
+  } catch {
+    threw = true;
+  }
+  assert(!threw, 'multiple LLM calls within the same message trace must all be allowed');
+
+  // --- A second distinct trace within the same window must be rejected ---
+  let blocked = false;
+  try {
+    checkLocalRateLimit(BASE, 1, 'trace-B');
+  } catch (err) {
+    blocked = err?.code === 'LLM_LOCAL_RATE_LIMIT';
+  }
+  assert(blocked, 'a second distinct message within the same 60-second window must be rate-limited');
+
+  console.log('test-llm-local-rpm-per-message passed');
+}
+
 run()
   .then(() => runLocalDownCloudLimited())
+  .then(() => runLocalRpmPerMessage())
   .catch((err) => {
     console.error(err);
     process.exit(1);
