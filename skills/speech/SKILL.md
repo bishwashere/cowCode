@@ -73,4 +73,4 @@ Speech uses a **separate setup** from the LLM cloud provider:
 - **Whisper (voice → text):** During setup you can choose to use your existing **OpenAI API key** (e.g. `LLM_1_API_KEY`) or enter a **separate Whisper/OpenAI key** (stored as `SPEECH_WHISPER_API_KEY`). Config: `skills.speech.whisper.apiKey` (env var name).
 - **11Labs (text → voice):** During setup you are asked for your **11Labs API key**; it is stored in `.env` as `ELEVEN_LABS_API_KEY`. Config: `skills.speech.elevenLabs.apiKey` (env var name).
 
-Re-run setup to add or change speech keys.
+Re-run `pasture setup` to add or change speech keys.

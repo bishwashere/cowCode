@@ -116,7 +116,7 @@ On Windows with Git Bash, you can use the Linux/macOS one-liner instead (`instal
 git clone https://github.com/bishwashere/pastureprotocol.git
 cd pastureprotocol
 pnpm install
-node setup.js      # interactive first-run setup
+node setup.js      # or: pasture setup — interactive onboarding / re-configure
 ```
 
 <small>Upgrading from Pasture? Run `pasture update` (or `pasture update` — the old command forwards to `pasture`). State migrates from `~/.pasture` to `~/.pasture` automatically.</small>

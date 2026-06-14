@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CLI entry: auth, start/stop/status/restart, update, and skill add/remove.
- * Usage: pasture auth | pasture start|stop|status|restart | pasture logs | pasture add <skill-id> | pasture remove <skill-id> | pasture update [--force]
+ * Usage: pasture auth | pasture setup | pasture start|stop|status|restart | pasture logs | pasture add <skill-id> | pasture remove <skill-id> | pasture update [--force]
  */
 
 import { spawn, spawnSync, execSync } from 'child_process';
@@ -184,6 +184,19 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
     }, 800);
     process.exit(0);
   })();
+} else if (sub === 'setup') {
+  const setupScript = join(INSTALL_DIR, 'setup.js');
+  if (!existsSync(setupScript)) {
+    console.error('pasture: setup.js not found. Re-run the installer or run from repo.');
+    installHint();
+    process.exit(1);
+  }
+  const child = spawn(process.execPath, [setupScript], {
+    stdio: 'inherit',
+    env: { ...process.env, PASTURE_INSTALL_DIR: INSTALL_DIR },
+    cwd: INSTALL_DIR,
+  });
+  child.on('close', (code) => process.exit(code ?? 0));
 } else if (sub === 'auth' || (args.length === 1 && args[0] === '--auth-only')) {
   const authArgs = args[0] === '--auth-only' ? args : ['--auth-only', ...args.slice(1)];
   const child = spawn(process.execPath, [join(INSTALL_DIR, 'index.js'), ...authArgs], {
@@ -504,6 +517,7 @@ if (['start', 'stop', 'status', 'restart'].includes(sub)) {
   }
 } else {
   console.log('Usage: pasture start | stop | status | restart');
+  console.log('       pasture setup');
   console.log('       pasture logs');
   console.log('       pasture dashboard');
   console.log('       pasture tide checklist list|add|remove|run|triggers|enable|disable');

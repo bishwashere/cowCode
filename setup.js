@@ -2,7 +2,7 @@
 /**
  * One-command setup: install deps, one-time onboarding (base URL, optional API keys), then run the app.
  * On first run the app will show QR to link WhatsApp, then start the bot.
- * Usage: npm run setup | pnpm run setup | yarn setup | node setup.js
+ * Usage: pasture setup | npm run setup | pnpm run setup | node setup.js
  */
 
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, cpSync } from 'fs';
@@ -670,7 +670,8 @@ async function onboarding() {
 async function main() {
   if (!process.stdin.isTTY) {
     console.log('Setup needs an interactive terminal.');
-    console.log('Run: cd Pasture Protocol && node setup.js');
+    console.log('Run: pasture setup');
+    console.log('Or: cd Pasture Protocol && node setup.js');
     console.log('Or: cd Pasture Protocol && npm install && npm start\n');
     process.exit(0);
   }

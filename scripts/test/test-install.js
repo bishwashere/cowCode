@@ -106,6 +106,22 @@ function checkPastureLauncherNotLegacyShim() {
   return { ok: true, detail: 'pasture launcher is the sole CLI entry point; no legacy name references' };
 }
 
+function checkCliSetupCommand() {
+  const cli = readFileSync(join(ROOT, 'cli.js'), 'utf8');
+  const checks = [];
+  if (!cli.includes("sub === 'setup'")) {
+    checks.push("cli.js must handle sub === 'setup'");
+  }
+  if (!cli.includes('setup.js')) {
+    checks.push('cli.js setup must spawn setup.js');
+  }
+  if (!cli.includes('pasture setup')) {
+    checks.push('cli.js help must list pasture setup');
+  }
+  if (checks.length) return { ok: false, detail: checks.join('; ') };
+  return { ok: true, detail: 'pasture setup runs setup.js with PASTURE_INSTALL_DIR' };
+}
+
 async function main() {
   startReport('test-install');
 
@@ -139,6 +155,14 @@ async function main() {
     input: 'install/update launcher scripts',
     output: launcher.detail,
     status: launcher.ok ? 'pass' : 'fail',
+  });
+
+  const setupCmd = checkCliSetupCommand();
+  recordCase({
+    name: 'pasture setup command',
+    input: 'pasture setup',
+    output: setupCmd.detail,
+    status: setupCmd.ok ? 'pass' : 'fail',
   });
 
   const shellTest = spawnSync('bash', [join(ROOT, 'scripts/test/test-install.sh')], {
