@@ -977,6 +977,7 @@
               progress: normalizeTaskProgress(sg.progress),
               description: String(sg.description || '').trim(),
               expectedOutput: String(sg.expectedOutput || '').trim(),
+              blockerType: String(sg.blockerType || '').trim(),
               type: String(sg.type || '').trim(),
               priority: Number(sg.priority) || 0,
               routeReason: String(sg.routeReason || '').trim(),
@@ -1484,9 +1485,17 @@
           ' aria-label="View blocked tasks and subtasks">[' + escapeHtml(String(summary.blocked)) + ' Blocked]</button>' +
         '<span class="team-task-badge completed">[' + escapeHtml(String(summary.completedToday)) + ' Completed Today]</span>';
       if (summary.blocked > 0 && summary.blockedLabel) {
+        var attentionText = '';
+        if (typeof missionAttentionPrompt === 'function') {
+          var _missions = Array.isArray(teamMissionsSnapshot.missions) ? teamMissionsSnapshot.missions : [];
+          for (var _mi = 0; _mi < _missions.length; _mi++) {
+            var _prompt = missionAttentionPrompt(_missions[_mi]);
+            if (_prompt) { attentionText = _prompt.split('\n')[0]; break; }
+          }
+        }
+        var displayLabel = attentionText || summary.blockedLabel;
         blockedEl.innerHTML = '<button type="button" class="team-task-blocked-link">' +
-          '<strong>' + (summary.blockedLabel.indexOf('Research continues') >= 0 ? 'Implementation blocked:' : 'Blocked:') + '</strong> ' +
-          escapeHtml(summary.blockedLabel) + '</button>';
+          escapeHtml(displayLabel) + '</button>';
         blockedEl.classList.remove('empty');
       } else {
         blockedEl.innerHTML = '<strong>Blocked:</strong> <span class="empty">None</span>';

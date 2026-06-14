@@ -43,7 +43,7 @@ import {
 } from './lib/request-timing.js';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
+import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, readdirSync } from 'fs';
 import { spawn } from 'child_process';
 import pino from 'pino';
 import { startCron, stopCron, scheduleOneShot, runPastDueOneShots } from './cron/runner.js';
@@ -70,7 +70,7 @@ import {
   buildRetrospectiveContextBlock,
 } from './lib/retrospective.js';
 import { startSystemPulse, getPendingHealthFlags, migrateSystemPulseConfig } from './lib/system-pulse.js';
-import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, resolveChatHistoryExchanges } from './lib/chat-log.js';
+import { appendExchange, appendGroupExchange, readLastGroupExchanges, readLastPrivateExchanges, readPrivateExchangesInWindow, resolveChatHistoryExchanges } from './lib/chat-log.js';
 import { ensureChatSession, shouldAckNewSessionOnly, NEW_SESSION_ACK } from './lib/chat-session.js';
 import { buildSessionBootstrapContext } from './lib/session-bootstrap.js';
 import {
@@ -789,6 +789,178 @@ async function main() {
     console.log('[tide] Stopped.');
   }
 
+  // ── Tide history nudge (completely separate from the silence follow-up) ────
+  /** Per-JID timestamp of the last nudge sent. */
+  const nudgeLastSentByJid = new Map();
+  /** JIDs currently running a nudge — prevents overlapping runs for the same JID. */
+  const nudgeRunningJids = new Set();
+  /** Handle for the nudge interval. */
+  let nudgeGlobalInterval = null;
+
+  async function runNudgeForJid(nudgeJid) {
+    const trace = startRequestTrace({ source: 'tide_nudge', jid: String(nudgeJid), agentId: 'main' });
+    logRequestStart(trace);
+    let status = 'ok';
+    try {
+      await _runNudgeForJid(nudgeJid);
+    } catch (err) {
+      status = 'error';
+      console.error('[tide-nudge]', getErrorMessageForLog(err));
+    } finally {
+      logRequestEnd(trace, status);
+    }
+  }
+
+  async function _runNudgeForJid(nudgeJid) {
+    const config = getTideConfig();
+    const tide = config.tide || {};
+    if (!tide.enabled) return;
+    const nudgeCfg = tide.nudge || {};
+    if (nudgeCfg.enabled === false) return;
+    const inactiveStart = tide.inactiveStart && String(tide.inactiveStart).trim();
+    const inactiveEnd = tide.inactiveEnd && String(tide.inactiveEnd).trim();
+    if (inactiveStart && inactiveEnd && isInTideInactiveWindow(inactiveStart, inactiveEnd)) return;
+    const isTgJid = isTelegramChatId(nudgeJid);
+    const waSock = whatsappSockRef.current;
+    if (isTgJid && !telegramBot) return;
+    if (!isTgJid && !waSock?.sendMessage) return;
+
+    const nudgeLogJid = isTelegramGroupJid(nudgeJid) ? nudgeJid : toLogJid(nudgeJid);
+    const lookbackDays = Math.max(1, Number(nudgeCfg.lookbackDays) || 7);
+    const maxItems = Math.min(40, Math.max(5, Number(nudgeCfg.maxHistoryItems) || 20));
+    const historyItems = readPrivateExchangesInWindow(getWorkspaceDir(), nudgeLogJid, lookbackDays, maxItems);
+    if (!historyItems.length) {
+      console.log('[tide-nudge] No history window for', String(nudgeJid).slice(0, 20), '— skipping');
+      return;
+    }
+
+    const nudgeBootstrap = buildSessionBootstrapContext(getWorkspaceDir(), {
+      logJid: isTelegramGroupJid(nudgeJid) ? undefined : nudgeLogJid,
+    }).block;
+
+    const payload = JSON.stringify({
+      jid: nudgeJid,
+      storePath: getCronStorePath(),
+      workspaceDir: getWorkspaceDir(),
+      historyItems,
+      bootstrapBlock: nudgeBootstrap,
+    });
+
+    let textToSend = '';
+    let sendOk = false;
+    try {
+      textToSend = await new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, ['cron/run-tide-nudge.js'], {
+          cwd: __dirname,
+          stdio: ['pipe', 'pipe', 'inherit'],
+          env: { ...process.env, PASTURE_STATE_DIR: process.env.PASTURE_STATE_DIR },
+        });
+        let out = '';
+        child.stdout.setEncoding('utf8');
+        child.stdout.on('data', (chunk) => { out += chunk; });
+        child.on('exit', (code, signal) => {
+          if (code !== 0 && code != null) { reject(new Error(`run-tide-nudge exited ${code}`)); return; }
+          if (signal) { reject(new Error(`run-tide-nudge killed: ${signal}`)); return; }
+          const lastLine = out.trim().split('\n').filter(Boolean).pop() || '';
+          try {
+            const parsed = JSON.parse(lastLine);
+            if (parsed.error) reject(new Error(parsed.error));
+            else resolve(parsed.textToSend || '');
+          } catch (e) {
+            reject(new Error(lastLine.slice(0, 100) || e.message || 'run-tide-nudge invalid output'));
+          }
+        });
+        child.on('error', reject);
+        child.stdin.end(payload, 'utf8');
+      });
+      sendOk = true;
+    } catch (e) {
+      console.error('[tide-nudge] subprocess failed:', getErrorMessageForLog(e));
+    }
+
+    if (sendOk) {
+      const rawText = sanitizeOutboundText((textToSend || '').trim());
+      let text = isTelegramChatId(nudgeJid) ? rawText.replace(/^\[Pasture\]\s*/i, '').trim() : rawText;
+      const nothingPhrases = /^(nothing|n\/?a|no(ne)?\s*to\s*do|all\s*good|nothing\s*to\s*report\.?)\s*\.?$/i;
+      if (!text || (text.length < 20 && nothingPhrases.test(text))) {
+        console.log('[tide-nudge] Empty/useless response — skipping send');
+        return;
+      }
+      const nudgeJidShort = String(nudgeJid).slice(0, 20) + (String(nudgeJid).length > 20 ? '…' : '');
+      try {
+        if (isTgJid && telegramBot) {
+          await sendLongText(telegramBot, Number(nudgeJid), text);
+        } else if (waSock?.sendMessage) {
+          await waSock.sendMessage(nudgeJid, { text });
+        }
+        nudgeLastSentByJid.set(nudgeJid, Date.now());
+        console.log('[tide-nudge] Nudge sent to', nudgeJidShort);
+      } catch (e) {
+        console.error('[tide-nudge] Send failed:', getErrorMessageForLog(e));
+      }
+      const exchange = {
+        user: 'Tide nudge',
+        assistant: text,
+        timestampMs: Date.now(),
+        jid: nudgeLogJid,
+        sessionId: null,
+      };
+      try {
+        const memoryConfig = getMemoryConfig();
+        if (memoryConfig && !isTelegramGroupJid(nudgeJid)) {
+          await indexChatExchange(memoryConfig, exchange);
+        } else {
+          appendExchange(getWorkspaceDir(), exchange);
+        }
+      } catch (err) {
+        console.error('[tide-nudge] Chat log write failed:', err.message);
+      }
+    }
+  }
+
+  function startTideNudge() {
+    const config = getTideConfig();
+    const tide = config.tide || {};
+    if (!tide.enabled) return;
+    const nudgeCfg = tide.nudge || {};
+    if (nudgeCfg.enabled === false) {
+      console.log('[tide-nudge] Disabled via tide.nudge.enabled = false.');
+      return;
+    }
+    const intervalMinutes = Math.max(30, Number(nudgeCfg.intervalMinutes) || 120);
+    if (nudgeGlobalInterval) clearInterval(nudgeGlobalInterval);
+    // Poll more frequently than the interval so we don't overshoot by a full poll cycle.
+    const pollMinutes = Math.min(intervalMinutes, 30);
+    console.log('[tide-nudge] Enabled — history nudge every', intervalMinutes, 'min (poll every', pollMinutes, 'min).');
+    nudgeGlobalInterval = setInterval(() => {
+      if (isDailyLimitReached()) return;
+      const now = Date.now();
+      const intervalMs = intervalMinutes * 60 * 1000;
+      // tideTimerByJid tracks which JIDs are actively monitored by Tide.
+      for (const [jid] of tideTimerByJid) {
+        if (nudgeRunningJids.has(jid)) continue;
+        const lastSent = nudgeLastSentByJid.get(jid) || 0;
+        if (now - lastSent < intervalMs) continue;
+        const jidShort = String(jid).slice(0, 20) + (String(jid).length > 20 ? '…' : '');
+        console.log('[tide-nudge] Nudge due for', jidShort);
+        nudgeRunningJids.add(jid);
+        runNudgeForJid(jid)
+          .catch((e) => console.error('[tide-nudge]', getErrorMessageForLog(e)))
+          .finally(() => nudgeRunningJids.delete(jid));
+      }
+    }, pollMinutes * 60 * 1000);
+  }
+
+  function stopTideNudge() {
+    if (nudgeGlobalInterval) {
+      clearInterval(nudgeGlobalInterval);
+      nudgeGlobalInterval = null;
+    }
+    nudgeRunningJids.clear();
+    console.log('[tide-nudge] Stopped.');
+  }
+  // ── end Tide history nudge ─────────────────────────────────────────────────
+
   const WHO_AM_I_MD = 'WhoAmI.md';
   const MY_HUMAN_MD = 'MyHuman.md';
   const SOUL_MD = 'SOUL.md';
@@ -1446,6 +1618,7 @@ async function main() {
       writeDaemonStarted();
       startCron({ storePath: getCronStorePath(), telegramBot: optsTelegramBot });
       startTide(sock, null);
+      startTideNudge();
       startRetrospective();
       startSystemPulse();
       const lastSentByJid = new Map();
@@ -1510,6 +1683,7 @@ async function main() {
       console.log('  Telegram bot enabled.');
       console.log('[tide] Calling startTide (Telegram path)');
       startTide(telegramSock, null);
+      startTideNudge();
       startRetrospective();
       startSystemPulse();
     }
@@ -1526,6 +1700,7 @@ async function main() {
       if (sid) {
         startCron({ sock, selfJid: sid, storePath: getCronStorePath(), telegramBot: telegramBot || undefined });
         startTide(sock, sid);
+        startTideNudge();
         startRetrospective();
         startSystemPulse();
       }
