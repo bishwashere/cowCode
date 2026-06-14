@@ -355,6 +355,8 @@ const checks = [
     ok: html.includes('countBlockedTasksForMission') &&
       html.includes('missionNeedsAttention') &&
       html.includes('missionAttentionPrompt') &&
+      html.includes('formatUserInputQuestionHtml') &&
+      html.includes('extractUserInputQuickOptions') &&
       html.includes('data-mc-task-action="respond"'),
   },
   {
