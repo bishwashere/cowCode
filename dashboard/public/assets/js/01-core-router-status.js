@@ -1,5 +1,5 @@
 const API = '';
-    var validPages = ['home', 'chat', 'crons', 'skills', 'groups', 'llm', 'tide', 'config', 'memory', 'test', 'projects', 'team', 'team-agent'];
+    var validPages = ['home', 'chat', 'crons', 'skills', 'groups', 'config', 'memory', 'test', 'team', 'team-agent'];
     var IDENTITY_FILE_ORDER = ['SOUL.md', 'WhoAmI.md', 'MyHuman.md', 'group.md'];
     var IDENTITY_FILE_LABELS = {
       'SOUL.md': 'Soul',
@@ -42,6 +42,18 @@ const API = '';
     function dashboardRouteFromPath() {
       try {
         var p = parsePath();
+        if (p.name === 'team' && p.mc2View === 'projects') {
+          var path = (location.pathname || '').replace(/^\//, '').replace(/\/$/, '');
+          if (path === 'projects') {
+            try { history.replaceState(null, '', '/team/projects'); } catch (_) {}
+          }
+        }
+        if (p.name === 'config') {
+          var configPath = (location.pathname || '').replace(/^\//, '').replace(/\/$/, '');
+          if (configPath === 'tide' || configPath === 'llm') {
+            try { history.replaceState(null, '', '/config'); } catch (_) {}
+          }
+        }
         setPage(p.name, p.memoryFile, p.openIdentity, p.teamAgentId, p.mc2View);
       } catch (err) {
         console.error('[dashboard] route failed:', err);
@@ -105,9 +117,7 @@ const API = '';
         if (typeof stopTeamActivityFeed === 'function') stopTeamActivityFeed();
         if (typeof setTeamPageFullscreen === 'function') setTeamPageFullscreen(false);
       }
-      if (name === 'llm') renderLlmForm();
       if (name === 'config') fetchConfig();
-      if (name === 'tide') fetchTideChecklist();
       if (name === 'test') fetchTests();
       if (name === 'memory') {
         fetchMemoryFiles().then(function () {
@@ -124,6 +134,12 @@ const API = '';
       var subFile = slash >= 0 ? raw.slice(slash + 1) : null;
       if (name === 'chat' || name === 'status') name = 'home';
       if (name === 'agents') name = 'team';
+      if (name === 'projects') {
+        return { name: 'team', memoryFile: null, openIdentity: null, teamAgentId: null, mc2View: 'projects' };
+      }
+      if (name === 'tide' || name === 'llm') {
+        return { name: 'config', memoryFile: null, openIdentity: null, teamAgentId: null };
+      }
       if (name === 'team' || name === 'team') {
         if (subFile) {
           var decodedSub = decodeURIComponent(subFile);

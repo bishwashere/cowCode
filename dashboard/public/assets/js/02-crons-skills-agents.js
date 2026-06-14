@@ -1128,7 +1128,8 @@ async function fetchCrons() {
     });
 
     function renderTideChecklistItems(items) {
-      var el = document.getElementById('tide-checklist-items');
+      var el = document.getElementById('config-tide-checklist-items');
+      if (!el) return;
       if (!items.length) {
         el.innerHTML = '<p class="skill-meta">No items yet.</p>';
         return;
@@ -1158,94 +1159,116 @@ async function fetchCrons() {
       });
     }
 
-    async function saveTideChecklistFromCache() {
-      var payload = {
-        tideEnabled: document.getElementById('tide-enabled').checked,
-        enabled: document.getElementById('tide-checklist-enabled').checked,
+    function readTideChecklistUiPayload() {
+      return {
+        tideEnabled: !!(document.getElementById('config-tide-enabled') && document.getElementById('config-tide-enabled').checked),
+        enabled: !!(document.getElementById('config-tide-checklist-enabled') && document.getElementById('config-tide-checklist-enabled').checked),
         triggers: {
-          onRestart: document.getElementById('tide-trigger-restart').checked,
-          onCycle: document.getElementById('tide-trigger-cycle').checked,
-          onFollowUp: document.getElementById('tide-trigger-followup').checked,
+          onRestart: !!(document.getElementById('config-tide-trigger-restart') && document.getElementById('config-tide-trigger-restart').checked),
+          onCycle: !!(document.getElementById('config-tide-trigger-cycle') && document.getElementById('config-tide-trigger-cycle').checked),
+          onFollowUp: !!(document.getElementById('config-tide-trigger-followup') && document.getElementById('config-tide-trigger-followup').checked),
         },
-        items: tideChecklistCache.items,
+        items: (tideChecklistCache && tideChecklistCache.items) ? tideChecklistCache.items : [],
       };
+    }
+
+    async function saveTideChecklistFromCache() {
+      var payload = readTideChecklistUiPayload();
       var r = await fetch(API + '/api/tide/checklist', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error('Save failed');
       var d = await r.json();
       applyTideChecklistUi(d);
+      if (configCache) {
+        configCache.tide = configCache.tide || {};
+        configCache.tide.enabled = !!d.tideEnabled;
+        configCache.tide.checklist = d.checklist;
+        document.getElementById('full-config').value = JSON.stringify(configCache, null, 2);
+      }
     }
 
     function applyTideChecklistUi(d) {
-      document.getElementById('tide-enabled').checked = !!d.tideEnabled;
-      document.getElementById('tide-checklist-enabled').checked = !!d.checklist.enabled;
-      document.getElementById('tide-trigger-restart').checked = !!d.checklist.triggers.onRestart;
-      document.getElementById('tide-trigger-cycle').checked = !!d.checklist.triggers.onCycle;
-      document.getElementById('tide-trigger-followup').checked = !!d.checklist.triggers.onFollowUp;
-      tideChecklistCache = d.checklist;
-      renderTideChecklistItems(d.checklist.items || []);
-      document.getElementById('tide-checklist-last').textContent = d.lastRun
-        ? JSON.stringify(d.lastRun, null, 2)
-        : '—';
+      if (!d) return;
+      var tideEnabled = document.getElementById('config-tide-enabled');
+      if (tideEnabled) tideEnabled.checked = !!d.tideEnabled;
+      var checklistEnabled = document.getElementById('config-tide-checklist-enabled');
+      if (checklistEnabled) checklistEnabled.checked = !!(d.checklist && d.checklist.enabled);
+      var trigRestart = document.getElementById('config-tide-trigger-restart');
+      var trigCycle = document.getElementById('config-tide-trigger-cycle');
+      var trigFollow = document.getElementById('config-tide-trigger-followup');
+      var triggers = (d.checklist && d.checklist.triggers) || {};
+      if (trigRestart) trigRestart.checked = !!triggers.onRestart;
+      if (trigCycle) trigCycle.checked = !!triggers.onCycle;
+      if (trigFollow) trigFollow.checked = !!triggers.onFollowUp;
+      tideChecklistCache = d.checklist || { items: [] };
+      renderTideChecklistItems(tideChecklistCache.items || []);
+      var lastEl = document.getElementById('config-tide-checklist-last');
+      if (lastEl) {
+        lastEl.textContent = d.lastRun ? JSON.stringify(d.lastRun, null, 2) : '—';
+      }
     }
 
-    async function fetchTideChecklist() {
+    async function fetchTideChecklistForConfig() {
       try {
         var r = await fetch(API + '/api/tide/checklist');
+        if (!r.ok) throw new Error('Failed to load tide checklist');
         var d = await r.json();
         applyTideChecklistUi(d);
+        return d;
       } catch (e) {
-        document.getElementById('tide-checklist-last').textContent = 'Failed to load: ' + (e.message || e);
+        var lastEl = document.getElementById('config-tide-checklist-last');
+        if (lastEl) lastEl.textContent = 'Failed to load: ' + (e.message || e);
+        return null;
       }
     }
 
-    wireEl('tide-checklist-save-triggers', 'click', async function () {
-      var saved = document.getElementById('tide-checklist-saved');
-      saved.style.display = 'none';
-      try {
-        await saveTideChecklistFromCache();
-        saved.style.display = 'inline';
-        setTimeout(function () { saved.style.display = 'none'; }, 2500);
-      } catch (e) {
-        alert(e.message || 'Save failed');
+    function wireConfigTideActions() {
+      var addBtn = document.getElementById('config-tide-checklist-add');
+      if (addBtn && !addBtn.dataset.wired) {
+        addBtn.dataset.wired = '1';
+        addBtn.addEventListener('click', async function () {
+          var labelEl = document.getElementById('config-tide-new-label');
+          var promptEl = document.getElementById('config-tide-new-prompt');
+          var label = labelEl ? labelEl.value.trim() : '';
+          var prompt = promptEl ? promptEl.value.trim() : '';
+          if (!label) { alert('Label is required.'); return; }
+          if (!tideChecklistCache) tideChecklistCache = { items: [] };
+          var item = {
+            id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48),
+            label: label,
+            prompt: prompt || label,
+            enabled: true,
+          };
+          tideChecklistCache.items = tideChecklistCache.items || [];
+          tideChecklistCache.items.push(item);
+          if (labelEl) labelEl.value = '';
+          if (promptEl) promptEl.value = '';
+          try {
+            await saveTideChecklistFromCache();
+          } catch (e) {
+            alert(e.message || 'Add failed');
+          }
+        });
       }
-    });
-
-    wireEl('tide-checklist-add', 'click', async function () {
-      var label = document.getElementById('tide-new-label').value.trim();
-      var prompt = document.getElementById('tide-new-prompt').value.trim();
-      if (!label) { alert('Label is required.'); return; }
-      if (!tideChecklistCache) tideChecklistCache = { items: [] };
-      var item = {
-        id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48),
-        label: label,
-        prompt: prompt || label,
-        enabled: true
-      };
-      tideChecklistCache.items = tideChecklistCache.items || [];
-      tideChecklistCache.items.push(item);
-      document.getElementById('tide-new-label').value = '';
-      document.getElementById('tide-new-prompt').value = '';
-      try {
-        await saveTideChecklistFromCache();
-      } catch (e) {
-        alert(e.message || 'Add failed');
+      var runBtn = document.getElementById('config-tide-checklist-run');
+      if (runBtn && !runBtn.dataset.wired) {
+        runBtn.dataset.wired = '1';
+        runBtn.addEventListener('click', async function () {
+          var status = document.getElementById('config-tide-checklist-run-status');
+          if (status) status.textContent = 'Running…';
+          try {
+            var r = await fetch(API + '/api/tide/checklist/run', { method: 'POST' });
+            var d = await r.json();
+            var lastEl = document.getElementById('config-tide-checklist-last');
+            if (d.lastRun && lastEl) lastEl.textContent = JSON.stringify(d.lastRun, null, 2);
+            var s = d.summary || d.lastRun || {};
+            if (status) status.textContent = (s.passed != null ? s.passed + '/' + s.total + ' passed' : 'Done');
+          } catch (e) {
+            if (status) status.textContent = 'Failed';
+            alert(e.message || 'Run failed');
+          }
+        });
       }
-    });
-
-    wireEl('tide-checklist-run', 'click', async function () {
-      var status = document.getElementById('tide-checklist-run-status');
-      status.textContent = 'Running…';
-      try {
-        var r = await fetch(API + '/api/tide/checklist/run', { method: 'POST' });
-        var d = await r.json();
-        if (d.lastRun) document.getElementById('tide-checklist-last').textContent = JSON.stringify(d.lastRun, null, 2);
-        var s = d.summary || d.lastRun || {};
-        status.textContent = (s.passed != null ? s.passed + '/' + s.total + ' passed' : 'Done');
-      } catch (e) {
-        status.textContent = 'Failed';
-        alert(e.message || 'Run failed');
-      }
-    });
+    }
 
     var configCache = null;
     var configSkillsList = [];
@@ -1319,6 +1342,8 @@ async function fetchCrons() {
       }).join('');
       var allowLines = Array.isArray(agentMessaging.allow) ? agentMessaging.allow.join('\n') : '';
       var tideCooldown = tide.silenceCooldownMinutes != null ? tide.silenceCooldownMinutes : tide.intervalMinutes;
+      var checklist = tide.checklist || {};
+      var checklistTriggers = checklist.triggers || {};
       var html = '' +
         '<details class="config-section" open><summary>General</summary><div class="config-section-body">' +
         '<div class="field"><label for="config-bio">Bio / personality</label><textarea id="config-bio" rows="3">' + escapeHtml(config.bio || '') + '</textarea></div>' +
@@ -1359,11 +1384,33 @@ async function fetchCrons() {
         configTextField('config-owner-telegram', 'Telegram user ID', owner.telegramUserId != null ? owner.telegramUserId : '', '123456789', 'number') +
         '</div></details>' +
         '<details class="config-section"><summary>Tide</summary><div class="config-section-body">' +
+        '<p class="skill-meta">Follow-ups and checklist items run as agent turns. Checklist requires Tide enabled for automatic runs.</p>' +
         '<div class="config-check-row">' + configBoolInput('config-tide-enabled', !!tide.enabled, 'Tide enabled') + '</div>' +
         configTextField('config-tide-cooldown', 'Silence cooldown (minutes)', tideCooldown != null ? tideCooldown : 30, '', 'number') +
         configTextField('config-tide-inactive-start', 'Quiet hours start', tide.inactiveStart || '23:00', '23:00') +
         configTextField('config-tide-inactive-end', 'Quiet hours end', tide.inactiveEnd || '06:00', '06:00') +
         configTextField('config-tide-jid', 'Target JID (optional)', tide.jid || '', '') +
+        '<div class="config-subsection">' +
+        '<p class="overview-label">Checklist</p>' +
+        '<div class="config-check-row">' + configBoolInput('config-tide-checklist-enabled', !!checklist.enabled, 'Checklist enabled') + '</div>' +
+        '<div class="config-tide-actions">' +
+        '<button type="button" id="config-tide-checklist-run">Run now</button>' +
+        '<span id="config-tide-checklist-run-status" class="skill-meta"></span>' +
+        '</div>' +
+        '<p class="overview-label">Triggers</p>' +
+        '<div class="config-check-row">' + configBoolInput('config-tide-trigger-restart', !!checklistTriggers.onRestart, 'On daemon restart') + '</div>' +
+        '<div class="config-check-row">' + configBoolInput('config-tide-trigger-cycle', !!checklistTriggers.onCycle, 'On health-check cycle') + '</div>' +
+        '<div class="config-check-row">' + configBoolInput('config-tide-trigger-followup', !!checklistTriggers.onFollowUp, 'On follow-up (per chat)') + '</div>' +
+        '<p class="overview-label">Checklist items</p>' +
+        '<div id="config-tide-checklist-items"></div>' +
+        '<div class="config-tide-add">' +
+        '<input type="text" id="config-tide-new-label" placeholder="Short label" />' +
+        '<textarea id="config-tide-new-prompt" placeholder="Prompt for the agent (what to check). Defaults to label if empty." rows="2"></textarea>' +
+        '<button type="button" id="config-tide-checklist-add">Add item</button>' +
+        '</div>' +
+        '<p class="overview-label">Last run</p>' +
+        '<pre id="config-tide-checklist-last" class="config-json-editable config-tide-last-run">—</pre>' +
+        '</div>' +
         '</div></details>' +
         '<details class="config-section"><summary>Agent messaging</summary><div class="config-section-body">' +
         '<div class="field"><label for="config-agent-allow">Allowed agents (one per line)</label><textarea id="config-agent-allow" rows="3">' + escapeHtml(allowLines) + '</textarea></div>' +
@@ -1392,6 +1439,7 @@ async function fetchCrons() {
       if (!container) return;
       container.innerHTML = html;
       wireConfigUiActions();
+      if (tideChecklistCache) renderTideChecklistItems(tideChecklistCache.items || []);
     }
 
     function wireConfigUiActions() {
@@ -1424,6 +1472,7 @@ async function fetchCrons() {
           renderConfigUi(merged);
         });
       });
+      wireConfigTideActions();
     }
 
     function collectConfigFromUi(base) {
@@ -1534,6 +1583,22 @@ async function fetchCrons() {
       if (tideStart) config.tide.inactiveStart = tideStart.value.trim() || '23:00';
       if (tideEnd) config.tide.inactiveEnd = tideEnd.value.trim() || '06:00';
       if (tideJid) config.tide.jid = tideJid.value.trim();
+      var checklistEnabled = document.getElementById('config-tide-checklist-enabled');
+      var trigRestart = document.getElementById('config-tide-trigger-restart');
+      var trigCycle = document.getElementById('config-tide-trigger-cycle');
+      var trigFollow = document.getElementById('config-tide-trigger-followup');
+      if (checklistEnabled || trigRestart || trigCycle || trigFollow || tideChecklistCache) {
+        config.tide.checklist = config.tide.checklist || {};
+        if (checklistEnabled) config.tide.checklist.enabled = !!checklistEnabled.checked;
+        config.tide.checklist.triggers = {
+          onRestart: !!(trigRestart && trigRestart.checked),
+          onCycle: !!(trigCycle && trigCycle.checked),
+          onFollowUp: !!(trigFollow && trigFollow.checked),
+        };
+        if (tideChecklistCache && Array.isArray(tideChecklistCache.items)) {
+          config.tide.checklist.items = tideChecklistCache.items;
+        }
+      }
 
       var allowEl = document.getElementById('config-agent-allow');
       config.agentMessaging = config.agentMessaging || {};
@@ -1660,6 +1725,7 @@ async function fetchCrons() {
         configSkillsList = results[1].skills || [];
         document.getElementById('full-config').value = JSON.stringify(configCache, null, 2);
         renderConfigUi(configCache);
+        await fetchTideChecklistForConfig();
         applyConfigViewMode();
         errEl.style.display = 'none';
         errEl.textContent = '';
@@ -1702,6 +1768,7 @@ async function fetchCrons() {
         configCache = d;
         textarea.value = JSON.stringify(d, null, 2);
         renderConfigUi(d);
+        await fetchTideChecklistForConfig();
         savedEl.style.display = 'inline';
         setTimeout(function () { savedEl.style.display = 'none'; }, 2500);
       } catch (e) {

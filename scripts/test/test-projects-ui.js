@@ -51,9 +51,10 @@ const checks = [
       team2Css.includes('.mc2-mongo-map'),
   },
   {
-    name: 'Connectors API and project patch support',
-    ok: serverJs.includes('/api/connectors/status') &&
-      serverJs.includes('connectors: connectors !== undefined'),
+    name: 'Standalone Projects nav/page removed (Team hosts projects)',
+    ok: !readFileSync(join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="projects"') &&
+      !mc2Projects.includes('Open full editor') &&
+      readFileSync(join(publicDir, 'assets/js/01-core-router-status.js'), 'utf8').includes("name === 'projects'"),
   },
 ];
 

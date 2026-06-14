@@ -88,8 +88,9 @@ const checks = [
   },
   {
     name: 'nav partial exists with all main tabs',
-    ok: ['home', 'memory', 'crons', 'skills', 'team', 'team2', 'projects'].every((p) =>
-      fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="' + p + '"')),
+    ok: ['home', 'memory', 'crons', 'skills', 'team'].every((p) =>
+      fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="' + p + '"')) &&
+      !fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="projects"'),
   },
   {
     name: 'wireClick and wireEl helpers exist',
@@ -245,15 +246,14 @@ const checks = [
       !fullHtml.includes('data-mc-nav="agents">View all blockers'),
   },
   {
-    name: 'config page has UI/JSON toggle and sectioned editor',
+    name: 'config page has UI/JSON toggle and tide checklist in Tide section',
     ok: fullHtml.includes('data-config-view="ui"') &&
-      fullHtml.includes('data-config-view="json"') &&
       fullHtml.includes('id="config-ui-sections"') &&
-      fullHtml.includes('id="config-json-panel"') &&
       script.includes('function renderConfigUi(') &&
-      script.includes('function collectConfigFromUi(') &&
-      script.includes('name="config-llm-priority"') &&
-      script.includes("localStorage.setItem('pasture-config-view'"),
+      script.includes('id="config-tide-checklist-items"') &&
+      script.includes('config-tide-checklist-run') &&
+      script.includes('fetchTideChecklistForConfig') &&
+      !fs.readFileSync(path.join(publicDir, 'assets/partials/nav.html'), 'utf8').includes('data-page="tide"'),
   },
   {
     name: 'chat bundle guards mission-control forward refs before script 04 loads (click handler regression)',

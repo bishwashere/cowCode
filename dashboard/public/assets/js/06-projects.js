@@ -10,19 +10,8 @@
         return fetch('/api' + path, Object.assign({ headers: projHeaders() }, opts));
       }
 
-      function showProjMain() {
-        document.getElementById('proj-main').style.display = 'block';
-        loadProjects();
-      }
-
-      async function initProjectsPage() {
-        showProjMain();
-      }
       function activeProjectsCanvas() {
-        var mc2View = document.getElementById('mc2-view-projects');
-        var mc2Canvas = document.getElementById('mc2-proj-canvas');
-        if (mc2View && !mc2View.hidden && mc2Canvas) return mc2Canvas;
-        return document.getElementById('proj-canvas');
+        return document.getElementById('mc2-proj-canvas');
       }
 
       async function loadProjects(canvas) {
@@ -718,16 +707,6 @@
         if (typeof renderMc2Connectors === 'function') renderMc2Connectors(String(proj.id));
       }
 
-      document.getElementById('proj-add-btn').addEventListener('click', function () {
-        addProjectFromForm('proj-new-name', 'proj-new-url', 'proj-new-desc', 'proj-canvas');
-      });
-      function projNewEnterSubmit(e) {
-        if (e.key === 'Enter') document.getElementById('proj-add-btn').click();
-      }
-      document.getElementById('proj-new-name').addEventListener('keydown', projNewEnterSubmit);
-      document.getElementById('proj-new-url').addEventListener('keydown', projNewEnterSubmit);
-      document.getElementById('proj-new-desc').addEventListener('keydown', projNewEnterSubmit);
-
       window.pastureProjectsApi = {
         fetch: projFetch,
         loadProjects: loadProjects,
@@ -744,12 +723,4 @@
       function esc(s) {
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
       }
-
-      // Init when Projects page is opened
-      var origSetPage = window._projSetPageHooked;
-      document.querySelector('nav a[data-page="projects"]').addEventListener('click', function () {
-        initProjectsPage();
-      });
-      // Also init if navigated directly
-      if (location.pathname === '/projects' || location.pathname === '/projects/') initProjectsPage();
     })();
