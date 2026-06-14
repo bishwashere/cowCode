@@ -2137,6 +2137,16 @@
       gap: 0.4rem;
       margin: 0.65rem 0 0.35rem;
     }
+    .team-user-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin-top: 0.35rem;
+    }
+    .team-user-input-row .team-user-input-composer {
+      flex: 1;
+      min-width: 0;
+    }
     .team-user-input-composer {
       position: relative;
       min-height: 4.5rem;
@@ -2236,19 +2246,12 @@
     @keyframes team-voice-spin {
       to { transform: rotate(360deg); }
     }
-    .team-input-label-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.35rem;
-    }
-    .team-input-label-row label { margin-bottom: 0; }
     .team-mic-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 2rem;
-      height: 2rem;
+      width: 2.75rem;
+      height: 2.75rem;
       border-radius: 50%;
       border: none;
       cursor: pointer;
@@ -2257,15 +2260,16 @@
       color: #fff;
       transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(109, 77, 242, 0.28);
     }
-    .team-mic-btn:hover { background: #5a3fd4; box-shadow: 0 0 0 3px rgba(109,77,242,0.25); }
+    .team-mic-btn:hover { background: #5a3fd4; box-shadow: 0 4px 12px rgba(109,77,242,0.35); }
     .team-mic-btn--recording {
       background: var(--accent, #6d4df2);
-      box-shadow: 0 4px 14px rgba(109, 77, 242, 0.3);
+      box-shadow: 0 4px 14px rgba(109, 77, 242, 0.35);
     }
     .team-mic-btn--recording:hover { background: #5a3fd4; }
     .team-mic-btn--transcribing { opacity: 0.6; cursor: not-allowed; }
-    .team-mic-btn svg { width: 1rem; height: 1rem; display: block; }
+    .team-mic-btn svg { width: 1.15rem; height: 1.15rem; display: block; }
     .agent-edit-basics {
       display: grid;
       grid-template-columns: 1fr 1.4fr;
