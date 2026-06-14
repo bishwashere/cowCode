@@ -1400,7 +1400,7 @@ async function main() {
           ...(testAgentId ? { agentIdOverride: testAgentId } : {}),
         }) || runRet;
       } catch (err) {
-        lastSent.set(testJid, 'Moo — ' + (err && err.message ? err.message : String(err)));
+        lastSent.set(testJid, (err && err.message ? err.message : String(err)));
       }
       const reply = lastSent.get(testJid);
       if (reply != null && (testMsg2 ? (i === 1) : true)) {
@@ -1705,14 +1705,14 @@ async function main() {
           forceVoiceReply: userSentVoice,
         }).catch((err) => {
           console.error('Background agent error:', err.message);
-          const errorText = '[Pasture] Moo — ' + toUserMessage(err);
+          const errorText = '[Pasture] ' + toUserMessage(err);
           sock.sendMessage(jid, { text: errorText }).catch(() => {
             pendingReplies.push({ jid, text: errorText });
           });
         });
       } catch (err) {
         console.error('LLM error:', err.message);
-        const errorText = '[Pasture] Moo — ' + toUserMessage(err);
+        const errorText = '[Pasture] ' + toUserMessage(err);
         try {
           await sock.sendMessage(jid, { text: errorText });
         } catch (_) {

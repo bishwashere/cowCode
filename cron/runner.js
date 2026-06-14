@@ -177,7 +177,7 @@ export async function runJob({ job, sock, selfJid }) {
     }
   }
   try {
-    await sendCronReply(jid, `[Pasture] Moo — reminder "${job.name}" didn't go through. ${toUserMessage(lastErr)}`);
+    await sendCronReply(jid, `[Pasture] Reminder "${job.name}" didn't go through. ${toUserMessage(lastErr)}`);
   } catch (_) {}
 }
 
