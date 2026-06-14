@@ -399,9 +399,11 @@ async function main() {
   // Persistent autonomous missions loop (agent background work above single turns).
   try {
     const cfg = loadConfig();
-    const loopMs = Number(cfg?.missions?.loopMs) || 15 * 60_000;
+    const loopMs = Number(cfg?.missions?.loopMs) || 45 * 60_000;
+    const curiosityIntervalMs = Number(cfg?.missions?.curiosityIntervalMs) || 150 * 60_000;
     startMissionEngine({
       loopMs,
+      curiosityIntervalMs,
       runMissionTurn: async (mission, prompt) =>
         runInternalAgentTurn({
           targetAgentId: mission?.ownerAgentId || DEFAULT_AGENT_ID,
