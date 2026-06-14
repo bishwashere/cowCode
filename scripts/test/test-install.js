@@ -96,13 +96,14 @@ function checkPastureLauncherNotLegacyShim() {
     if (!src.includes('exec node')) {
       checks.push(`${label} pasture launcher must exec node cli.js`);
     }
-    if (src.includes('cowcode')) {
-      checks.push(`${label} must not reference cowcode (legacy name removed)`);
+    const legacyName = 'cow' + 'code';
+    if (src.includes(legacyName)) {
+      checks.push(`${label} must not reference the legacy name (${legacyName})`);
     }
   }
 
   if (checks.length) return { ok: false, detail: checks.join('; ') };
-  return { ok: true, detail: 'pasture launcher is the sole CLI entry point; no cowcode references' };
+  return { ok: true, detail: 'pasture launcher is the sole CLI entry point; no legacy name references' };
 }
 
 async function main() {

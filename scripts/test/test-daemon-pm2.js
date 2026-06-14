@@ -42,8 +42,8 @@ function checkWindowsPs1(filename, opts) {
   }
   const required = [
     'Encode-GitHubBranchPath',
-    'Get-CowcodeRequestHeaders',
-    'Save-CowcodeDownload',
+    'Get-PastureRequestHeaders',
+    'Save-PastureDownload',
     'Read-PackageJsonVersion',
     'ConvertFrom-Json',
     'Cache-Control',
@@ -70,22 +70,22 @@ function checkWindowsPs1(filename, opts) {
   if (opts.exitHelper && !src.includes(opts.exitHelper)) {
     return { ok: false, detail: `${filename} must define ${opts.exitHelper}` };
   }
-  if (opts.offerNode && !src.includes('Offer-CowcodeNodeJs')) {
+  if (opts.offerNode && !src.includes('Offer-PastureNodeJs')) {
     return { ok: false, detail: `${filename} must offer Node.js install help` };
   }
-  if (opts.pm2Help && !src.includes('Ensure-CowcodePm2')) {
+  if (opts.pm2Help && !src.includes('Ensure-PasturePm2')) {
     return { ok: false, detail: `${filename} must offer pm2 install help` };
   }
-  if (opts.pm2Help && !src.includes('Show-CowcodePostInstallHelp')) {
+  if (opts.pm2Help && !src.includes('Show-PasturePostInstallHelp')) {
     return { ok: false, detail: `${filename} must show post-install commands` };
   }
-  if (opts.pm2Help && !src.includes('Enable-CowcodePm2AutoRestart')) {
+  if (opts.pm2Help && !src.includes('Enable-PasturePm2AutoRestart')) {
     return { ok: false, detail: `${filename} must configure pm2 auto-start` };
   }
-  if (opts.npmCmd && !src.includes('Get-CowcodeToolPath')) {
+  if (opts.npmCmd && !src.includes('Get-PastureToolPath')) {
     return { ok: false, detail: `${filename} must use npm.cmd (execution policy safe)` };
   }
-  if (opts.npmCmd && !src.includes('Test-CowcodeSupportedNode')) {
+  if (opts.npmCmd && !src.includes('Test-PastureSupportedNode')) {
     return { ok: false, detail: `${filename} must reject unsupported Node versions` };
   }
   if (opts.pastureRepo && !src.includes('bishwashere/pastureprotocol')) {

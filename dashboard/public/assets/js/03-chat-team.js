@@ -5076,6 +5076,8 @@
       });
     })();
     // ── End voice input ────────────────────────────────────────────────────
+
+    async function fetchSuggestedTasksSnapshot() {
       try {
         var r = await fetch(API + '/api/suggestedTasks');
         if (!r.ok) return;

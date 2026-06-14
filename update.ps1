@@ -262,7 +262,6 @@ $Tarball = "https://github.com/bishwashere/pastureprotocol/archive/refs/heads/$B
 
 $Root = if ($env:PASTURE_ROOT) { $env:PASTURE_ROOT } elseif ($env:PASTURE_INSTALL_DIR) { $env:PASTURE_INSTALL_DIR } else { $PSScriptRoot }
 $StateDir = if ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } elseif ($env:PASTURE_STATE_DIR) { $env:PASTURE_STATE_DIR } else { Join-Path $env:USERPROFILE ".pasture" }
-$LegacyState = Join-Path $env:USERPROFILE ".cowcode"
 
 if (-not (Test-Path (Join-Path $Root "package.json")) -or -not (Test-Path (Join-Path $Root "index.js"))) {
     Write-Host ""
